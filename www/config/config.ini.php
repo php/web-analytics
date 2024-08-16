@@ -9,7 +9,7 @@ charset = "utf8mb4"
 
 [General]
 noreply_email_address = "noreply@php.net"
-salt = trim(file_get_contents("/local/this-box/matomo.env.salt"));
+salt = "PLACEHOLDERFORSALT-REPLACEDONDEPLOY";
 trusted_hosts[] = "analytics.php.net"
 
 [mail]
