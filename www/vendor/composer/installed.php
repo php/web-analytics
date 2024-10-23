@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => 'matomo/matomo',
-        'pretty_version' => '5.1.1',
-        'version' => '5.1.1.0',
-        'reference' => '11af37b46f21609a1c472e193ba4971a8e6cd14a',
+        'pretty_version' => '5.1.2',
+        'version' => '5.1.2.0',
+        'reference' => 'd124e1c8f10d4d1d754b3facc8f4718fe9337f8f',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -103,9 +103,9 @@
             'dev_requirement' => false,
         ),
         'matomo/matomo' => array(
-            'pretty_version' => '5.1.1',
-            'version' => '5.1.1.0',
-            'reference' => '11af37b46f21609a1c472e193ba4971a8e6cd14a',
+            'pretty_version' => '5.1.2',
+            'version' => '5.1.2.0',
+            'reference' => 'd124e1c8f10d4d1d754b3facc8f4718fe9337f8f',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
