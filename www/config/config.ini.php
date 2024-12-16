@@ -12,6 +12,11 @@ noreply_email_address = "noreply@php.net"
 salt = "PLACEHOLDERFORSALT-REPLACEDONDEPLOY";
 trusted_hosts[] = "analytics.php.net"
 
+[log]
+log_level = "INFO"
+log_writers[] = "file"
+logger_file_path = "/var/log/matomo.log"
+
 [mail]
 transport = "smtp"
 host = "mailout.php.net"
