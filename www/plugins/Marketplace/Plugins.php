@@ -11,6 +11,7 @@ namespace Piwik\Plugins\Marketplace;
 
 use Piwik\Container\StaticContainer;
 use Piwik\Date;
+use Piwik\NumberFormatter;
 use Piwik\ProfessionalServices\Advertising;
 use Piwik\Plugin\Dependency as PluginDependency;
 use Piwik\Plugin;
@@ -43,6 +44,11 @@ class Plugins
     private $pluginManager;
 
     /**
+     * @var NumberFormatter
+     */
+    private $numberFormatter;
+
+    /**
      * @internal for tests only
      * @var array
      */
@@ -56,6 +62,7 @@ class Plugins
         $this->consumer = $consumer;
         $this->advertising = $advertising;
         $this->pluginManager = Plugin\Manager::getInstance();
+        $this->numberFormatter = NumberFormatter::getInstance();
     }
 
     public function getPluginInfo($pluginName)
@@ -178,9 +185,9 @@ class Plugins
      */
     public function getPluginsHavingUpdate(): array
     {
-        $skipPluginUpdateCheck = StaticContainer::get('dev.disable_plugin_update_checks');
-        if ($skipPluginUpdateCheck) {
-            return [];
+        $forcedResult = StaticContainer::get('dev.forced_plugin_update_result');
+        if ($forcedResult !== null) {
+            return $forcedResult;
         }
 
         $this->pluginManager->loadAllPluginsAndGetTheirInfo();
@@ -296,7 +303,15 @@ class Plugins
             }
         }
 
+        $haDownloadLink = false;
+        if (!empty($plugin['versions'])) {
+            $latestVersion = end($plugin['versions']);
+            $hasDownloadLink = !empty($latestVersion['download']);
+        }
+        $plugin['hasDownloadLink'] = $hasDownloadLink;
+
         $plugin = $this->addMissingRequirements($plugin);
+        $plugin = $this->addConsumerLicenseStatus($plugin);
 
         $plugin['isEligibleForFreeTrial'] =
             $plugin['canBePurchased']
@@ -432,16 +447,16 @@ class Plugins
      */
     private function prettifyNumberOfDownloads(&$plugin): void
     {
-        $num = $nice = $plugin['numDownloads'] ?? 0;
+        $num = $plugin['numDownloads'] ?? 0;
 
-        if (($num >= 1000) && ($num < 100000)) {
-            $nice = round($num / 1000, 1, PHP_ROUND_HALF_DOWN) . 'k';
-        } elseif (($num >= 100000) && ($num < 1000000)) {
-            $nice = floor($num / 1000) . 'k';
-        } elseif ($num >= 1000000) {
-            $nice = floor($num / 1000000) . 'm';
-        }
+        $plugin['numDownloadsPretty'] = $this->numberFormatter->formatNumberCompact($num);
+    }
 
-        $plugin['numDownloadsPretty'] = $nice;
+    private function addConsumerLicenseStatus($plugin): array
+    {
+        $consumerPluginLicenseInfo = $this->consumer->getConsumerPluginLicenseStatus();
+        $plugin['licenseStatus'] = $consumerPluginLicenseInfo[$plugin['name']] ?? '';
+
+        return $plugin;
     }
 }

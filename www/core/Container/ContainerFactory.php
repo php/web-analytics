@@ -119,8 +119,20 @@ class ContainerFactory
             $builder->addDefinitions($file);
         }
 
+        $file = sprintf(
+            '%s/config/environment/%s-%s.php',
+            PIWIK_USER_PATH,
+            $environment,
+            strtolower($this->getDatabaseSchema())
+        );
+
+        if (file_exists($file)) {
+            $builder->addDefinitions($file);
+        }
+
         // add plugin environment configs
         $plugins = $this->pluginList->getActivatedPlugins();
+        $plugins = array_unique(array_merge($plugins, Manager::getAlwaysActivatedPlugins()));
 
         if ($this->shouldSortPlugins()) {
             $plugins = $this->sortPlugins($plugins);
@@ -139,6 +151,7 @@ class ContainerFactory
     private function addPluginConfigs(ContainerBuilder $builder)
     {
         $plugins = $this->pluginList->getActivatedPlugins();
+        $plugins = array_unique(array_merge($plugins, Manager::getAlwaysActivatedPlugins()));
 
         if ($this->shouldSortPlugins()) {
             $plugins = $this->sortPlugins($plugins);
@@ -177,5 +190,11 @@ class ContainerFactory
     {
         $section = $this->settings->getSection('Development');
         return (bool) @$section['enabled']; // TODO: code redundancy w/ Development. hopefully ok for now.
+    }
+
+    private function getDatabaseSchema(): string
+    {
+        $section = $this->settings->getSection('database');
+        return $section['schema'] ?? 'Mysql';
     }
 }

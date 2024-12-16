@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
@@ -22,7 +23,7 @@ use Piwik\Plugins\TagManager\Validators\CustomRequestProcessing;
 
 class MatomoConfigurationVariable extends BaseVariable
 {
-    const ID = 'MatomoConfiguration';
+    public const ID = 'MatomoConfiguration';
 
     public function getId()
     {
@@ -75,7 +76,8 @@ class MatomoConfigurationVariable extends BaseVariable
             $this->makeSetting('idSite', $idSite, FieldConfig::TYPE_STRING, function (FieldConfig $field) use ($matomoUrl, $url) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoIDSiteTitle');
                 $field->customFieldComponent = self::FIELD_VARIABLE_COMPONENT;
-                $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoIDSiteDescription');;
+                $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoIDSiteDescription');
+                ;
                 $field->validators[] = new NotEmpty();
                 $field->validators[] = new CharacterLength(0, 500);
                 $field->validate = function ($value) use ($matomoUrl, $url) {
@@ -110,6 +112,7 @@ class MatomoConfigurationVariable extends BaseVariable
             $this->makeSetting('crossDomainLinkingTimeout', '180', FieldConfig::TYPE_INT, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoCrossDomainLinkingTimeoutTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoCrossDomainLinkingTimeoutDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoCrossDomainLinkingTimeoutPlaceholder')];
                 $field->condition = 'enableCrossDomainLinking';
                 $field->validators[] = new NumberRange($min = 1);
             }),
@@ -133,6 +136,7 @@ class MatomoConfigurationVariable extends BaseVariable
             $this->makeSetting('heartBeatTime', '15', FieldConfig::TYPE_INT, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoHeartBeatTimeTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoHeartBeatTimeDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoHeartBeatTimePlaceholder')];
                 $field->condition = 'enableHeartBeatTimer';
                 $field->validators[] = new NumberRange($min = 5);
             }),
@@ -143,6 +147,10 @@ class MatomoConfigurationVariable extends BaseVariable
             $this->makeSetting('trackVisibleContentImpressions', false, FieldConfig::TYPE_BOOL, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoTrackVisibleContentImpressionsTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoTrackVisibleContentImpressionsDescription');
+            }),
+            $this->makeSetting('trackBots', false, FieldConfig::TYPE_BOOL, function (FieldConfig $field) {
+                $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoTrackBotsTitle');
+                $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoTrackBotsDescription');
             }),
             $this->makeSetting('disableCookies', false, FieldConfig::TYPE_BOOL, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoDisableCookiesTitle');
@@ -167,18 +175,21 @@ class MatomoConfigurationVariable extends BaseVariable
             $this->makeSetting('customCookieTimeOut', '393', FieldConfig::TYPE_INT, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoVisitorCookieTimeOutTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoVisitorCookieTimeOutDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoVisitorCookieTimeOutPlaceholder')];
                 $field->condition = 'customCookieTimeOutEnable && !disableCookies';
                 $field->validators[] = new NumberRange($min = 1);
             }),
             $this->makeSetting('referralCookieTimeOut', '182', FieldConfig::TYPE_INT, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoReferralCookieTimeOutTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoReferralCookieTimeOutDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoReferralCookieTimeOutPlaceholder')];
                 $field->condition = 'customCookieTimeOutEnable && !disableCookies';
                 $field->validators[] = new NumberRange($min = 1);
             }),
             $this->makeSetting('sessionCookieTimeOut', '30', FieldConfig::TYPE_INT, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoSessionCookieTimeOutTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoSessionCookieTimeOutDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoSessionCookieTimeOutPlaceholder')];
                 $field->condition = 'customCookieTimeOutEnable && !disableCookies';
                 $field->validators[] = new NumberRange($min = 1);
             }),
@@ -198,6 +209,7 @@ class MatomoConfigurationVariable extends BaseVariable
             $this->makeSetting('cookieNamePrefix', '_pk_', FieldConfig::TYPE_STRING, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoCookieNamePrefixTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoCookieNamePrefixDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoCookieNamePrefixPlaceholder')];
                 $field->validators[] = new CharacterLength(1, 20);
                 $field->transform = function ($value) {
                     return trim($value);
@@ -206,6 +218,7 @@ class MatomoConfigurationVariable extends BaseVariable
             $this->makeSetting('cookiePath', '', FieldConfig::TYPE_STRING, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoCookiePathTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoCookiePathDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoCookiePathPlaceholder')];
                 $field->validators[] = new CharacterLength(0, 500);
                 $field->transform = function ($value) {
                     return trim($value);
@@ -224,8 +237,20 @@ class MatomoConfigurationVariable extends BaseVariable
             $this->makeSetting('disableBrowserFeatureDetection', false, FieldConfig::TYPE_BOOL, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoDisableBrowserFeatureDetectionTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoDisableBrowserFeatureDetectionDescription');
-                $field->inlineHelp = Piwik::translate('TagManager_MatomoConfigurationMatomoDisableBrowserFeatureDetectionInLineHelp',
-                    ['<br><strong>', '<a href="' . Url::addCampaignParametersToMatomoLink('https://matomo.org/faq/how-to/how-do-i-disable-browser-feature-detection-completely/', null, null, 'App.TagManager.getParameters') . '" target="_blank" rel="noreferrer noopener">', '</a>', '</strong>']);
+                $field->inlineHelp = Piwik::translate(
+                    'TagManager_MatomoConfigurationMatomoDisableBrowserFeatureDetectionInLineHelp',
+                    [
+                        '<br><strong>',
+                        '<a href="' . Url::addCampaignParametersToMatomoLink(
+                            'https://matomo.org/faq/how-to/how-do-i-disable-browser-feature-detection-completely/',
+                            null,
+                            null,
+                            'App.TagManager.getParameters'
+                        ) . '" target="_blank" rel="noreferrer noopener">',
+                        '</a>',
+                        '</strong>'
+                    ]
+                );
             }),
             $this->makeSetting('disableCampaignParameters', false, FieldConfig::TYPE_BOOL, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoDisableCampaignParametersTitle');
@@ -340,6 +365,7 @@ class MatomoConfigurationVariable extends BaseVariable
             $matomoUrl = $this->makeSetting('jsEndpointCustom', 'custom.js', FieldConfig::TYPE_STRING, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoJsEndpointCustomTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoJsEndpointCustomDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoJsEndpointCustomPlaceholder')];
                 $field->condition = '!bundleTracker && jsEndpoint == "custom"';
                 $field->transform = function ($value) {
                     return trim($value);
@@ -361,6 +387,7 @@ class MatomoConfigurationVariable extends BaseVariable
             $matomoUrl = $this->makeSetting('trackingEndpointCustom', 'custom.php', FieldConfig::TYPE_STRING, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoTrackingEndpointCustomTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoTrackingEndpointCustomDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoTrackingEndpointCustomPlaceholder')];
                 $field->condition = 'trackingEndpoint == "custom"';
                 $field->transform = function ($value) {
                     return trim($value);
@@ -384,12 +411,15 @@ class MatomoConfigurationVariable extends BaseVariable
                 );
 
                 $field->condition = 'forceRequestMethod';
-                $field->inlineHelp = Piwik::translate('TagManager_MatomoConfigurationMatomoRequestMethodInlineHelp',
-                    ['<a href="' . Url::addCampaignParametersToMatomoLink('https://matomo.org/faq/how-to/faq_18694/') . '" target="_blank" rel="noreferrer noopener">', '</a>', '<br>']);
+                $field->inlineHelp = Piwik::translate(
+                    'TagManager_MatomoConfigurationMatomoRequestMethodInlineHelp',
+                    ['<a href="' . Url::addCampaignParametersToMatomoLink('https://matomo.org/faq/how-to/faq_18694/') . '" target="_blank" rel="noreferrer noopener">', '</a>', '<br>']
+                );
             }),
             $matomoUrl = $this->makeSetting('requestContentType', 'application/x-www-form-urlencoded; charset=UTF-8', FieldConfig::TYPE_STRING, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_MatomoConfigurationMatomoRequestContentTypeTitle');
                 $field->description = Piwik::translate('TagManager_MatomoConfigurationMatomoRequestContentTypeDescription');
+                $field->uiControlAttributes = ['placeholder' => Piwik::translate('TagManager_MatomoConfigurationMatomoRequestContentTypePlaceholder')];
                 $field->condition = 'forceRequestMethod && requestMethod == "POST"';
                 $field->transform = function ($value) {
                     return trim($value);
@@ -446,5 +476,4 @@ class MatomoConfigurationVariable extends BaseVariable
 
         return array_merge(array_merge($firstPart, $pluginParameters), $secondPart);
     }
-
 }

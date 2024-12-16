@@ -1,6 +1,7 @@
 {
     "MobileMessaging": {
         "Available_Credits": "Verfügbares Guthaben: %1$s",
+        "ConfirmRemovePhoneNumber": "Sind Sie sicher, dass Sie die Telefonnummer %1$s entfernen möchten?",
         "Exception_UnknownProvider": "Der Anbietername '%1$s' ist unbekannt. Versuchen Sie stattdessen einen der folgenden: %2$s.",
         "MobileReport_AdditionalPhoneNumbers": "Sie können weitere Telefonnummern hinzufügen auf",
         "MobileReport_MobileMessagingSettingsLink": "der Mobile Messaging Einstellungsseite",
@@ -25,6 +26,7 @@
         "Settings_LetUsersManageAPICredential_No_Help": "Alle Benutzer können SMS Berichte empfangen und nutzen Ihr Kontoguthaben.",
         "Settings_LetUsersManageAPICredential_Yes_Help": "Jeder Benutzer kann seinen eigenes SMS API Konto erstellen und Ihr Kontoguthaben nicht nutzen.",
         "Settings_ManagePhoneNumbers": "Telefonnummern verwalten",
+        "Settings_NewVerificationCodeSent": "Ein neuer Bestätigungscode wurde gesendet.",
         "Settings_PhoneActivated": "Telefonnummer wurde überprüft! Sie können nun SMS mit Ihren Statistiken empfangen.",
         "Settings_PhoneNumber": "Telefonnummer",
         "Settings_PhoneNumbers_Add": "Neue Telefonnummer hinzufügen",
@@ -32,6 +34,7 @@
         "Settings_PhoneNumbers_Help": "Bevor Sie SMS (Textnachrichten) auf dem Telefon empfangen können, müssen Sie unten die Telefonnummer eingeben.",
         "Settings_PhoneNumbers_HelpAdd": "Wenn Sie auf \"Hinzufügen\" klicken wird eine SMS mit einem Code ans Telefon versendet. Der Benutzer, der den Code empfängt, sollte sich dann in Matomo einloggen, auf Einstellungen und danach auf Mobile Messaging klicken. Nach dem Eingeben des Codes kann der Benutzer Textberichte auf diesem Telefon empfangen.",
         "Settings_PleaseSignUp": "Um SMS Berichte zu erstellen und Textnachrichten mit Ihren Statistiken auf Ihrem Mobiltelefon empfangen zu können, registrieren Sie sich unterhalb für die SMS API.",
+        "Settings_ResendVerification": "Bestätigungscode erneut senden",
         "Settings_SMSAPIAccount": "SMS-API Zugang verwalten",
         "Settings_SMSProvider": "SMS-Anbieter",
         "Settings_SelectCountry": "Land auswählen",

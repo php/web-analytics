@@ -1,15 +1,18 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
  * @link https://matomo.org
  * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
+
 namespace Piwik\Plugins\TagManager\Context;
 
 use Piwik\Common;
 use Piwik\Container\StaticContainer;
 use Piwik\Plugins\TagManager\Context\Storage\StorageInterface;
+use Piwik\Plugins\TagManager\Dao\TagsDao;
 use Piwik\Plugins\TagManager\Exception\EntityRecursionException;
 use Piwik\Plugins\TagManager\Model\Container;
 use Piwik\Plugins\TagManager\Model\Environment;
@@ -22,7 +25,6 @@ use Piwik\Settings\FieldConfig;
 
 abstract class BaseContext
 {
-
     /**
      * @var VariablesProvider
      */
@@ -85,6 +87,7 @@ abstract class BaseContext
 
         $idSite = $container['idsite'];
         $idContainer = $container['idcontainer'];
+        $isTagFireLimitAllowedInPreviewMode = $container['isTagFireLimitAllowedInPreviewMode'] ? 1 : 0;
         $idContainerVersion = $release['idcontainerversion'];
         $container['idcontainerversion'] = $idContainerVersion;
         $environment = $release['environment'];
@@ -95,6 +98,7 @@ abstract class BaseContext
 
         $containerJs = [
             'id' => $idContainer,
+            'isTagFireLimitAllowedInPreviewMode' => $isTagFireLimitAllowedInPreviewMode,
             'idsite' => $idSite,
             'versionName' => $version['name'],
             'revision' => $version['revision'],
@@ -105,6 +109,9 @@ abstract class BaseContext
         ];
 
         foreach ($this->tagModel->getContainerTags($idSite, $idContainerVersion) as $tag) {
+            if ($tag['status'] !== TagsDao::STATUS_ACTIVE) {
+                continue;
+            }
             $containerJs['tags'][] = [
                 'id' => $tag['idtag'],
                 'type' => $tag['type'],
@@ -168,7 +175,7 @@ abstract class BaseContext
             if (method_exists($variable, 'getDataLayerVariableJs')) {
                 $response['keys'][] = '{{' . $variable->getId() . '}}';
                 $response['values'][] = $variable->getDataLayerVariableJs();
-            } else if (method_exists($variable, 'loadTemplate')) {
+            } elseif (method_exists($variable, 'loadTemplate')) {
                 $response['keys'][] = '{{' . $variable->getId() . '}}';
                 $response['values'][] = '(function(){' . $variable->loadTemplate($context, $variable, true) . '})()';
             }
@@ -187,7 +194,10 @@ abstract class BaseContext
             // eg MatomoConfiguration variable referencing itself in a variable like matomoUrl=https://matomo.org{{MatomoConfiguration}}
             $entries = array_slice($this->nestedVariableCals, -3); // show last 3 entities in error message
             $entries = array_unique($entries);
-            throw new EntityRecursionException('It seems an entity references itself or a recursion is caused in some other way. It may be related due to these entites: "'.implode(',', $entries). '". Please check if the entity references itself maybe or if a recursion might happen in another way.');
+            throw new EntityRecursionException(
+                'It seems an entity references itself or a recursion is caused in some other way. It may be related due to these entites: "'
+                . implode(',', $entries) . '". Please check if the entity references itself maybe or if a recursion might happen in another way.'
+            );
         }
 
         $parameters = $entity['parameters'];
@@ -202,19 +212,23 @@ abstract class BaseContext
                     $parameterTemplateTypes[] = $parameter['name'];
                 }
 
-                if (!empty($parameter['uiControl']) && $parameter['uiControl'] === FieldConfig::UI_CONTROL_MULTI_TUPLE
+                if (
+                    !empty($parameter['uiControl']) && $parameter['uiControl'] === FieldConfig::UI_CONTROL_MULTI_TUPLE
                 ) {
-                    if (!empty($parameter['uiControlAttributes']['field1']['key'])
-                        && Variable::hasFieldConfigVariableParameter($parameter['uiControlAttributes']['field1'])) {
+                    if (
+                        !empty($parameter['uiControlAttributes']['field1']['key'])
+                        && Variable::hasFieldConfigVariableParameter($parameter['uiControlAttributes']['field1'])
+                    ) {
                         $parameterTemplateTypes[] = $parameter['name'] . $keyTemplateTypeSeparator . $parameter['uiControlAttributes']['field1']['key'];
                     }
 
-                    if (!empty($parameter['uiControlAttributes']['field2']['key'])
-                        && Variable::hasFieldConfigVariableParameter($parameter['uiControlAttributes']['field2'])) {
+                    if (
+                        !empty($parameter['uiControlAttributes']['field2']['key'])
+                        && Variable::hasFieldConfigVariableParameter($parameter['uiControlAttributes']['field2'])
+                    ) {
                         $parameterTemplateTypes[] = $parameter['name'] . $keyTemplateTypeSeparator . $parameter['uiControlAttributes']['field2']['key'];
                     }
                 }
-
             }
         }
 
@@ -251,7 +265,8 @@ abstract class BaseContext
         return $vars;
     }
 
-    private function mb_strpos($haystack, $needle, $offset) {
+    private function mb_strpos($haystack, $needle, $offset)
+    {
         if (function_exists('mb_strpos')) {
             return mb_strpos($haystack, $needle, $offset, 'UTF-8');
         }
@@ -259,7 +274,8 @@ abstract class BaseContext
         return strpos($haystack, $needle, $offset);
     }
 
-    private function mb_strrpos($haystack, $needle, $offset) {
+    private function mb_strrpos($haystack, $needle, $offset)
+    {
         if (function_exists('mb_strpos')) {
             return mb_strrpos($haystack, $needle, $offset, 'UTF-8');
         }
@@ -306,11 +322,13 @@ abstract class BaseContext
                 }
 
                 $ignoreLengthOpeningBrackets = 2;
-                $variableName = Common::mb_substr($value, $start + $ignoreLengthOpeningBrackets, $end - ($start+$ignoreLengthOpeningBrackets));
+                $variableName = Common::mb_substr($value, $start + $ignoreLengthOpeningBrackets, $end - ($start + $ignoreLengthOpeningBrackets));
 
                 $trimmedVariableName = trim($variableName);
-                if ($trimmedVariableName
-                    && Common::mb_substr($trimmedVariableName, 0, 1) !==  '{') {    // case when using {{{foobar}}
+                if (
+                    $trimmedVariableName
+                    && Common::mb_substr($trimmedVariableName, 0, 1) !==  '{'
+                ) {    // case when using {{{foobar}}
                     $var = $this->variableToArray($container, $trimmedVariableName);
                     if ($var) {
                         $multiVars[] = $var;
@@ -324,7 +342,6 @@ abstract class BaseContext
                 }
 
                 $pos = $end + $ignoreLengthOpeningBrackets;
-
             } while ($end !== false);
 
             $allStrings = true;
@@ -361,7 +378,7 @@ abstract class BaseContext
     {
         if (is_array($variableNameOrVariable)) {
             $variable = $variableNameOrVariable;
-        } else if (isset($this->variables[$variableNameOrVariable])) {
+        } elseif (isset($this->variables[$variableNameOrVariable])) {
             return $this->variables[$variableNameOrVariable];
         } else {
             $variable = $this->variableModel->findVariableByName($container['idsite'], $container['idcontainerversion'], $variableNameOrVariable);

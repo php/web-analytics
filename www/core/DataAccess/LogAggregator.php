@@ -173,7 +173,7 @@ class LogAggregator
      *
      * @param \Piwik\ArchiveProcessor\Parameters $params
      */
-    public function __construct(Parameters $params, LoggerInterface $logger = null)
+    public function __construct(Parameters $params, ?LoggerInterface $logger = null)
     {
         $this->dateStart = $params->getDateTimeStart();
         $this->dateEnd = $params->getDateTimeEnd();
@@ -307,7 +307,7 @@ class LogAggregator
             // set uncommitted is easily noticeable in the code as it could be missed quite easily otherwise
             // we set uncommitted so we don't make the INSERT INTO... SELECT... locking ... we do not want to lock
             // eg the visits table
-            if (!$transactionLevel->setUncommitted()) {
+            if (!$transactionLevel->setTransactionLevelForNonLockingReads()) {
                 $canSetTransactionLevel = false;
             }
         }
@@ -318,7 +318,7 @@ class LogAggregator
             $all = $readerDb->fetchAll($segmentSelectSql, $segmentSelectBind);
             if (!empty($all)) {
                 // we're not using batchinsert since this would not support the reader DB.
-                $readerDb->query('INSERT INTO ' . $table . ' VALUES (' . implode('),(', array_column($all, 'idvisit')) . ')');
+                $readerDb->query('INSERT IGNORE INTO ' . $table . ' VALUES (' . implode('),(', array_column($all, 'idvisit')) . ')');
             }
             return;
         }
@@ -398,7 +398,9 @@ class LogAggregator
         if (is_array($query) && array_key_exists('sql', $query)) {
             $query['sql'] = DbHelper::addOriginHintToQuery($query['sql'], $this->queryOriginHint, $this->dateStart, $this->dateEnd, $this->sites, $this->segment);
             if (DatabaseConfig::getConfigValue('enable_first_table_join_prefix')) {
-                $query['sql'] = DbHelper::addJoinPrefixHintToQuery($query['sql'], (is_array($from) ? reset($from) : $from));
+                $fromTable = is_array($from) ? reset($from) : $from;
+                $fromTable = is_array($fromTable) ? $fromTable['table'] : $fromTable;
+                $query['sql'] = DbHelper::addJoinPrefixHintToQuery($query['sql'], $fromTable);
             }
         }
 
@@ -1176,6 +1178,8 @@ class LogAggregator
      * @param RankingQuery|bool $rankingQuery
      * @param bool $rankingQueryGenerate if `true`, generates a SQL query / bind array pair and returns it. If false, the
      *                                   ranking query SQL will be immediately executed and the results returned.
+     * @param bool $forceSiteDateIndex Forces the resulting query to use the index_idsite_datetime index. For some
+     * reason, the engine doesn't always use that index automatically. This allows us to make sure that it uses it.
      * @return \Zend_Db_Statement|array
      */
     public function queryConversionsByDimension(
@@ -1184,7 +1188,8 @@ class LogAggregator
         $additionalSelects = array(),
         $extraFrom = [],
         $rankingQuery = false,
-        $rankingQueryGenerate = false
+        $rankingQueryGenerate = false,
+        $forceSiteDateIndex = false
     ) {
         $dimensions = array_merge(array(self::IDGOAL_FIELD), $dimensions);
         $tableName  = self::LOG_CONVERSION_TABLE;
@@ -1192,7 +1197,8 @@ class LogAggregator
 
         $select = $this->getSelectStatement($dimensions, $tableName, $additionalSelects, $availableMetrics);
 
-        $from    = array_merge([$tableName], $extraFrom);
+        $primaryFrom = !$forceSiteDateIndex ? [$tableName] : [['table' => $tableName, 'useIndex' => 'index_idsite_datetime']];
+        $from    = array_merge($primaryFrom, $extraFrom);
         $where   = $this->getWhereStatement($tableName, self::CONVERSION_DATETIME_FIELD, $where);
         $groupBy = $this->getGroupByStatement($dimensions, $tableName);
         $orderBy = false;
@@ -1236,9 +1242,9 @@ class LogAggregator
             " . sprintf("ROUND(SUM(1 / log_conversion.pageviews_before * log_conversion.revenue_tax),2) AS `%d`,", Metrics::INDEX_GOAL_ECOMMERCE_REVENUE_TAX) . "
             " . sprintf("ROUND(SUM(1 / log_conversion.pageviews_before * log_conversion.revenue_shipping),2) AS `%d`,", Metrics::INDEX_GOAL_ECOMMERCE_REVENUE_SHIPPING) . "
             " . sprintf("ROUND(SUM(1 / log_conversion.pageviews_before * log_conversion.revenue_discount),2) AS `%d`,", Metrics::INDEX_GOAL_ECOMMERCE_REVENUE_DISCOUNT) . "
-            " . sprintf("SUM(1 / log_conversion.pageviews_before * log_conversion.items) AS `%d`,", Metrics::INDEX_GOAL_ECOMMERCE_ITEMS) . "
+            " . sprintf("SUM(ROUND(1 / log_conversion.pageviews_before * log_conversion.items, 4)) AS `%d`,", Metrics::INDEX_GOAL_ECOMMERCE_ITEMS) . "
             " . sprintf("log_conversion.pageviews_before AS `%d`,", Metrics::INDEX_GOAL_NB_PAGES_UNIQ_BEFORE) . "
-            " . sprintf("SUM(1 / log_conversion.pageviews_before) AS `%d`,", Metrics::INDEX_GOAL_NB_CONVERSIONS_ATTRIB) . "
+            " . sprintf("SUM(ROUND(1 / log_conversion.pageviews_before, 4)) AS `%d`,", Metrics::INDEX_GOAL_NB_CONVERSIONS_ATTRIB) . "
             " . sprintf("COUNT(*) AS `%d`,", Metrics::INDEX_GOAL_NB_CONVERSIONS_PAGE_UNIQ) . "
             " . sprintf("ROUND(SUM(1 / log_conversion.pageviews_before * log_conversion.revenue),2) AS `%d`", Metrics::INDEX_GOAL_REVENUE_ATTRIB);
 
