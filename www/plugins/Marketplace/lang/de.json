@@ -70,7 +70,6 @@
         "OverviewPluginSubscriptions": "Übersicht über Ihre Plugin Abonnements",
         "OverviewPluginSubscriptionsAllDetails": "Um alle Details anzusehen, oder um ein Abonnement zu ändern, melden Sie sich mit Ihrem Konto an.",
         "OverviewPluginSubscriptionsMissingInfo": "Es ist möglich, dass ein Abonnement fehlt, zum Beispiel wenn eine Zahlung noch nicht verbucht ist. In so einem Fall versuchen Sie es in ein paar Stunden noch einmal oder kontaktieren Sie das Matomo Team.",
-        "OverviewPluginSubscriptionsMissingLicense": "Sie haben noch keinen Lizenzschlüssel definiert. Wenn Sie ein Plugin Abonnement gekauft haben, gehen Sie bitte zum %1$sMarketplace%2$s und geben Sie dort Ihren Lizenzschlüssel an.",
         "PaidPlugins": "Premium Funktionen",
         "PluginDescription": "Die Funktionalität von Matomo mithilfe des Marketplace per Download von Plugins und Themes ausbauen und erweitern.",
         "PluginKeywords": "Suchbegriffe",

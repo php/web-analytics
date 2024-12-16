@@ -156,7 +156,7 @@ class ArchiveInvalidator
         return array_keys($this->getRememberedArchivedReportsThatShouldBeInvalidated($idSite));
     }
 
-    public function getRememberedArchivedReportsThatShouldBeInvalidated(int $idSite = null)
+    public function getRememberedArchivedReportsThatShouldBeInvalidated(?int $idSite = null)
     {
         if (null === $idSite) {
             $optionName = $this->rememberArchivedReportIdStart . '%';
@@ -268,6 +268,7 @@ class ArchiveInvalidator
      * @param string $name null to make sure every plugin is archived when this invalidation is processed by core:archive,
      *                     or a plugin name to only archive the specific plugin.
      * @param bool $ignorePurgeLogDataDate
+     * @param bool $doNotCreateInvalidations If true, archives will only be marked as invalid, but no archive_invalidation record will be created
      * @return InvalidationResult
      * @throws \Exception
      */
@@ -275,15 +276,18 @@ class ArchiveInvalidator
         array $idSites,
         array $dates,
         $period,
-        Segment $segment = null,
-        $cascadeDown = false,
-        $forceInvalidateNonexistentRanges = false,
-        $name = null,
-        $ignorePurgeLogDataDate = false
+        ?Segment $segment = null,
+        bool $cascadeDown = false,
+        bool $forceInvalidateNonexistentRanges = false,
+        ?string $name = null,
+        bool $ignorePurgeLogDataDate = false,
+        bool $doNotCreateInvalidations = false
     ) {
         $plugin = null;
         if ($name && strpos($name, '.') !== false) {
             list($plugin) = explode('.', $name);
+        } elseif ($name) {
+            $plugin = $name;
         }
 
         if (
@@ -294,23 +298,6 @@ class ArchiveInvalidator
         }
 
         $invalidationInfo = new InvalidationResult();
-
-        // quick fix for #15086, if we're only invalidating today's date for a site, don't add the site to the list of sites
-        // to reprocess.
-        $hasMoreThanJustToday = [];
-        foreach ($idSites as $idSite) {
-            $hasMoreThanJustToday[$idSite] = true;
-            $tz = Site::getTimezoneFor($idSite);
-
-            if (
-                ($period == 'day' || $period === false)
-                && count($dates) == 1
-                && ((string)$dates[0]) == ((string)Date::factoryInTimezone('today', $tz))
-            ) {
-                // date is for today
-                $hasMoreThanJustToday[$idSite] = false;
-            }
-        }
 
         /**
          * Triggered when a Matomo user requested the invalidation of some reporting archives. Using this event, plugin
@@ -344,7 +331,7 @@ class ArchiveInvalidator
 
         $allPeriodsToInvalidate = $this->getAllPeriodsByYearMonth($period, $datesToInvalidate, $cascadeDown);
 
-        $this->markArchivesInvalidated($idSites, $allPeriodsToInvalidate, $segment, $period != 'range', $forceInvalidateNonexistentRanges, $name);
+        $this->markArchivesInvalidated($idSites, $allPeriodsToInvalidate, $segment, $period != 'range', $forceInvalidateNonexistentRanges, $name, $doNotCreateInvalidations);
 
         $isInvalidatingDays = $period == 'day' || $cascadeDown || empty($period);
         $isNotInvalidatingSegment = empty($segment) || empty($segment->getString());
@@ -429,7 +416,7 @@ class ArchiveInvalidator
         }
     }
 
-    private function addParentPeriodsByYearMonth(&$result, Period $period, Date $originalDate = null)
+    private function addParentPeriodsByYearMonth(&$result, Period $period, ?Date $originalDate = null)
     {
         if (
             $period->getLabel() == 'year'
@@ -455,7 +442,7 @@ class ArchiveInvalidator
      * @return InvalidationResult
      * @throws \Exception
      */
-    public function markArchivesOverlappingRangeAsInvalidated(array $idSites, array $dates, Segment $segment = null)
+    public function markArchivesOverlappingRangeAsInvalidated(array $idSites, array $dates, ?Segment $segment = null)
     {
         $invalidationInfo = new InvalidationResult();
 
@@ -498,7 +485,7 @@ class ArchiveInvalidator
      * @throws \Exception
      * @api
      */
-    public function reArchiveReport($idSites, string $plugin = null, string $report = null, Date $startDate = null, Segment $segment = null)
+    public function reArchiveReport($idSites, ?string $plugin = null, ?string $report = null, ?Date $startDate = null, ?Segment $segment = null)
     {
         $date2 = Date::today();
 
@@ -584,10 +571,10 @@ class ArchiveInvalidator
      */
     public function scheduleReArchiving(
         $idSites,
-        string $pluginName = null,
+        ?string $pluginName = null,
         $report = null,
-        Date $startDate = null,
-        Segment $segment = null
+        ?Date $startDate = null,
+        ?Segment $segment = null
     ) {
         if (!empty($report)) {
             $this->removeInvalidationsSafely($idSites, $pluginName, $report);
@@ -671,6 +658,9 @@ class ArchiveInvalidator
             $idSites = $this->getAllSitesId();
         }
 
+        // Make sure that idSites is an array to prevent typeError
+        $idSites = is_array($idSites) ? $idSites : ($idSites !== true ? [$idSites] : []);
+
         foreach ($entries as $index => $entry) {
             $entry = @json_decode($entry, true);
             if (empty($entry)) {
@@ -722,10 +712,11 @@ class ArchiveInvalidator
     private function markArchivesInvalidated(
         $idSites,
         $dates,
-        Segment $segment = null,
-        $removeRanges = false,
-        $forceInvalidateNonexistentRanges = false,
-        $name = null
+        ?Segment $segment = null,
+        bool $removeRanges = false,
+        bool $forceInvalidateNonexistentRanges = false,
+        ?string $name = null,
+        bool $doNotCreateInvalidations = false
     ) {
         $idSites = array_map('intval', $idSites);
 
@@ -737,7 +728,7 @@ class ArchiveInvalidator
             $table = ArchiveTableCreator::getNumericTable($tableDateObj);
             $yearMonths[] = $tableDateObj->toString('Y_m');
 
-            $this->model->updateArchiveAsInvalidated($table, $idSites, $datesForTable, $segment, $forceInvalidateNonexistentRanges, $name);
+            $this->model->updateArchiveAsInvalidated($table, $idSites, $datesForTable, $segment, $forceInvalidateNonexistentRanges, $name, $doNotCreateInvalidations);
 
             if ($removeRanges) {
                 $this->model->updateRangeArchiveAsInvalidated($table, $idSites, $datesForTable, $segment);

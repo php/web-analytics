@@ -42,7 +42,7 @@ class DeleteLogsData extends ConsoleCommand
      */
     private $logDeleter;
 
-    public function __construct(LogDeleter $logDeleter = null, RawLogDao $rawLogDao = null)
+    public function __construct(?LogDeleter $logDeleter = null, ?RawLogDao $rawLogDao = null)
     {
         parent::__construct();
 
@@ -100,8 +100,7 @@ class DeleteLogsData extends ConsoleCommand
             throw $ex;
         }
 
-        $this->writeSuccessMessage(array(
-            "Successfully deleted $logsDeleted visits. <comment>" . $timer . "</comment>"));
+        $this->writeSuccessMessage("Successfully deleted {$logsDeleted} visits. <comment>{$timer}</comment>");
 
         if ($input->getOption('optimize-tables')) {
             $this->optimizeTables();
@@ -194,7 +193,7 @@ class DeleteLogsData extends ConsoleCommand
 
             $prefixedTable = Common::prefixTable($table);
 
-            $done = Db::optimizeTables($prefixedTable);
+            $done = Db\Schema::getInstance()->optimizeTables([$prefixedTable]);
 
             if ($done) {
                 $this->getOutput()->writeln("done. <comment>" . $timer . "</comment>");
@@ -203,6 +202,6 @@ class DeleteLogsData extends ConsoleCommand
             }
         }
 
-        $this->writeSuccessMessage(['Table optimization finished.']);
+        $this->writeSuccessMessage('Table optimization finished.');
     }
 }

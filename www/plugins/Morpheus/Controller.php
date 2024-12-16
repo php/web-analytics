@@ -22,6 +22,7 @@ class Controller extends \Piwik\Plugin\Controller
 
         $snippets = [];
 
+        // @phpcs:disable Generic.Files.LineLength
         $snippets[] = [
             'id' => 'ActivityIndicator',
             'title' => 'Loading indicator',
@@ -861,9 +862,13 @@ export default defineComponent({
                 'admin-development',
                 'admin-settings',
                 'marketplace',
-                'plugin'
+                'plugin',
+                'circle',
+                'dollar-sign',
+                'hits',
             ],
         ];
+        // @phpcs:enable Generic.Files.LineLength
 
         return $this->renderTemplate('demo', [
             'snippets' => $snippets,

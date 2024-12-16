@@ -151,6 +151,21 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
         ));
     }
 
+    public function getPaidPluginsToInstallAtOnceParams()
+    {
+        Piwik::checkUserHasSuperUserAccess();
+        Json::sendHeaderJSON();
+
+        if (!$this->isInstallAllPaidPluginsVisible()) {
+            return json_encode([]);
+        }
+
+        return json_encode([
+            'paidPluginsToInstallAtOnce' => $this->getAllPaidPluginsToInstallAtOnce(),
+            'installAllPluginsNonce' => Nonce::getNonce(self::INSTALL_NONCE),
+        ], JSON_HEX_APOS);
+    }
+
     private function getPrettyLongDate($date)
     {
         if (empty($date)) {
@@ -254,7 +269,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
             'premium' => count($paidPlugins),
         ];
 
-        $view->paidPluginsToInstallAtOnce = $this->getPaidPluginsToInstallAtOnceData($paidPlugins);
+        $view->paidPluginsToInstallAtOnce = $this->getAllPaidPluginsToInstallAtOnce();
         $view->isValidConsumer = $this->consumer->isValidConsumer();
         $view->pluginTypeOptions = array(
             'plugins' => Piwik::translate('General_Plugins'),
@@ -292,7 +307,6 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
         $paidPlugins = $this->plugins->getAllPaidPlugins();
 
         $updateData = [
-            'paidPluginsToInstallAtOnce' => $this->getPaidPluginsToInstallAtOnceData($paidPlugins),
             'isValidConsumer' => $this->consumer->isValidConsumer(),
         ];
 
@@ -472,16 +486,31 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
 
         $pluginInfos = [];
         foreach ($plugins as $pluginName) {
-            $pluginInfos[] = $this->plugins->getPluginInfo($pluginName);
+            $currentPluginInfo = $this->plugins->getPluginInfo($pluginName);
+            $pluginInfos[] = $currentPluginInfo;
 
             try {
                 $this->pluginInstaller->installOrUpdatePluginFromMarketplace($pluginName);
             } catch (\Exception $e) {
-                $notification = new Notification($e->getMessage());
+                $message = $e->getMessage();
+                $isRaw = false;
+                if (stripos($message, 'PCLZIP_ERR_BAD_FORMAT') !== false) {
+                    $faqLink = Url::addCampaignParametersToMatomoLink('https://matomo.org/faq/plugins/faq_21/');
+                    if (!empty($currentPluginInfo['isPaid'])) {
+                        $downloadLink = Url::addCampaignParametersToMatomoLink('https://shop.matomo.org/my-account/downloads');
+                        $translateKey = 'Marketplace_PluginDownloadLinkMissingPremium';
+                    } else {
+                        $downloadLink = Url::addCampaignParametersToMatomoLink('https://plugins.matomo.org/' . $pluginName);
+                        $translateKey = 'Marketplace_PluginDownloadLinkMissingFree';
+                    }
+                    $message = Piwik::translate($translateKey, [$pluginName, "<a href='$downloadLink' target='_blank' rel='noreferrer noopener'>", '</a>', "<a href='$faqLink' target='_blank' rel='noreferrer noopener'>", '</a>']);
+                    $isRaw = true;
+                }
+                $notification = new Notification($message);
                 $notification->context = Notification::CONTEXT_ERROR;
                 $notification->type = Notification::TYPE_PERSISTENT;
                 $notification->flags = Notification::FLAG_CLEAR;
-                if (method_exists($e, 'isHtmlMessage') && $e->isHtmlMessage()) {
+                if ((method_exists($e, 'isHtmlMessage') && $e->isHtmlMessage()) || $isRaw) {
                     $notification->raw = true;
                 }
                 Notification\Manager::notify('CorePluginsAdmin_InstallPlugin', $notification);
@@ -538,7 +567,7 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
             || $this->pluginManager->isPluginLoaded($pluginName)
             || $this->pluginManager->isPluginActivated($pluginName);
 
-        return !$isAlreadyInstalled;
+        return !$isAlreadyInstalled && $plugin['hasDownloadLink'];
     }
 
     protected function configureViewAndCheckPermission($template)
@@ -555,5 +584,23 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
         $view->errorMessage = '';
 
         return $view;
+    }
+
+    private function isInstallAllPaidPluginsVisible(): bool
+    {
+        return (
+            $this->consumer->isValidConsumer() &&
+            Piwik::hasUserSuperUserAccess() &&
+            SettingsPiwik::isAutoUpdatePossible() &&
+            CorePluginsAdmin::isPluginsAdminEnabled() &&
+            count($this->getAllPaidPluginsToInstallAtOnce()) > 0
+        );
+    }
+
+    private function getAllPaidPluginsToInstallAtOnce()
+    {
+        $paidPlugins = $this->plugins->getAllPaidPlugins();
+
+        return $this->getPaidPluginsToInstallAtOnceData($paidPlugins);
     }
 }

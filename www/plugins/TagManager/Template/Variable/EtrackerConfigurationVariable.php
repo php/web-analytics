@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Matomo - free/libre analytics platform
  *
  * @link https://matomo.org
  * @license http://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
  */
+
 namespace Piwik\Plugins\TagManager\Template\Variable;
 
 use Piwik\Piwik;
@@ -13,7 +15,7 @@ use Piwik\Validators\NotEmpty;
 
 class EtrackerConfigurationVariable extends BaseVariable
 {
-    const ID = 'EtrackerConfiguration';
+    public const ID = 'EtrackerConfiguration';
 
     public function getId()
     {
@@ -41,7 +43,7 @@ class EtrackerConfigurationVariable extends BaseVariable
             $this->makeSetting('etrackerID', '', FieldConfig::TYPE_STRING, function (FieldConfig $field) {
                 $field->title = Piwik::translate('TagManager_EtrackerConfigurationVariableIdTitle');
                 $field->customFieldComponent = self::FIELD_VARIABLE_COMPONENT;
-                $field->description = Piwik::translate('TagManager_EtrackerConfigurationVariableIdDescription');
+                $field->description = Piwik::translate('TagManager_EtrackerConfigurationVariableIdDescriptionNew');
                 $field->validators[] = new NotEmpty();
                 $field->transform = function ($value) {
                     return trim($value);

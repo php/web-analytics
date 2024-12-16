@@ -51,7 +51,8 @@ class EventReports extends RecordBuilder
 
         foreach ($records as $record) {
             $record->setMaxRowsInTable($maximumRowsInDataTable)
-                ->setMaxRowsInSubtable($maximumRowsInSubDataTable);
+                ->setMaxRowsInSubtable($maximumRowsInSubDataTable)
+                ->setBlobColumnAggregationOps($this->columnAggregationOps);
         }
 
         return $records;
@@ -149,7 +150,7 @@ class EventReports extends RecordBuilder
         string $where,
         string $groupBy,
         string $orderBy,
-        RankingQuery $rankingQuery = null
+        ?RankingQuery $rankingQuery = null
     ): void {
         // get query with segmentation
         $query = $logAggregator->generateQuery($select, $from, $where, $groupBy, $orderBy);
@@ -198,8 +199,8 @@ class EventReports extends RecordBuilder
                 Metrics::INDEX_EVENT_NB_HITS            => $row[Metrics::INDEX_EVENT_NB_HITS] ?? 0,
                 Metrics::INDEX_EVENT_NB_HITS_WITH_VALUE => $row[Metrics::INDEX_EVENT_NB_HITS_WITH_VALUE] ?? 0,
                 Metrics::INDEX_EVENT_SUM_EVENT_VALUE    => round($row[Metrics::INDEX_EVENT_SUM_EVENT_VALUE] ?? 0, 2),
-                Metrics::INDEX_EVENT_MIN_EVENT_VALUE    => round($row[Metrics::INDEX_EVENT_MIN_EVENT_VALUE] ?? false, 2),
-                Metrics::INDEX_EVENT_MAX_EVENT_VALUE    => round($row[Metrics::INDEX_EVENT_MAX_EVENT_VALUE] ?? 0, 2),
+                Metrics::INDEX_EVENT_MIN_EVENT_VALUE    => is_numeric($row[Metrics::INDEX_EVENT_MIN_EVENT_VALUE]) ? round($row[Metrics::INDEX_EVENT_MIN_EVENT_VALUE], 2) : null,
+                Metrics::INDEX_EVENT_MAX_EVENT_VALUE    => is_numeric($row[Metrics::INDEX_EVENT_MAX_EVENT_VALUE]) ? round($row[Metrics::INDEX_EVENT_MAX_EVENT_VALUE], 2) : null,
             ];
 
             $topLevelRow = $table->sumRowWithLabel($mainLabel, $columns, $this->columnAggregationOps);
