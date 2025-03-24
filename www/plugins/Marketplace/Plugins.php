@@ -303,7 +303,7 @@ class Plugins
             }
         }
 
-        $haDownloadLink = false;
+        $hasDownloadLink = false;
         if (!empty($plugin['versions'])) {
             $latestVersion = end($plugin['versions']);
             $hasDownloadLink = !empty($latestVersion['download']);

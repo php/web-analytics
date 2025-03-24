@@ -12,7 +12,7 @@
         "ConfirmPasswordReset": "Nollaa salasana",
         "ConfirmPasswordToContinue": "Varmista salasana jatkaaksesi",
         "ConfirmationLinkSent": "Varmistusviesti on lähetetty sähköpostiisi. Sähköpostista löydät aktivointilinkin.",
-        "ContactAdmin": "Mahdollinen syy: palvelimelta on poistettu mail() -funktio käytöstä. <br />Ota yhteys Matomon ylläpitäjään.",
+        "ContactAdmin": "Mahdollinen syy: isäntäsi on saattanut poistaa mail() function. käytöstä. <br>Ota yhteyttä Matomon järjestelmänvalvojaan.",
         "CreatePasswordDescription": "Varmista, että muistat tämän salasanan, ja säilytät sitä turvallisessa sijainnissa.",
         "CurrentlyBlockedIPs": "Estetyt IP:t",
         "CurrentlyBlockedIPsUnblockConfirm": "Haluatko varmasti poistaa kaikki voimassa olevat IP-osoitteiden estot?",

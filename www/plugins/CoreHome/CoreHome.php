@@ -405,10 +405,15 @@ class CoreHome extends \Piwik\Plugin
             && Common::getRequestVar('module', '') != 'CoreUpdater'
             && Piwik::isUserHasSomeViewAccess()
         ) {
+            /*
+             * Executed as super user to ensure we are able to add translations for all menu entries that might be displayed.
+             */
             Access::doAsSuperUser(function () use (&$translationKeys) {
                 $menu = MenuAdmin::getInstance()->getMenu();
                 foreach ($menu as $level1 => $level2) {
-                    $translationKeys[] = $level1;
+                    if (strpos($level1, '_') !== false) {
+                        $translationKeys[] = $level1;
+                    }
                     foreach ($level2 as $name => $params) {
                         if (strpos($name, '_') !== false) {
                             $translationKeys[] = $name;

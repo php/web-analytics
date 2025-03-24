@@ -410,6 +410,7 @@ class API extends \Piwik\Plugin\API
 
         $originalShowEvolutionWithinSelectedPeriod = Config::getInstance()->General['graphs_show_evolution_within_selected_period'];
         $originalDefaultEvolutionGraphLastPeriodsAmount = Config::getInstance()->General['graphs_default_evolution_graph_last_days_amount'];
+        $initialFilterTruncate = Common::getRequestVar('filter_truncate', false);
         try {
             Config::setSetting('General', 'graphs_show_evolution_within_selected_period', (bool)$report['evolution_graph_within_period']);
             Config::setSetting('General', 'graphs_default_evolution_graph_last_days_amount', $report['evolution_graph_period_n']);
@@ -427,7 +428,6 @@ class API extends \Piwik\Plugin\API
 
             // the report will be rendered with the first 23 rows and will aggregate other rows in a summary row
             // 23 rows table fits in one portrait page
-            $initialFilterTruncate = Common::getRequestVar('filter_truncate', false);
             $_GET['filter_truncate'] = Config::getInstance()->General['scheduled_reports_truncate'];
 
             $prettyDate = null;
@@ -637,7 +637,7 @@ class API extends \Piwik\Plugin\API
             $date = Date::now()->subPeriod(1, $report['period'])->toString();
         }
 
-        Context::changeIdSite($report['idsite'], function () use ($report, $idReport, $period, $date, $force) {
+        Context::changeIdSite($report['idsite'], function () use ($report, $idReport, $date, $force) {
 
             $language = \Piwik\Plugins\LanguagesManager\API::getInstance()->getLanguageForUser($report['login']);
 

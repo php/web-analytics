@@ -450,7 +450,7 @@ class API extends \Piwik\Plugin\API
      * For the superUser it returns all the websites in the database.
      *
      * @param bool|int $limit Specify max number of sites to return
-     * @param bool $_restrictSitesToLogin Hack necessary when running scheduled tasks, where "Super User" is forced, but sometimes not desired, see #3017
+     * @param bool|string $_restrictSitesToLogin Hack necessary when running scheduled tasks, where "Super User" is forced, but sometimes not desired, see #3017
      * @return array array for each site, an array of information (idsite, name, main_url, etc.)
      */
     public function getSitesWithAtLeastViewAccess($limit = false, $_restrictSitesToLogin = false)
@@ -1378,7 +1378,7 @@ class API extends \Piwik\Plugin\API
     {
         Piwik::checkUserHasSuperUserAccess();
 
-        $queryParamsToExclude = $this->checkAndReturnCommaSeparatedStringList($queryParamsToExclude);
+        $queryParamsToExclude = $this->checkAndReturnCommaSeparatedStringList($queryParamsToExclude ?? '');
         $whiteListValidator = new WhitelistedValue(SitesManager::URL_PARAM_EXCLUSION_TYPES);
         $whiteListValidator->validate($exclusionType);
 
@@ -1455,8 +1455,6 @@ class API extends \Piwik\Plugin\API
      * @throws Exception
      * @see getKeepURLFragmentsGlobal. If null, the existing value will
      *                                   not be modified.
-     *
-     * @return bool true on success
      */
     public function updateSite(
         $idSite,
@@ -1500,10 +1498,7 @@ class API extends \Piwik\Plugin\API
             $settingValues = [];
         }
 
-        if (empty($coreProperties)) {
-            $coreProperties = [];
-        }
-
+        $coreProperties = [];
         $coreProperties = $this->setSettingValue('urls', $urls, $coreProperties, $settingValues);
         $coreProperties = $this->setSettingValue('group', $group, $coreProperties, $settingValues);
         $coreProperties = $this->setSettingValue('ecommerce', $ecommerce, $coreProperties, $settingValues);
@@ -1583,7 +1578,7 @@ class API extends \Piwik\Plugin\API
         $this->getModel()->updateSiteCreatedTime($idSites, $minDateSql);
     }
 
-    private function checkAndReturnCommaSeparatedStringList($parameters)
+    private function checkAndReturnCommaSeparatedStringList(string $parameters): string
     {
         $parameters = trim($parameters);
         if (empty($parameters)) {

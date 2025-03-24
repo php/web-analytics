@@ -3,10 +3,12 @@
         "Available_Credits": "Verfügbares Guthaben: %1$s",
         "ConfirmRemovePhoneNumber": "Sind Sie sicher, dass Sie die Telefonnummer %1$s entfernen möchten?",
         "Exception_UnknownProvider": "Der Anbietername '%1$s' ist unbekannt. Versuchen Sie stattdessen einen der folgenden: %2$s.",
+        "IncorrectNumberFormat": "Die Telefonnummer %1$s entspricht nicht dem erwarteten Nummernformat.",
         "MobileReport_AdditionalPhoneNumbers": "Sie können weitere Telefonnummern hinzufügen auf",
         "MobileReport_MobileMessagingSettingsLink": "der Mobile Messaging Einstellungsseite",
         "MobileReport_NoPhoneNumbers": "Bitte aktivieren Sie mindestens eine Telefonnummer auf",
         "MultiSites_Must_Be_Activated": "Um SMS-Berichte über Ihre Webseitenstatistiken generieren zu können, aktivieren Sie das MultiSites-Plugin in Matomo.",
+        "NumberAlreadyAdded": "Die Telefonnummer %1$s wurde bereits hinzugefügt.",
         "PhoneNumbers": "Telefonnummern",
         "PluginDescription": "Erstellen Sie eigene SMS-Berichte, laden Sie diese herunter und lassen Sie diese täglich, wöchentlich oder monatlich auf Ihr Handy senden.",
         "SMS_Content_Too_Long": "[zu lang]",
@@ -43,9 +45,11 @@
         "Settings_UpdateOrDeleteAccount": "Sie können diesen Zugang auch %1$saktualisieren%2$s oder %3$sentfernen%4$s.",
         "Settings_ValidatePhoneNumber": "Validieren",
         "Settings_VerificationCodeJustSent": "Wir haben Ihnen eine SMS mit einem Code an diese Nummer geschickt: Bitte geben Sie den Code oben ein und klicken auf \"Validieren\".",
+        "TooManyUnverifiedNumbersError": "Sie können nicht mehr als 3 nicht verifizierte Telefonnummern hinzufügen!",
         "TopLinkTooltip": "Erhalten Sie Webanalytik-Berichte direkt in Ihren E-Mail Posteingang oder auf Ihr Mobiltelefon.",
         "TopMenu": "E-Mail und SMS-Berichte",
         "UserKey": "Userkey/Benutzerschlüssel",
+        "VerificationCodeRecentlySentError": "Ein Bestätigungscode für die Telefonnummer %1$s wurde bereits kürzlich angefordert.",
         "VerificationText": "Der Code lautet %1$s. Um Ihre Telefonnummer zu validieren und Matomo SMS-Berichte zu erhalten, kopieren Sie bitte diesen Code in das via Matomo verfügbare Formular → %2$s → %3$s."
     }
 }
