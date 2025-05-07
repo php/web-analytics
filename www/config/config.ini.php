@@ -13,6 +13,7 @@ schema = "Mariadb"
 noreply_email_address = "noreply@php.net"
 salt = "PLACEHOLDERFORSALT-REPLACEDONDEPLOY";
 trusted_hosts[] = "analytics.php.net"
+browser_archiving_disabled_enforce = 1
 
 [log]
 log_level = "INFO"
