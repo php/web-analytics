@@ -21,7 +21,7 @@ proxy_host_headers[] = HTTP_X_FORWARDED_HOST
 [log]
 log_level = "INFO"
 log_writers[] = "file"
-logger_file_path = "/var/log/matomo.log"
+logger_file_path = "/var/log/matomo/matomo.log"
 
 [mail]
 transport = "smtp"
