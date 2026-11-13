@@ -13,8 +13,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_0_2_12 extends Updates
 {
     /**
@@ -35,7 +33,7 @@ class Updates_0_2_12 extends Updates
 
             // 0.2.12 [673]
             // Note: requires INDEX privilege
-            $this->migration->db->dropIndex('log_action', 'index_idaction')
+            $this->migration->db->dropIndex('log_action', 'index_idaction'),
         );
     }
 

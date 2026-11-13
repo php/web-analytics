@@ -12,26 +12,22 @@ namespace Piwik\Plugins\API;
 use Piwik\API\DocumentationGenerator;
 use Piwik\API\Proxy;
 use Piwik\API\Request;
+use Piwik\Request\AuthenticationToken;
 use Piwik\Common;
 use Piwik\Config;
+use Piwik\Container\StaticContainer;
+use Piwik\Http\SecurityHeaders;
 use Piwik\Piwik;
 use Piwik\Plugins\API\Renderer\Original;
 use Piwik\Url;
 use Piwik\UrlHelper;
 use Piwik\View;
 
-/**
- *
- */
 class Controller extends \Piwik\Plugin\Controller
 {
     public function index()
     {
-        $tokenAuth = Common::getRequestVar('token_auth', 'anonymous', 'string');
-        $format = Common::getRequestVar('format', false);
-        $serialize = Common::getRequestVar('serialize', false);
-
-        $token = 'token_auth=' . $tokenAuth;
+        $tokenAuth = StaticContainer::get(AuthenticationToken::class)->getAuthToken() ?: 'anonymous';
 
         // when calling the API through http, we limit the number of returned results
         if (!isset($_GET['filter_limit'])) {
@@ -42,16 +38,14 @@ class Controller extends \Piwik\Plugin\Controller
             }
         }
 
-        $request  = new Request($token);
+        $request  = new Request([
+            'token_auth' => $tokenAuth,
+        ]);
         $response = $request->process();
 
         if (is_array($response)) {
-            if (
-                $format == 'original'
-                && $serialize != 1
-            ) {
-                Original::sendPlainTextHeader();
-            }
+            // var_export() output is a plain-text PHP structure dump and is always served as such
+            Original::sendPlainTextHeader();
 
             $response = var_export($response, true);
         }
@@ -63,14 +57,17 @@ class Controller extends \Piwik\Plugin\Controller
     {
         Piwik::checkUserHasSomeViewAccess();
 
+        $this->sendHtmlHeadersForDataResponse();
+
         $ApiDocumentation = new DocumentationGenerator();
-        $prefixUrls = Common::getRequestVar('prefixUrl', 'https://demo.matomo.org/', 'string');
+        $prefixUrls = Common::getRequestVar('prefixUrl', 'https://demo.matomo.cloud/', 'string');
         $parsedUrl = parse_url($prefixUrls);
         if (empty($parsedUrl['host']) || !UrlHelper::isLookLikeUrl($prefixUrls) || strpos($prefixUrls, 'http') !== 0 || !Url::isValidHost($parsedUrl['host'])) {
             $prefixUrls = '';
         } else {
             // We put together the url based on the parsed parameters manually to ensure it might not contain unexpected locations
             // unescaped slashes in username or password part for example have unexpected results in browsers
+            unset($parsedUrl['query'], $parsedUrl['fragment']);
             $prefixUrls = UrlHelper::getParseUrlReverse($parsedUrl);
         }
         return $ApiDocumentation->getApiDocumentationAsStringForDeveloperReference($outputExampleUrls = true, $prefixUrls);
@@ -89,7 +86,10 @@ class Controller extends \Piwik\Plugin\Controller
 
     public function listSegments()
     {
+        // after the API call, so the headers are not sent for a failed permission check
         $segments = API::getInstance()->getSegmentsMetadata($this->idSite);
+
+        $this->sendHtmlHeadersForDataResponse();
 
         $tableDimensions = $tableMetrics = '';
         $customVariables = 0;
@@ -171,12 +171,12 @@ class Controller extends \Piwik\Plugin\Controller
         $glossaryItems = array(
             'metrics' => array(
                 'title' => Piwik::translate('General_Metrics'),
-                'entries' => $metrics
+                'entries' => $metrics,
             ),
             'reports' => array(
                 'title' => Piwik::translate('General_Reports'),
-                'entries' => $reports
-            )
+                'entries' => $reports,
+            ),
         );
 
         /**
@@ -211,5 +211,15 @@ class Controller extends \Piwik\Plugin\Controller
         return $this->renderTemplate('glossary', array(
             'glossaryItems' => $glossaryItems,
         ));
+    }
+
+    /**
+     * Headers for the actions that return plain HTML without rendering a View, so no headers are
+     * sent for them otherwise.
+     */
+    private function sendHtmlHeadersForDataResponse(): void
+    {
+        SecurityHeaders::sendForDataResponse();
+        Common::sendHeader('Content-Type: text/html; charset=utf-8');
     }
 }

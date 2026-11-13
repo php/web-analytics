@@ -1,6 +1,6 @@
 {
     "Dashboard": {
-        "AddAWidget": "增加一个小工具",
+        "AddAWidget": "向报表面板增加小工具",
         "AddPreviewedWidget": "添加小工具到报表面板",
         "ChangeDashboardLayout": "修改面板布局",
         "CopyDashboardToUser": "复制面板给用户",
@@ -32,6 +32,7 @@
         "SetAsDefaultWidgetsConfirm": "您确定要设置当前的小工具列表和布局为默认的面板模板吗?",
         "SetAsDefaultWidgetsConfirmHelp": "用户创建新面板时，或者“%s”功能启用时，将使用当前小工具列表和面板布局。",
         "TopLinkTooltip": "查看%s的统计报表。",
+        "TopMenuTitle": "分析",
         "WidgetNotFound": "找不到小工具",
         "WidgetPreview": "小工具预览"
     }

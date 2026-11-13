@@ -24,7 +24,6 @@ class Transport
     /**
      * Sends the given mail
      *
-     * @param Mail $mail
      * @return bool
      * @throws DependencyException
      * @throws PHPMailerException
@@ -49,7 +48,7 @@ class Transport
         $phpMailer->XMailer = ' ';
         // avoid triggering automated (vacation) responses
         $phpMailer->addCustomHeader('Auto-Submitted', 'yes');
-        $phpMailer->setLanguage(StaticContainer::get('Piwik\Translation\Translator')->getCurrentLanguage());
+        PHPMailer::setLanguage(StaticContainer::get('Piwik\Translation\Translator')->getCurrentLanguage());
         $this->initSmtpTransport($phpMailer);
 
         if ($mail->isSmtpDebugEnabled()) {

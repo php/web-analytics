@@ -62,9 +62,6 @@ class OptOutManager
     /** @var array */
     private $queryParameters = array();
 
-    /**
-     * @param DoNotTrackHeaderChecker|null $doNotTrackHeaderChecker
-     */
     public function __construct(?DoNotTrackHeaderChecker $doNotTrackHeaderChecker = null)
     {
         $this->doNotTrackHeaderChecker = $doNotTrackHeaderChecker ?: new DoNotTrackHeaderChecker();
@@ -184,17 +181,6 @@ class OptOutManager
 
     /**
      * Return the HTML code to be added to pages for the JavaScript opt-out
-     *
-     * @param string $matomoUrl
-     * @param string $language
-     * @param string $backgroundColor
-     * @param string $fontColor
-     * @param string $fontSize
-     * @param string $fontFamily
-     * @param bool   $applyStyling
-     * @param bool   $showIntro
-     *
-     * @return string
      */
     public function getOptOutJSEmbedCode(
         string $matomoUrl,
@@ -226,15 +212,6 @@ class OptOutManager
 
     /**
      * Return the HTML code to be added to pages for the self-contained opt-out
-     *
-     * @param string $backgroundColor
-     * @param string $fontColor
-     * @param string $fontSize
-     * @param string $fontFamily
-     * @param bool   $applyStyling
-     * @param bool   $showIntro
-     *
-     * @return string
      */
     public function getOptOutSelfContainedEmbedCode(
         string $backgroundColor,
@@ -302,8 +279,6 @@ HTML;
      *     useSecureCookies (default 1)       Set secure cookies?
      *     cookiePath (default blank)         Use this path for consent cookies
      *     cookieDomain (default blank)       Use this domain for consent cookies
-     *
-     * @return string
      */
     public function getOptOutJS(): string
     {
@@ -422,8 +397,6 @@ JS;
 
     /**
      * Return the shared opt-out JavaScript (used by self-contained and tracker versions)
-     *
-     * @return string
      */
     private function getOptOutCommonJS(): string
     {
@@ -465,24 +438,43 @@ JS;
                 if (settings.showIntro) {
                     content += '<p>'+settings.YouMayOptOut2+' '+settings.YouMayOptOut3+'</p>';                       
                 }
-                if (useTracker) {
-                    content += '<input onclick="_paq.push([\'optUserOut\']);showContent(false, null, true);" id="trackVisits" type="checkbox" checked="checked" />';
-                } else {
-                    content += '<input onclick="window.MatomoConsent.consentRevoked();showContent(false);" id="trackVisits" type="checkbox" checked="checked" />';
-                }
+                content += '<input id="trackVisits" type="checkbox" checked="checked" />';
                 content += '<label for="trackVisits"><strong><span>'+settings.YouAreNotOptedOut+' '+settings.UncheckToOptOut+'</span></strong></label>';                               
             } else {
                 if (settings.showIntro) {
                     content += '<p>'+settings.OptOutComplete+' '+settings.OptOutCompleteBis+'</p>';
                 }
-                if (useTracker) {
-                    content += '<input onclick="_paq.push([\'forgetUserOptOut\']);showContent(true, null, true);" id="trackVisits" type="checkbox" />';
-                } else {
-                    content += '<input onclick="window.MatomoConsent.consentGiven();showContent(true);" id="trackVisits" type="checkbox" />';
-                }
+                content += '<input id="trackVisits" type="checkbox" />';
                 content += '<label for="trackVisits"><strong><span>'+settings.YouAreOptedOut+' '+settings.CheckToOptIn+'</span></strong></label>';
             }                   
             div.innerHTML = content;      
+
+            var tV = document.getElementById('trackVisits');
+            if (consent) {
+                if (useTracker) {
+                    tV.addEventListener("click", function (e) {
+                        _paq.push(['optUserOut']);
+                        showContent(false, null, true);
+                    });
+                } else {
+                    tV.addEventListener("click", function (e) {
+                        window.MatomoConsent.consentRevoked();
+                        showContent(false);
+                    });
+                }
+            } else {
+                if (useTracker) {
+                    tV.addEventListener("click", function (e) {
+                        _paq.push(['forgetUserOptOut']);
+                        showContent(true, null, true);
+                    });
+                } else {
+                    tV.addEventListener("click", function (e) {
+                        window.MatomoConsent.consentGiven();
+                        showContent(true);
+                    });
+                }
+            }
         };   
 
         window.MatomoConsent = {                         
@@ -542,8 +534,6 @@ JS;
     /**
      * Get translations used by the opt-out popup
      *
-     * @param string|null $language
-     *
      * @return array
      */
     private function getTranslations(?string $language = null): array
@@ -589,7 +579,7 @@ JS;
             $reloadUrl = Url::getCurrentQueryStringWithParametersModified(array(
                 'showConfirmOnly' => 1,
                 'setCookieInNewWindow' => 0,
-                'nonce' => $nonce ? : ''
+                'nonce' => $nonce ? : '',
             ));
         } else {
             $reloadUrl = false;
@@ -614,7 +604,7 @@ JS;
             'action' => 'optOut',
             'language' => $lang,
             'setCookieInNewWindow' => 1,
-            'nonce' => $nonce
+            'nonce' => $nonce,
         ), false);
 
         if (Common::getRequestVar('applyStyling', 1, 'int')) {
@@ -643,13 +633,6 @@ JS;
     /**
      * Provide a CSS style sheet based on the chosen opt out style options
      *
-     * @param string|null $fontSize
-     * @param string|null $fontColor
-     * @param string|null $fontFamily
-     * @param string|null $backgroundColor
-     * @param bool        $noBody
-     *
-     * @return string
      * @throws \Exception
      */
     private function optOutStyling(
@@ -672,7 +655,7 @@ JS;
 
         $hexstrings = array(
             'fontColor' => $cssfontcolour,
-            'backgroundColor' => $cssbackgroundcolor
+            'backgroundColor' => $cssbackgroundcolor,
         );
         foreach ($hexstrings as $key => $testcase) {
             if ($testcase && !(ctype_xdigit($testcase) && in_array(strlen($testcase), array(3,6), true))) {

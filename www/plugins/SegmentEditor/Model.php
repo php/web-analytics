@@ -29,12 +29,10 @@ class Model
     /**
      * Returns all stored segments that haven't been deleted. Ignores the site the segments are enabled
      * for and whether to auto archive or not.
-     *
-     * @return array
      */
-    public function getAllSegmentsAndIgnoreVisibility()
+    public function getAllSegmentsAndIgnoreVisibility(): array
     {
-        $sql = "SELECT * FROM " . $this->getTable() . " WHERE deleted = 0";
+        $sql = "SELECT * FROM `" . $this->getTable() . "` WHERE deleted = 0";
 
         $segments = $this->getDb()->fetchAll($sql);
 
@@ -42,7 +40,7 @@ class Model
     }
 
     /**
-     * Returns all stored segments.
+     * Returns all segments that are enabled for auto archiving.
      *
      * @param bool|int $idSite Whether to return stored segments for a specific idSite, or segments that are available
      *                         for all sites. If supplied, must be a valid site ID.
@@ -68,11 +66,8 @@ class Model
 
     /**
      * Returns all stored segments that are available to the given login.
-     *
-     * @param  string $userLogin
-     * @return array
      */
-    public function getAllSegments($userLogin)
+    public function getAllSegments(string $userLogin): array
     {
         $bind = array($userLogin);
         $sql  = $this->buildQuerySortedByName('deleted = 0 AND (enable_all_users = 1 OR login = ?)');
@@ -84,12 +79,8 @@ class Model
 
     /**
      * Returns all stored segments that are available for the given site and login.
-     *
-     * @param  string $userLogin
-     * @param  int    $idSite Whether to return stored segments for a specific idSite, or all of them. If supplied, must be a valid site ID.
-     * @return array
      */
-    public function getAllSegmentsForSite($idSite, $userLogin)
+    public function getAllSegmentsForSite(int $idSite, string $userLogin): array
     {
         $bind = array($idSite, $userLogin);
         $sql  = $this->buildQuerySortedByName('(enable_only_idsite = ? OR enable_only_idsite = 0)
@@ -121,26 +112,35 @@ class Model
         return $segments;
     }
 
-    public function getSegmentByDefinition($definition)
+    /**
+     * Returns the first stored segment with the given definition that is available for the given site and login.
+     *
+     * @param string|null $userLogin Pass null to include the segments of all users (Super User only).
+     */
+    public function getSegmentByDefinition(string $definition, int $idSite, ?string $userLogin): ?array
     {
-        $sql = $this->buildQuerySortedByName("definition = ? AND deleted = 0");
-        $bind = [$definition];
+        $where = 'definition = ? AND deleted = 0 AND (enable_only_idsite = ? OR enable_only_idsite = 0)';
+        $bind = [$definition, $idSite];
 
-        $segment = $this->getDb()->fetchRow($sql, $bind);
-        return $segment;
+        if ($userLogin !== null) {
+            $where .= ' AND (enable_all_users = 1 OR login = ?)';
+            $bind[] = $userLogin;
+        }
+
+        $segment = $this->getDb()->fetchRow($this->buildQuerySortedByName($where), $bind);
+        return $segment ?: null;
     }
 
     /**
-     * Gets a list of segments that have been deleted in the last week and therefore may have orphaned archives.
+     * Gets a list of segments that have been deleted on or after the given date and therefore may have orphaned archives.
      * @param Date $date Segments deleted on or after this date will be returned.
      * @return array of segments. The segments are only populated with the fields needed for archive invalidation
      * (e.g. definition, enable_only_idsite).
-     * @throws \Exception
      */
-    public function getSegmentsDeletedSince(Date $date)
+    public function getSegmentsDeletedSince(Date $date): array
     {
         $dateStr = $date->getDatetime();
-        $sql = "SELECT DISTINCT `definition`, `enable_only_idsite`, `hash` FROM " . Common::prefixTable('segment')
+        $sql = "SELECT DISTINCT `definition`, `enable_only_idsite`, `hash` FROM `" . Common::prefixTable('segment') . "`"
             . " WHERE deleted = 1 AND ts_last_edit >= ?";
         $deletedSegments = Db::fetchAll($sql, array($dateStr));
 
@@ -148,16 +148,12 @@ class Model
             return array();
         }
 
-        $existingSegments = $this->getExistingSegmentsLike($deletedSegments);
+        $existingSegments = $this->getExistingSegmentsSharingArchives($deletedSegments);
 
         foreach ($deletedSegments as $i => $deleted) {
             $deletedSegments[$i]['idsites_to_preserve'] = array();
             foreach ($existingSegments as $existing) {
-                if (
-                    $existing['definition'] != $deleted['definition'] &&
-                    $existing['definition'] != urlencode($deleted['definition']) &&
-                    $existing['definition'] != urldecode($deleted['definition'])
-                ) {
+                if (!$this->sharesArchivesWith($existing, $deleted)) {
                     continue;
                 }
 
@@ -165,8 +161,8 @@ class Model
                     $existing['enable_only_idsite'] == $deleted['enable_only_idsite']
                     || $existing['enable_only_idsite'] == 0
                 ) {
-                    // There is an identical segment (for either the specific site or for all sites) that is active
-                    // The archives for this segment will therefore still be needed
+                    // There is a segment sharing these archives (for either the specific site or for all
+                    // sites) that is active. The archives for this segment will therefore still be needed
                     unset($deletedSegments[$i]);
                     break;
                 } elseif ($deleted['enable_only_idsite'] == 0) {
@@ -180,7 +176,14 @@ class Model
         return $deletedSegments;
     }
 
-    private function getExistingSegmentsLike(array $segments)
+    /**
+     * Returns the segments that are still in use and share their archives with one of the given segments.
+     *
+     * Narrows down the candidates, {@see self::sharesArchivesWith()} then decides per pair of segments.
+     *
+     * @param array $segments Segments as returned by {@see self::getSegmentsDeletedSince()}
+     */
+    private function getExistingSegmentsSharingArchives(array $segments): array
     {
         if (empty($segments)) {
             return array();
@@ -188,35 +191,70 @@ class Model
 
         $whereClauses = array();
         $bind = array();
-        $definitionWhereClauseTemplate = '(definition = ? OR definition = ? OR definition = ?)';
         foreach ($segments as $segment) {
             // Sometimes they are stored encoded and sometimes they aren't
+            $matchWhereClause = '(definition = ? OR definition = ? OR definition = ?';
             $bind[] = $segment['definition'];
             $bind[] = urlencode($segment['definition']);
             $bind[] = urldecode($segment['definition']);
 
+            // Archives are keyed by the hash, so segments sharing it also share their archives
+            if (!empty($segment['hash'])) {
+                $matchWhereClause .= ' OR hash = ?';
+                $bind[] = $segment['hash'];
+            }
+            $matchWhereClause .= ')';
+
             if ($segment['enable_only_idsite'] == 0) {
-                // They deleted an all-sites segment, but there is a single-site segment with same definition?
+                // They deleted an all-sites segment, but there is a single-site segment sharing its archives?
                 // Need to handle this carefully so that the archives for the single-site segment are preserved
-                $whereClauses[] = "$definitionWhereClauseTemplate";
+                $whereClauses[] = $matchWhereClause;
             } else {
-                $whereClauses[] = "($definitionWhereClauseTemplate AND (enable_only_idsite = ? OR enable_only_idsite = 0))";
+                $whereClauses[] = "($matchWhereClause AND (enable_only_idsite = ? OR enable_only_idsite = 0))";
                 $bind[] = $segment['enable_only_idsite'];
             }
         }
         $whereClauses = implode(' OR ', $whereClauses);
 
-        // Check for any non-deleted segments with the same definition
-        $sql = "SELECT DISTINCT definition, enable_only_idsite FROM " . Common::prefixTable('segment')
+        // Check for any non-deleted segments that share the archives of one of the deleted segments
+        $sql = "SELECT DISTINCT definition, enable_only_idsite, hash FROM `" . Common::prefixTable('segment') . "`"
             . " WHERE deleted = 0 AND (" . $whereClauses . ")";
         return Db::fetchAll($sql, $bind);
+    }
+
+    /**
+     * Whether an existing segment shares its archives with a deleted one, and therefore still needs them.
+     *
+     * Archives are tied to a segment by its hash, as the archive done flag is `done<hash>`, so any segment
+     * with the same hash shares them. The definitions are compared as well because they are stored in
+     * varying encodings, and {@see \Piwik\Segment::getSegmentHash()} resolves every encoding of a definition
+     * to a stored hash - two segments differing only in encoding can therefore end up sharing archives even
+     * when their stored hashes differ.
+     *
+     * The hashes are compared case insensitively to match the lookups this guards: the done flag is matched
+     * with a `LIKE` and the segment table is queried by hash, both case insensitive for the collations
+     * Matomo uses.
+     */
+    private function sharesArchivesWith(array $existing, array $deleted): bool
+    {
+        if (
+            !empty($deleted['hash'])
+            && !empty($existing['hash'])
+            && strcasecmp($existing['hash'], $deleted['hash']) === 0
+        ) {
+            return true;
+        }
+
+        return $existing['definition'] === $deleted['definition']
+            || $existing['definition'] === urlencode($deleted['definition'])
+            || $existing['definition'] === urldecode($deleted['definition']);
     }
 
     public function deleteSegment($idSegment)
     {
         $fieldsToSet = array(
             'deleted' => 1,
-            'ts_last_edit' => Date::factory('now')->toString('Y-m-d H:i:s')
+            'ts_last_edit' => Date::factory('now')->toString('Y-m-d H:i:s'),
         );
 
         $db = $this->getDb();
@@ -250,7 +288,7 @@ class Model
     public function getSegment($idSegment)
     {
         $db = $this->getDb();
-        $segment = $db->fetchRow("SELECT * FROM " . $this->getTable() . " WHERE idsegment = ?", $idSegment);
+        $segment = $db->fetchRow("SELECT * FROM `" . $this->getTable() . "` WHERE idsegment = ?", $idSegment);
 
         return $segment;
     }
@@ -260,9 +298,9 @@ class Model
         return Db::get();
     }
 
-    private function buildQuerySortedByName($where)
+    private function buildQuerySortedByName(string $where): string
     {
-        return "SELECT * FROM " . $this->getTable() . " WHERE $where ORDER BY name ASC";
+        return "SELECT * FROM `" . $this->getTable() . "` WHERE $where ORDER BY name ASC";
     }
 
     private function createHash($definition)
@@ -282,6 +320,8 @@ class Model
                          `auto_archive` tinyint(4) NOT NULL default 0,
                          `ts_created` TIMESTAMP NULL,
                          `ts_last_edit` TIMESTAMP NULL,
+                         `starred` tinyint(4) NOT NULL default 0,
+                         `starred_by` VARCHAR(100) NULL default NULL,
                          `deleted` tinyint(4) NOT NULL default 0,
                          PRIMARY KEY (`idsegment`)";
 

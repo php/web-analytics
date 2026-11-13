@@ -5,7 +5,7 @@
 
   a.withIcon {
     display: inline-block;
-    
+
     img {
       vertical-align: bottom;
     }
@@ -26,7 +26,32 @@
     }
 
     label {
-      color: @color-black-matomo;
+      color: @theme-color-text;
+    }
+  }
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.move-left {
+  margin-left: 3px;
+}
+
+.periodTooltipList {
+  padding-bottom: 10px;
+}
+
+.scheduledReportsUnsubscribePage {
+  .loginSection {
+    margin-top: 32px;
+
+    > .col {
+      max-width: 750px;
+      float: none;
+      margin-left: auto;
+      margin-right: auto;
     }
   }
 }

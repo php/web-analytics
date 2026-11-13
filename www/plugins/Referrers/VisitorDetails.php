@@ -11,6 +11,7 @@ namespace Piwik\Plugins\Referrers;
 
 use Piwik\Common;
 use Piwik\Plugins\Live\VisitorDetailsAbstract;
+use Piwik\Plugins\PrivacyManager\Settings\CampaignParameterValuesMasked;
 use Piwik\UrlHelper;
 use Piwik\View;
 
@@ -28,6 +29,8 @@ class VisitorDetails extends VisitorDetailsAbstract
         $visitor['referrerSearchEngineIcon']  = $this->getSearchEngineIcon();
         $visitor['referrerSocialNetworkUrl']  = $this->getSocialNetworkUrl();
         $visitor['referrerSocialNetworkIcon'] = $this->getSocialNetworkIcon();
+        $visitor['referrerAIAssistantUrl'] = $this->getAIAssistantUrl();
+        $visitor['referrerAIAssistantIcon'] = $this->getAIAssistantIcon();
     }
 
     public function renderVisitorDetails($visitorDetails)
@@ -40,7 +43,11 @@ class VisitorDetails extends VisitorDetailsAbstract
 
     public function renderActionTooltip($action, $visitInfo)
     {
-        if (($action['type'] !== 'goal' && $action['type'] !== 'ecommerceOrder') || empty($action['referrerType'])) {
+        if (
+            empty($action['type'])
+            || ($action['type'] !== 'goal' && $action['type'] !== 'ecommerceOrder')
+            || empty($action['referrerType'])
+        ) {
             return [];
         }
 
@@ -75,7 +82,9 @@ class VisitorDetails extends VisitorDetailsAbstract
             $keyword = API::getCleanKeyword($keyword);
         }
 
-        return urldecode($keyword);
+        $keyword = urldecode($keyword);
+
+        return CampaignParameterValuesMasked::formatValue($keyword);
     }
 
     protected function getReferrerUrl()
@@ -109,7 +118,9 @@ class VisitorDetails extends VisitorDetailsAbstract
 
     protected function getReferrerName(): string
     {
-         return html_entity_decode(($this->details['referer_name'] ?? ''), ENT_QUOTES, "UTF-8");
+         $name = html_entity_decode(($this->details['referer_name'] ?? ''), ENT_QUOTES, "UTF-8");
+
+         return CampaignParameterValuesMasked::formatValue($name);
     }
 
     protected function getSearchEngineUrl()
@@ -153,6 +164,29 @@ class VisitorDetails extends VisitorDetailsAbstract
 
         if (!is_null($socialNetworkUrl)) {
             return Social::getInstance()->getLogoFromUrl($socialNetworkUrl);
+        }
+
+        return null;
+    }
+
+    protected function getAIAssistantUrl(): ?string
+    {
+        if (
+            $this->getReferrerType() === 'ai'
+            && !empty($this->details['referer_name'])
+        ) {
+            return AIAssistant::getInstance()->getMainUrl($this->details['referer_url']);
+        }
+
+        return null;
+    }
+
+    protected function getAIAssistantIcon(): ?string
+    {
+        $aiAssistantUrl = $this->getAIAssistantUrl();
+
+        if (!is_null($aiAssistantUrl)) {
+            return AIAssistant::getInstance()->getLogoFromUrl($aiAssistantUrl);
         }
 
         return null;

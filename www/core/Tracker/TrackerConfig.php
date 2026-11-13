@@ -9,41 +9,25 @@
 
 namespace Piwik\Tracker;
 
-use Piwik\Config;
+use Piwik\Config\SectionConfig;
+use Piwik\Tracker\Config\ThirdPartyCookies;
 
-class TrackerConfig
+class TrackerConfig extends SectionConfig
 {
+    public static function getSectionName(): string
+    {
+        return 'Tracker';
+    }
+
     /**
-     * Update Tracker config
-     *
-     * @param string $name Setting name
-     * @param mixed $value Value
+     * @return mixed|null
      */
-    public static function setConfigValue($name, $value)
+    protected static function getRawConfigValue(string $name, ?int $idSite = null)
     {
-        $section = self::getConfig();
-        $section[$name] = $value;
-        Config::getInstance()->Tracker = $section;
-    }
-
-    public static function getConfigValue($name, $idSite = null)
-    {
-        $config = self::getConfig();
-        if (!empty($idSite)) {
-            $siteSpecificConfig = self::getSiteSpecificConfig($idSite);
-            $config = array_merge($config, $siteSpecificConfig);
+        if ($name === 'use_third_party_id_cookie') {
+            return ThirdPartyCookies::getInstance($idSite)->getValue();
         }
-        return $config[$name] ?? null;
-    }
 
-    private static function getConfig()
-    {
-        return Config::getInstance()->Tracker;
-    }
-
-    private static function getSiteSpecificConfig($idSite)
-    {
-        $key = 'Tracker_' . $idSite;
-        return Config::getInstance()->$key;
+        return parent::getRawConfigValue($name, $idSite);
     }
 }

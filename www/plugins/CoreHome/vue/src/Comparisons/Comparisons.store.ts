@@ -7,6 +7,7 @@
 
 import {
   reactive,
+  ref,
   watch,
   computed,
   readonly,
@@ -61,6 +62,22 @@ function wrapArray<T>(values: T | T[]): T[] {
   return Array.isArray(values) ? values : [values];
 }
 
+function normalizeUrlState(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeUrlState);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, nestedValue]) => [key, normalizeUrlState(nestedValue)]),
+    );
+  }
+
+  return value;
+}
+
 export default class ComparisonsStore {
   private privateState = reactive<ComparisonsStoreState>({
     comparisonsDisabledFor: [],
@@ -68,7 +85,7 @@ export default class ComparisonsStore {
 
   readonly state = readonly(this.privateState); // for tests
 
-  private colors: { [key: string]: string } = {};
+  private colors = ref<{ [key: string]: string }>({});
 
   readonly segmentComparisons = computed(() => this.parseSegmentComparisons());
 
@@ -87,14 +104,21 @@ export default class ComparisonsStore {
     }
 
     $(() => {
-      this.colors = this.getAllSeriesColors() as { [key: string]: string };
+      this.colors.value = this.getAllSeriesColors() as { [key: string]: string };
     });
 
     watch(
-      () => this.getComparisons(),
+      () => this.getUrlStateWithoutPopoverKey(),
       () => Matomo.postEvent('piwikComparisonsChanged'),
-      { deep: true },
     );
+  }
+
+  private getUrlStateWithoutPopoverKey(): string {
+    const parsedWithoutPopover = Object.fromEntries(
+      Object.entries(MatomoUrl.parsed.value).filter(([key]) => key !== 'popover'),
+    );
+
+    return JSON.stringify(normalizeUrlState(parsedWithoutPopover));
   }
 
   getComparisons(): AnyComparison[] {
@@ -140,11 +164,11 @@ export default class ComparisonsStore {
     ) % SERIES_COLOR_COUNT;
 
     if (metricIndex === 0) {
-      return this.colors[`series${seriesIndex}`];
+      return this.colors.value[`series${seriesIndex}`];
     }
 
     const shadeIndex = metricIndex % SERIES_SHADE_COUNT;
-    return this.colors[`series${seriesIndex}-shade${shadeIndex}`];
+    return this.colors.value[`series${seriesIndex}-shade${shadeIndex}`];
   }
 
   getSeriesColorName(seriesIndex: number, metricIndex: number): string {
@@ -187,7 +211,7 @@ export default class ComparisonsStore {
         seriesInfo.push({
           index: seriesIndex,
           params: { ...segmentComp.params, ...periodComp.params },
-          color: this.colors[`series${seriesIndex}`],
+          color: this.colors.value[`series${seriesIndex}`],
         });
         seriesIndex += 1;
       });
@@ -214,6 +238,21 @@ export default class ComparisonsStore {
       this.periodComparisons.value,
       extraParams,
     );
+  }
+
+  removeSegmentComparisonByDefinition(segmentDefinition: string): void {
+    if (!this.isComparisonEnabled()) {
+      throw new Error('Comparison disabled.');
+    }
+    let segmentIndex = null;
+    this.getSegmentComparisons().forEach((segment: SegmentComparison, index: number) => {
+      if (segment && segment.params && segment.params.segment === segmentDefinition) {
+        segmentIndex = index;
+      }
+    });
+    if (segmentIndex !== null) {
+      this.removeSegmentComparison(segmentIndex);
+    }
   }
 
   addSegmentComparison(params: { [name: string]: string }): void {

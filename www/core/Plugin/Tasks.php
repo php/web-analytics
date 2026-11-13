@@ -103,7 +103,7 @@ class Tasks
     }
 
     /**
-     * Schedules the given tasks/method to run depending at the given scheduled time. Unlike the convenient methods
+     * Schedules the given tasks/method to run depending on the given scheduled time. Unlike the convenient methods
      * such as {@link hourly()} you need to specify the object on which the given method should be called. This can be
      * either an instance of a class or a class name. For more information about these parameters see {@link hourly()}
      *
@@ -140,8 +140,6 @@ class Tasks
     /**
      * In case you need very high flexibility and none of the other convenient methods such as {@link hourly()} or
      * {@link custom()} suit you, you can use this method to add a custom scheduled task.
-     *
-     * @param Task $task
      */
     protected function scheduleTask(Task $task)
     {

@@ -22,13 +22,12 @@ use Piwik\Piwik;
 use Piwik\Plugin\ArchivedMetric;
 use Piwik\Plugin\ComputedMetric;
 use Piwik\Plugin\ThemeStyles;
+use Piwik\Plugins\SegmentEditor\Settings\LimitSegments;
+use Piwik\Segment\SegmentsList;
 use Piwik\SettingsPiwik;
 use Piwik\SettingsServer;
 use Piwik\Tracker\Model as TrackerModel;
 
-/**
- *
- */
 class CoreHome extends \Piwik\Plugin
 {
     /**
@@ -44,15 +43,16 @@ class CoreHome extends \Piwik\Plugin
     public function registerEvents()
     {
         return array(
-            'AssetManager.getStylesheetFiles'        => 'getStylesheetFiles',
-            'AssetManager.getJavaScriptFiles'        => 'getJsFiles',
-            'AssetManager.filterMergedJavaScripts'   => 'filterMergedJavaScripts',
-            'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
-            'Metric.addComputedMetrics'              => 'addComputedMetrics',
-            'Request.initAuthenticationObject' => ['function' => 'checkAllowedIpsOnAuthentication', 'before' => true],
-            'AssetManager.addStylesheets' => 'addStylesheets',
+            'AssetManager.getStylesheetFiles'            => 'getStylesheetFiles',
+            'AssetManager.getJavaScriptFiles'            => 'getJsFiles',
+            'AssetManager.filterMergedJavaScripts'       => 'filterMergedJavaScripts',
+            'Translate.getClientSideTranslationKeys'     => 'getClientSideTranslationKeys',
+            'Metric.addComputedMetrics'                  =>  'addComputedMetrics',
+            'Request.initAuthenticationObject'           => ['function' => 'checkAllowedIpsOnAuthentication', 'before' => true],
+            'AssetManager.addStylesheets'                => 'addStylesheets',
             'Request.dispatchCoreAndPluginUpdatesScreen' => ['function' => 'checkAllowedIpsOnAuthentication', 'before' => true],
-            'Tracker.setTrackerCacheGeneral' => 'setTrackerCacheGeneral',
+            'Tracker.setTrackerCacheGeneral'             => 'setTrackerCacheGeneral',
+            'Segment.filterSegments'                     => 'filterSegments',
         );
     }
 
@@ -146,6 +146,7 @@ class CoreHome extends \Piwik\Plugin
         $stylesheets[] = "plugins/CoreHome/vue/src/EnrichedHeadline/EnrichedHeadline.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/Notification/Notification.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/QuickAccess/QuickAccess.less";
+        $stylesheets[] = "plugins/CoreHome/vue/src/SearchInput/SearchInput.less";
         $stylesheets[] = "plugins/CoreHome/stylesheets/selector.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/ReportingPage/ReportingPage.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/ReportExport/ReportExport.less";
@@ -155,10 +156,16 @@ class CoreHome extends \Piwik\Plugin
         $stylesheets[] = "plugins/CoreHome/vue/src/PeriodSelector/PeriodSelector.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/MultiPairField/MultiPairField.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/DropdownMenu/DropdownMenu.less";
+        $stylesheets[] = "plugins/CoreHome/vue/src/DraggableList/DraggableList.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/Sparkline/Sparkline.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/FieldArray/FieldArray.less";
         $stylesheets[] = "plugins/CoreHome/vue/src/Comparisons/Comparisons.less";
         $stylesheets[] = "plugins/CoreHome/stylesheets/vue-transitions.less";
+        $stylesheets[] = "plugins/CoreHome/vue/src/PasswordStrength/PasswordStrength.less";
+        $stylesheets[] = "plugins/CoreHome/vue/src/EntityDuplicator/EntityDuplicatorModal.less";
+        $stylesheets[] = "plugins/CoreHome/vue/src/EntityDuplicator/EntityDuplicatorAction.less";
+        $stylesheets[] = "plugins/CoreHome/vue/src/ReportHeader/ReportHeader.less";
+        $stylesheets[] = "plugins/CoreHome/vue/src/WidgetControls/WidgetControls.less";
     }
 
     public function getJsFiles(&$jsFiles)
@@ -184,6 +191,7 @@ class CoreHome extends \Piwik\Plugin
         $jsFiles[] = "plugins/CoreHome/javascripts/corehome.js";
         $jsFiles[] = "plugins/CoreHome/javascripts/top_controls.js";
         $jsFiles[] = "libs/jqplot/jqplot-custom.min.js";
+        $jsFiles[] = "plugins/CoreHome/javascripts/themes.js";
         $jsFiles[] = "plugins/CoreHome/javascripts/color_manager.js";
         $jsFiles[] = "plugins/CoreHome/javascripts/notification.js";
         $jsFiles[] = "plugins/CoreHome/javascripts/listingFormatter.js";
@@ -230,6 +238,10 @@ class CoreHome extends \Piwik\Plugin
         $translationKeys[] = 'CoreHome_Menu';
         $translationKeys[] = 'CoreHome_AddTotalsRowDataTable';
         $translationKeys[] = 'CoreHome_RemoveTotalsRowDataTable';
+        $translationKeys[] = 'CoreHome_ShowPercentageValuesDataTable';
+        $translationKeys[] = 'CoreHome_ShowAbsoluteValuesDataTable';
+        $translationKeys[] = 'CoreHome_ShowPercentageValues';
+        $translationKeys[] = 'CoreHome_ShowAbsoluteValues';
         $translationKeys[] = 'CoreHome_PeriodHasOnlyRawData';
         $translationKeys[] = 'CoreHome_PeriodHasOnlyRawDataNoVisitsLog';
         $translationKeys[] = 'SitesManager_NotFound';
@@ -341,8 +353,22 @@ class CoreHome extends \Piwik\Plugin
         $translationKeys[] = 'General_DateRangeTo';
         $translationKeys[] = 'General_DoubleClickToChangePeriod';
         $translationKeys[] = 'General_Apply';
+        $translationKeys[] = 'General_ChoosePeriod';
         $translationKeys[] = 'General_Period';
         $translationKeys[] = 'General_CompareTo';
+        $translationKeys[] = 'CoreHome_PresetDateToday';
+        $translationKeys[] = 'CoreHome_PresetDateYesterday';
+        $translationKeys[] = 'CoreHome_PresetDateLast7Days';
+        $translationKeys[] = 'CoreHome_PresetDateLast30Days';
+        $translationKeys[] = 'CoreHome_PresetDateLast90Days';
+        $translationKeys[] = 'CoreHome_PresetDateLastWeekMonSun';
+        $translationKeys[] = 'CoreHome_PresetDateLastMonth';
+        $translationKeys[] = 'CoreHome_PresetDateLastQuarter';
+        $translationKeys[] = 'CoreHome_PresetDateLastYear';
+        $translationKeys[] = 'CoreHome_PresetDateThisWeekMonToday';
+        $translationKeys[] = 'CoreHome_PresetDateThisMonth';
+        $translationKeys[] = 'CoreHome_PresetDateThisQuarter';
+        $translationKeys[] = 'CoreHome_PresetDateThisYear';
         $translationKeys[] = 'CoreHome_DateInvalid';
         $translationKeys[] = 'CoreHome_EnterZenMode';
         $translationKeys[] = 'CoreHome_ExitZenMode';
@@ -361,6 +387,7 @@ class CoreHome extends \Piwik\Plugin
         $translationKeys[] = 'CoreHome_ExportTooltip';
         $translationKeys[] = 'CoreHome_ExportTooltipWithLink';
         $translationKeys[] = 'CoreHome_FlattenReport';
+        $translationKeys[] = 'CoreHome_IncludeDimensionsSeparately';
         $translationKeys[] = 'CoreHome_CustomLimit';
         $translationKeys[] = 'CoreHome_ExpandSubtables';
         $translationKeys[] = 'CoreHome_HomeShortcut';
@@ -383,8 +410,10 @@ class CoreHome extends \Piwik\Plugin
         $translationKeys[] = 'CoreHome_TechDeprecationWarning';
         $translationKeys[] = 'CoreHome_StartDate';
         $translationKeys[] = 'CoreHome_EndDate';
+        $translationKeys[] = 'CoreHome_InvalidComparisonDateRange';
         $translationKeys[] = 'CoreHome_DataForThisReportHasBeenDisabled';
         $translationKeys[] = 'CoreHome_ChangeVisualization';
+        $translationKeys[] = 'CoreHome_ReportConfigure';
         $translationKeys[] = 'General_ExportThisReport';
         $translationKeys[] = 'Annotations_Annotations';
         $translationKeys[] = 'CoreHome_CloseSearch';
@@ -398,6 +427,20 @@ class CoreHome extends \Piwik\Plugin
         $translationKeys[] = 'General_YouAreCurrentlyUsing';
         $translationKeys[] = 'General_Copy';
         $translationKeys[] = 'General_CopiedToClipboard';
+        $translationKeys[] = 'CoreHome_ReportLowercase';
+        $translationKeys[] = 'CoreHome_LearnMoreFullStop';
+        $translationKeys[] = 'CoreHome_ChooseWebsite';
+        $translationKeys[] = 'CoreHome_CopyModalNote';
+        $translationKeys[] = 'CoreHome_CopyX';
+        $translationKeys[] = 'CoreHome_CopyXDescription';
+        $translationKeys[] = 'CoreHome_WebAnalyticsReports';
+        $translationKeys[] = 'General_Widget';
+        // Widget-control actions rendered by the shared CoreHome.WidgetControls component. Registered
+        // here (not in Dashboard) so the component works wherever CoreHome is loaded.
+        $translationKeys[] = 'General_Refresh';
+        $translationKeys[] = 'Dashboard_Minimise';
+        $translationKeys[] = 'Dashboard_Maximise';
+        $translationKeys[] = 'General_Close';
 
         // add admin menu translations
         if (
@@ -421,6 +464,33 @@ class CoreHome extends \Piwik\Plugin
                     }
                 }
             });
+        }
+    }
+
+    public function filterSegments(SegmentsList &$list, array $idSites)
+    {
+        $limitSegmentsSettingEnabled = false;
+        if (empty($idSites)) {
+            $limitSegmentsSettingEnabled = LimitSegments::getInstance()->getValue();
+        } else {
+            foreach ($idSites as $idsite) {
+                $limitSegmentsSettingEnabled |= LimitSegments::getInstance($idsite)->getValue();
+            }
+        }
+        if ($limitSegmentsSettingEnabled) {
+            $list->remove('General_Visitors', 'userId');
+            $list->remove('General_Visitors', 'visitIp');
+            $list->remove('General_Visitors', 'visitId');
+            $list->remove('General_Visitors', 'visitorId');
+            $list->remove('General_Visitors', 'fingerprint');
+            $list->remove('Referrers_Referrers', 'campaignId');
+            $list->remove('General_Actions', 'actionServerHour');
+            $list->remove('General_Actions', 'actionServerMinute');
+            $list->remove('General_Visitors', 'visitServerHour');
+            $list->remove('General_Visitors', 'visitEndServerMinute');
+            $list->remove('General_Visitors', 'visitEndServerSecond');
+            $list->remove('General_Visitors', 'visitStartServerHour');
+            $list->remove('General_Visitors', 'visitStartServerMinute');
         }
     }
 }

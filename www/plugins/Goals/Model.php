@@ -12,6 +12,22 @@ namespace Piwik\Plugins\Goals;
 use Piwik\Common;
 use Piwik\Db;
 
+/**
+ * @phpstan-type GoalStoredRecord array{
+ *     idgoal: int|string,
+ *     idsite: int|string,
+ *     name: string,
+ *     description: string,
+ *     match_attribute: string,
+ *     pattern: string,
+ *     pattern_type: string,
+ *     case_sensitive: int|string,
+ *     allow_multiple: int|string,
+ *     revenue: float|int|string,
+ *     event_value_as_revenue: int|string,
+ *     deleted?: int|string
+ * }
+ */
 class Model
 {
     private static $rawPrefix = 'goal';
@@ -25,7 +41,7 @@ class Model
     private function getNextIdGoal($idSite)
     {
         $db     = $this->getDb();
-        $idGoal = $db->fetchOne("SELECT max(idgoal) + 1 FROM " . $this->table . "
+        $idGoal = $db->fetchOne("SELECT max(idgoal) + 1 FROM `" . $this->table . "`
                                  WHERE idsite = ?", $idSite);
 
         if (empty($idGoal)) {
@@ -65,30 +81,39 @@ class Model
         Db::deleteAllRows($table, "WHERE idgoal = ? AND idsite = ?", "idvisit", 100000, array($idGoal, $idSite));
     }
 
+    /**
+     * @param string|int $idSite
+     * @param string|int $idGoal
+     * @phpstan-return GoalStoredRecord|array{}
+     */
     public function getActiveGoal($idSite, $idGoal)
     {
         $idSite = (int) $idSite;
         $idGoal = (int) $idGoal;
-        $goals  = Db::fetchRow("SELECT * FROM " . $this->table . "
+        $goals = Db::fetchRow("SELECT * FROM `" . $this->table . "`
                                 WHERE idsite = $idSite AND idgoal = $idGoal
                                       AND deleted = 0 LIMIT 1");
 
         return $goals;
     }
 
+    /**
+     * @param int|string|array<int|string> $idSite
+     * @phpstan-return list<GoalStoredRecord>
+     */
     public function getActiveGoals($idSite)
     {
         $idSite = array_map('intval', $idSite);
-        $goals  = Db::fetchAll("SELECT * FROM " . $this->table . "
+        $goals = Db::fetchAll("SELECT * FROM `" . $this->table . "`
                                 WHERE idsite IN (" . implode(", ", $idSite) . ")
                                       AND deleted = 0");
 
         return $goals;
     }
 
-    public function deleteGoalsForSite($idSite)
+    public function deleteGoalsForSite($idSite): void
     {
-        Db::query("DELETE FROM " . $this->table . " WHERE idsite = ? ", array($idSite));
+        Db::query("DELETE FROM `" . $this->table . "` WHERE idsite = ? ", [$idSite]);
     }
 
     public function deleteGoal($idSite, $idGoal)
@@ -100,9 +125,9 @@ class Model
         Db::query($query, $bind);
     }
 
-    public function getActiveGoalCount()
+    public function getActiveGoalCount(): int
     {
-        return (int) Db::fetchOne("SELECT count(*) FROM " . $this->table . "
+        return (int)Db::fetchOne("SELECT count(*) FROM `" . $this->table . "`
                                 WHERE deleted = 0");
     }
 
@@ -113,15 +138,10 @@ class Model
 
     /**
      * Checks if an active idgoal exists for the site
-     *
-     * @param int $idGoal
-     * @param int $idSite
-     *
-     * @return bool
      */
     public function doesGoalExist(int $idGoal, int $idSite): bool
     {
-        return (bool) Db::fetchOne("SELECT COUNT(*) FROM " . $this->table . "
+        return (bool)Db::fetchOne("SELECT COUNT(*) FROM `" . $this->table . "`
                                 WHERE deleted = 0 AND idsite = ? AND idgoal = ?", [$idSite, $idGoal]);
     }
 }

@@ -105,8 +105,6 @@ class CalculateConversionPages extends ConsoleCommand
     /**
      * Static method to calculate conversion for today and yesterday, for all sites and goals.
      * Called by the migration updater
-     *
-     * @return void
      */
     public static function calculateYesterdayAndToday(): void
     {
@@ -129,8 +127,7 @@ class CalculateConversionPages extends ConsoleCommand
     /**
      * Validate dates parameter
      *
-     * @param string $dates
-     * @return Date[]
+     * @return string[]
      */
     private function getDateRangeToCalculate(string $dates): ?array
     {
@@ -161,8 +158,6 @@ class CalculateConversionPages extends ConsoleCommand
 
     /**
      * Validate the sites parameter
-     *
-     * @return string|null
      */
     private function getSitesToCalculate(): ?string
     {
@@ -187,8 +182,6 @@ class CalculateConversionPages extends ConsoleCommand
 
     /**
      * Validate the goals parameter
-     *
-     * @return string|null
      */
     private function getGoalsToCalculate(): ?string
     {
@@ -258,7 +251,7 @@ class CalculateConversionPages extends ConsoleCommand
             $sql = "
                     SELECT MIN(s.t) FROM (
                     SELECT c.server_time AS t
-                    FROM " . Common::prefixTable('log_conversion') . " c                                 
+                    FROM `" . Common::prefixTable('log_conversion') . "` c                                 
                     ";
 
             $where = '';
@@ -268,12 +261,13 @@ class CalculateConversionPages extends ConsoleCommand
 
             $bind = [];
             if ($idGoal !== null) {
-                $where .= ' AND c.idgoal = ? ';
-                $bind[] = $idGoal;
+                $goalIds = explode(',', $idGoal);
+                $where .= ' AND c.idgoal IN (' . Common::getSqlStringFieldsArray($goalIds) . ') ';
+                $bind = array_merge($bind, $goalIds);
             }
             if ($idSite !== null) {
-                $where .= ' AND c.idsite = ? ';
-                $bind[] = $idSite;
+                $where .= ' AND c.idsite IN (' . Common::getSqlStringFieldsArray($sites) . ') ';
+                $bind = array_merge($bind, $sites);
             }
 
             if ($where !== '') {
@@ -303,7 +297,7 @@ class CalculateConversionPages extends ConsoleCommand
 
             if ($idGoal === null) {
                 // All goals
-                $gids = Db::fetchAll("SELECT idgoal FROM " . Common::prefixTable('goal') . "
+                $gids = Db::fetchAll("SELECT idgoal FROM `" . Common::prefixTable('goal') . "`
                                         WHERE idsite = ? AND deleted = 0", [$site]);
                 $goals = array_column($gids, 'idgoal');
 
@@ -343,11 +337,11 @@ class CalculateConversionPages extends ConsoleCommand
                 UPDATE " . Common::prefixTable('log_conversion') . " c
                 LEFT JOIN (                
                     SELECT c.idvisit, c.idgoal, COUNT(a.idvisit) AS pagesbefore, c.idlink_va, c.server_time
-                    FROM " . Common::prefixTable('log_conversion') . " c
+                    FROM `" . Common::prefixTable('log_conversion') . "` c
                     LEFT JOIN (
                         SELECT va.idvisit, va.server_time
-                        FROM " . Common::prefixTable('log_link_visit_action') . " va
-                        INNER JOIN " . Common::prefixTable('log_action') . " a ON a.idaction = va.idaction_url
+                        FROM `" . Common::prefixTable('log_link_visit_action') . "` va
+                        INNER JOIN `" . Common::prefixTable('log_action') . "` a ON a.idaction = va.idaction_url
                         WHERE a.type = 1
                         AND va.idsite = ?
                         AND va.server_time >= ?

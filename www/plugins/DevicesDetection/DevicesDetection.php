@@ -9,6 +9,12 @@
 
 namespace Piwik\Plugins\DevicesDetection;
 
+use Piwik\Plugins\DevicesDetection\Settings\OnlyMajorVersions;
+use Piwik\Plugins\DevicesDetection\Settings\DeviceModelDetectionDisabled;
+use Piwik\Plugins\SegmentEditor\Settings\LimitSegments;
+use Piwik\Segment\SegmentsList;
+use Piwik\Tracker\Cache as TrackerCache;
+
 require_once PIWIK_INCLUDE_PATH . '/plugins/DevicesDetection/functions.php';
 
 class DevicesDetection extends \Piwik\Plugin
@@ -17,7 +23,8 @@ class DevicesDetection extends \Piwik\Plugin
     {
         return [
             'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
-            'AssetManager.getStylesheetFiles' => 'getStylesheetFiles',
+            'AssetManager.getStylesheetFiles'        => 'getStylesheetFiles',
+            'Segment.filterSegments'                 => 'filterSegments',
         ];
     }
 
@@ -46,5 +53,40 @@ class DevicesDetection extends \Piwik\Plugin
     public function getStylesheetFiles(&$files)
     {
         $files[] = 'plugins/DevicesDetection/vue/src/DetectionPage/DetectionPage.less';
+    }
+
+    public static function shouldOnlyStoreMajorVersions(?int $idsite = null): bool
+    {
+        $cache = TrackerCache::getCacheWebsiteAttributes($idsite);
+        $cacheKey = OnlyMajorVersions::class;
+        return (($cache[$cacheKey] ?? false) === true);
+    }
+
+    /**
+     * Check if compliance policy disables device model detection
+     *
+     * @throws \Piwik\Exception\DI\DependencyException
+     * @throws \Piwik\Exception\DI\NotFoundException
+     */
+    public static function isDeviceModelDetectionDisabledByCompliancePolicy(?int $idSite = null): bool
+    {
+        $cache = TrackerCache::getCacheWebsiteAttributes($idSite);
+        $cacheKey = DeviceModelDetectionDisabled::class;
+        return (($cache[$cacheKey] ?? false) === true);
+    }
+
+    public function filterSegments(SegmentsList &$list, array $idSites)
+    {
+        $limitSegmentsSettingEnabled = false;
+        if (empty($idSites)) {
+            $limitSegmentsSettingEnabled = LimitSegments::getInstance()->getValue();
+        } else {
+            foreach ($idSites as $idsite) {
+                $limitSegmentsSettingEnabled |= LimitSegments::getInstance($idsite)->getValue();
+            }
+        }
+        if ($limitSegmentsSettingEnabled) {
+            $list->remove('General_Visitors', 'deviceModel');
+        }
     }
 }

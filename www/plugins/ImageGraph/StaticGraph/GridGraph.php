@@ -12,9 +12,6 @@ namespace Piwik\Plugins\ImageGraph\StaticGraph;
 use Piwik\Exception\InvalidDimensionException;
 use Piwik\Plugins\ImageGraph\StaticGraph;
 
-/**
- *
- */
 abstract class GridGraph extends StaticGraph
 {
     public const GRAPHIC_COLOR_KEY = 'GRAPHIC_COLOR';
@@ -55,7 +52,7 @@ abstract class GridGraph extends StaticGraph
             self::GRAPHIC_COLOR_KEY . '3' => 'CC3399',
             self::GRAPHIC_COLOR_KEY . '4' => '9933CC',
             self::GRAPHIC_COLOR_KEY . '5' => '80A033',
-            self::GRAPHIC_COLOR_KEY . '6' => '246AD2'
+            self::GRAPHIC_COLOR_KEY . '6' => '246AD2',
         );
     }
 
@@ -172,8 +169,8 @@ abstract class GridGraph extends StaticGraph
                  'ManualScale'      => array(
                      0 => array(
                          'Min' => 0,
-                         'Max' => $maxOrdinateValue
-                     )
+                         'Max' => $maxOrdinateValue,
+                     ),
                  ),
                  'Pos'              => $horizontalGraph ? SCALE_POS_TOPBOTTOM : SCALE_POS_LEFTRIGHT,
             )

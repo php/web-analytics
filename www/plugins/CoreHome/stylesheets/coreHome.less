@@ -1,5 +1,7 @@
 .home {
-    p {
+    // The promotion banner's copy brings its own padding; :where() adds no specificity, so
+    // every other paragraph is unchanged.
+    p:where(:not(.productPromotion__text, .productPromotion__reason)) {
         padding-bottom: 1em;
         margin-right: 1em;
         margin-left: 1em;
@@ -29,6 +31,13 @@
     }
 }
 
+/* Opt-in wider content area for admin pages that lay out in columns rather than in one text
+   measure. Set with the `contentClass` block in admin.twig. */
+#content.admin--wide {
+    display: block;
+    max-width: 1920px;
+}
+
 /* 2 columns reports */
 #leftcolumn {
     float: left;
@@ -48,15 +57,17 @@
 }
 
 .accessibility-skip-to-content {
+    padding: 0 0.5rem;
     font-size: 14px;
     position: absolute;
     left: -10000px;
     top: 0;
+    color: @theme-color-header-text;
 }
 .accessibility-skip-to-content:focus {
     display: block;
     position: absolute;
-    left: 200px;
+    left: 180px;
 }
 
 /* Calendar */
@@ -125,7 +136,10 @@ div .sparkline {
     margin-top: 10px;
 }
 
-.sparkline img {
+// `.sparklineImg` is the Vue Sparkline's image and styles itself — see Sparkline.less. Excluding
+// it here keeps all of its rules in one file. `:where()` adds no specificity, so legacy sparkline
+// images are unaffected.
+.sparkline img:where(:not(.sparklineImg)) {
     vertical-align: middle;
     padding-right: 10px;
     margin-top: 0;

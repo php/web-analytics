@@ -1,8 +1,8 @@
 //colors calendar
 @calendarHeaderBackground: @theme-color-background-contrast;
 @calendarHeaderColor: #999;
-@calendarCurrentStateHover: #f5f5f5;
-@calendarBorder: #ccc;
+@calendarCurrentStateHover: @theme-color-background-base;
+@calendarBorder: @theme-color-border;
 
 .ui-datepicker {
   th,
@@ -64,13 +64,8 @@
 }
 
 .segment-element {
-  background: @color-white;
-  border-color: @color-silver-l80;
-  line-height: 1.33;
-  box-shadow: 4px 7px 25px rgba(0, 0, 0, 0.3);
-
   .segment-add-row {
-    .border-radius(5px);
+    border-radius: 5px;
   }
 
   .custom_select_search {
@@ -107,7 +102,7 @@
   }
 
   .segment-top {
-    .font-default(10px, 12px);
+    .font-default(10px, 16px);
 
     color: @theme-color-text-light;
     text-transform: uppercase;
@@ -115,12 +110,12 @@
     h4 {
       color: @color-silver-l30;
       text-transform: uppercase;
-      .font-default(10px, 12px);
+      .font-default(10px, 16px);
 
       a.dropdown {
         color: @color-silver-l30;
         text-transform: uppercase;
-        .font-default(10px, 12px);
+        .font-default(10px, 16px);
       }
     }
 
@@ -132,13 +127,11 @@
       &.ui-autocomplete-input {
         background-position: 100% -2px;
       }
-      .font-default(10px, 12px);
+      .font-default(10px, 16px);
     }
   }
 
   .segment-footer {
-    background: @color-white;
-
     a.delete {
       color: @theme-color-brand;
     }
@@ -174,18 +167,6 @@
 
 #header_message {
   height: auto;
-  .border-radius(0);
-
-  &.isPiwikDemo {
-    text-align: right;
-    position: absolute;
-    right: 16px;
-    top: 8px;
-
-    .dropdown {
-      min-width: 280px;
-    }
-  }
 }
 
 .ui-menu {
@@ -251,7 +232,7 @@
       border-bottom: 1px solid @color-gray;
       font-weight: normal;
       padding: 15px;
-      background: #f5f5f5;
+      background: @theme-color-background-tinyContrast;
       .border-radius(6px 6px 0 0);
     }
 
@@ -275,7 +256,7 @@
 
         h3 {
           font-weight: normal;
-          color: #000;
+          color: @theme-color-text;
           .font-default(15px, 20px);
 
           margin-bottom: 10px;
@@ -287,7 +268,7 @@
 
         h3 {
           font-weight: normal;
-          color: #000;
+          color: @theme-color-text;
           .font-default(15px, 20px);
 
           margin-bottom: 10px;
@@ -297,7 +278,7 @@
   }
 
   .Transitions_TitleOfOpenGroup {
-    color: #000;
+    color: @theme-color-text;
     .font-default(15px, 20px);
 
     font-weight: normal;

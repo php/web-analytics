@@ -56,7 +56,7 @@ class AttributeHistoricalDataWithLocations extends ConsoleCommand
     private $percentStep;
 
     /**
-     * @var int
+     * @var float
      */
     private $processedPercent = 0;
 
@@ -86,9 +86,6 @@ class AttributeHistoricalDataWithLocations extends ConsoleCommand
                                                                           . "recommended to use this option.");
     }
 
-    /**
-     * @return int
-     */
     protected function doExecute(): int
     {
         $input = $this->getInput();

@@ -13,19 +13,16 @@ use Exception;
 use Piwik\Config;
 use Piwik\Db;
 use Piwik\Db\AdapterInterface;
+use Piwik\Db\Schema;
 use Piwik\Piwik;
 use Zend_Config;
 use Zend_Db_Adapter_Mysqli;
 
-/**
- */
 class Mysqli extends Zend_Db_Adapter_Mysqli implements AdapterInterface
 {
     use Db\TransactionalDatabaseDynamicTrait;
 
     /**
-     * Constructor
-     *
      * @param array|Zend_Config $config database configuration
      */
     public function __construct($config)
@@ -99,8 +96,8 @@ class Mysqli extends Zend_Db_Adapter_Mysqli implements AdapterInterface
      */
     public function checkServerVersion()
     {
+        $requiredVersion = Schema::getInstance()->getMinimumSupportedVersion();
         $serverVersion   = $this->getServerVersion();
-        $requiredVersion = Config::getInstance()->General['minimum_mysql_version'];
 
         if (version_compare($serverVersion, $requiredVersion) === -1) {
             throw new Exception(Piwik::translate('General_ExceptionDatabaseVersion', array('MySQL', $serverVersion, $requiredVersion)));
@@ -190,7 +187,7 @@ class Mysqli extends Zend_Db_Adapter_Mysqli implements AdapterInterface
      * Test error number
      *
      * @param Exception $e
-     * @param string $errno
+     * @param string|int $errno
      * @return bool
      */
     public function isErrNo($e, $errno)
@@ -202,7 +199,8 @@ class Mysqli extends Zend_Db_Adapter_Mysqli implements AdapterInterface
      * Test error number
      *
      * @param Exception $e
-     * @param string $errno
+     * @param \mysqli|null $connection
+     * @param string|int $errno
      * @return bool
      */
     public static function isMysqliErrorNumber($e, $connection, $errno)

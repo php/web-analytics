@@ -9,15 +9,17 @@
 
 namespace Piwik\Plugins\CorePluginsAdmin;
 
+use Piwik\Cache;
 use Piwik\Piwik;
 use Piwik\Plugin\SettingsProvider;
 use Exception;
 use Piwik\Container\StaticContainer;
 use Piwik\Plugins\CoreAdminHome\Emails\SettingsChangedEmail;
 use Piwik\Plugins\CoreAdminHome\Emails\SecurityNotificationEmail;
+use Piwik\Plugins\Marketplace\Marketplace;
 
 /**
- * API for plugin CorePluginsAdmin
+ * Provides API methods for reading and updating plugin settings.
  *
  * @method static \Piwik\Plugins\CorePluginsAdmin\API getInstance()
  */
@@ -41,11 +43,14 @@ class API extends \Piwik\Plugin\API
 
     /**
      * @internal
-     * @param array $settingValues Format: array('PluginName' => array(array('name' => 'SettingName1', 'value' => 'SettingValue1), ..))
-     * @throws Exception
+     * @param array<string, array<int, array{name:string, value?:mixed}>> $settingValues
+     * @param string|false $passwordConfirmation
      */
-    public function setSystemSettings($settingValues, $passwordConfirmation = false)
-    {
+    public function setSystemSettings(
+        $settingValues,
+        #[\SensitiveParameter]
+        $passwordConfirmation = false
+    ): void {
         Piwik::checkUserHasSuperUserAccess();
 
         $this->confirmCurrentUserPassword($passwordConfirmation);
@@ -78,10 +83,9 @@ class API extends \Piwik\Plugin\API
 
     /**
      * @internal
-     * @param array $settingValues  Format: array('PluginName' => array(array('name' => 'SettingName1', 'value' => 'SettingValue1), ..))
-     * @throws Exception
+     * @param array<string, array<int, array{name:string, value?:mixed}>> $settingValues
      */
-    public function setUserSettings($settingValues)
+    public function setUserSettings($settingValues): void
     {
         Piwik::checkUserIsNotAnonymous();
 
@@ -102,8 +106,7 @@ class API extends \Piwik\Plugin\API
 
     /**
      * @internal
-     * @return array
-     * @throws \Piwik\NoAccessException
+     * @return array<int, array<string, mixed>>
      */
     public function getSystemSettings()
     {
@@ -116,8 +119,7 @@ class API extends \Piwik\Plugin\API
 
     /**
      * @internal
-     * @return array
-     * @throws \Piwik\NoAccessException
+     * @return array<int, array<string, mixed>>
      */
     public function getUserSettings()
     {
@@ -128,7 +130,39 @@ class API extends \Piwik\Plugin\API
         return $this->settingsMetadata->formatSettings($userSettings);
     }
 
-    private function sendNotificationEmails($sendSettingsChangedNotificationEmailPlugins)
+    /**
+     * @internal
+     */
+    public function getNumberOfPluginUpdates(): int
+    {
+        try {
+            Piwik::checkUserHasSuperUserAccess();
+
+            if (!Marketplace::isMarketplaceEnabled()) {
+                return 0;
+            }
+
+            $cacheKey = 'CorePluginsAdmin_NumberOfPluginUpdates';
+            $cache = Cache::getLazyCache();
+
+            if ($cache->contains($cacheKey)) {
+                return $cache->fetch($cacheKey);
+            }
+
+            $marketplacePlugins = StaticContainer::get('Piwik\Plugins\Marketplace\Plugins');
+            $updatesCount = count($marketplacePlugins->getPluginsHavingUpdate());
+            $cache->save($cacheKey, $updatesCount, 300);
+
+            return $updatesCount;
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * @param string[] $sendSettingsChangedNotificationEmailPlugins
+     */
+    private function sendNotificationEmails(array $sendSettingsChangedNotificationEmailPlugins): void
     {
         $pluginNames = [];
         foreach ($sendSettingsChangedNotificationEmailPlugins as $plugin) {
@@ -141,7 +175,7 @@ class API extends \Piwik\Plugin\API
         $email = $container->make(SettingsChangedEmail::class, array(
             'login' => Piwik::getCurrentUserLogin(),
             'emailAddress' => Piwik::getCurrentUserEmail(),
-            'pluginNames' => $pluginNames
+            'pluginNames' => $pluginNames,
         ));
         $email->safeSend();
 
@@ -154,7 +188,7 @@ class API extends \Piwik\Plugin\API
                 'login' => Piwik::translate('Installation_SuperUser'),
                 'emailAddress' => $address,
                 'pluginNames' => $pluginNames,
-                'superuser' => Piwik::getCurrentUserLogin()
+                'superuser' => Piwik::getCurrentUserLogin(),
             ));
             $superUserEmail->addTo($address);
         }

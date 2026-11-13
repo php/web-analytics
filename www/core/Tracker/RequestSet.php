@@ -9,7 +9,8 @@
 
 namespace Piwik\Tracker;
 
-use Piwik\Common;
+use Piwik\Request\AuthenticationToken;
+use Piwik\Container\StaticContainer;
 use Piwik\Piwik;
 
 class RequestSet
@@ -50,8 +51,10 @@ class RequestSet
         }
     }
 
-    public function setTokenAuth($tokenAuth)
-    {
+    public function setTokenAuth(
+        #[\SensitiveParameter]
+        $tokenAuth
+    ) {
         $this->tokenAuth = $tokenAuth;
     }
 
@@ -79,7 +82,7 @@ class RequestSet
             return $this->tokenAuth;
         }
 
-        return Common::getRequestVar('token_auth', false);
+        return StaticContainer::get(AuthenticationToken::class)->getAuthToken();
     }
 
     private function areRequestsInitialized()
@@ -141,7 +144,7 @@ class RequestSet
             'requests'  => array(),
             'env'       => $this->getEnvironment(),
             'tokenAuth' => $this->getTokenAuth(),
-            'time'      => time()
+            'time'      => time(),
         );
 
         foreach ($this->getRequests() as $request) {
@@ -206,7 +209,7 @@ class RequestSet
     {
         return array(
             'server' => $_SERVER,
-            'cookie' => $_COOKIE
+            'cookie' => $_COOKIE,
         );
     }
 }

@@ -14,13 +14,17 @@ use Piwik\Access;
 use Piwik\Auth\Password;
 use Piwik\Common;
 use Piwik\Container\StaticContainer;
+use Piwik\Date;
 use Piwik\IP;
+use Piwik\Metrics\Formatter;
 use Piwik\Option;
 use Piwik\Piwik;
 use Piwik\Plugins\Login\Emails\PasswordResetEmail;
 use Piwik\Plugins\Login\Emails\PasswordResetCancelEmail;
 use Piwik\Plugins\UsersManager\API as UsersManagerAPI;
 use Piwik\Plugins\UsersManager\Model;
+use Piwik\Plugins\UsersManager\Repository\UserRepository;
+use Piwik\Plugins\UsersManager\UserLoginHelper;
 use Piwik\Plugins\UsersManager\UsersManager;
 use Piwik\Plugins\UsersManager\UserUpdater;
 use Piwik\SettingsPiwik;
@@ -38,12 +42,14 @@ use Piwik\Url;
  * 3. PasswordResetter will generate a reset token and email the user a link
  *    to confirm that they requested a password reset. (This way an attacker
  *    cannot reset a user's password if they do not have control of the user's
- *    email address.)
+ *    email address.) For a pending invitee, it will instead refresh the
+ *    invitation link token and email an activation link that keeps the
+ *    invitation's original expiry.
  * 4. The user opens the email and clicks on the link. The link leads to
  *    a controller action that finishes the password reset process.
  * 5. When the link is clicked, PasswordResetter will update the user's password
  *    and remove the Option stored earlier. This is accomplished by
- *    {@link confirmNewPassword()}.
+ *    {@link setHashedPasswordForLogin()}.
  *
  * Note: this class does not contain any controller logic so it won't directly
  * handle certain requests. Controllers should call the appropriate methods.
@@ -101,7 +107,7 @@ class PasswordResetter
      *
      * Defaults to the `[General] noreply_email_name` INI config option.
      *
-     * @var string
+     * @var string|null
      */
     private $emailFromName;
 
@@ -110,13 +116,11 @@ class PasswordResetter
      *
      * Defaults to the `[General] noreply_email_address` INI config option.
      *
-     * @var
+     * @var string|null
      */
     private $emailFromAddress;
 
     /**
-     * Constructor.
-     *
      * @param UsersManagerAPI|null $usersManagerApi
      * @param string|null $confirmPasswordModule
      * @param string|null $confirmPasswordAction
@@ -199,7 +203,9 @@ class PasswordResetter
      * information as an {@link Option} and send an email with the reset confirmation
      * link to the user whose password is being reset.
      *
-     * The email confirmation link will contain the generated reset token.
+     * For an active user, the email confirmation link contains the generated
+     * reset token. For a pending invitee, the email contains an activation link
+     * that preserves the original invitation expiry.
      *
      * @param string $loginOrEmail The user's login or email address.
      * @param string $newPassword The un-hashed/unencrypted password.
@@ -213,14 +219,15 @@ class PasswordResetter
         $this->checkNewPassword($newPassword);
 
         // 'anonymous' has no password and cannot be reset
-        if ($loginOrEmail === 'anonymous') {
+        if (strtolower($loginOrEmail) === 'anonymous') {
             throw new Exception(Piwik::translate('Login_InvalidUsernameEmail'));
         }
 
         // get the user's login
-        $user = $this->getUserInformation($loginOrEmail);
+        $user = $this->getUserInformationForPasswordResetInitiation($loginOrEmail);
         if ($user === null) {
-            throw new Exception(Piwik::translate('Login_InvalidUsernameEmail'));
+            // throw a custom exception type so it can be handled/suppressed
+            throw new PasswordResetUserIsInvalidException(Piwik::translate('Login_InvalidUsernameEmail'));
         }
 
         $login = $user['login'];
@@ -230,7 +237,10 @@ class PasswordResetter
 
         // ... send email with confirmation link
         try {
-            $this->sendEmailConfirmationLink($user, $keySuffix);
+            if (!$this->sendEmailConfirmationLink($user, $keySuffix)) {
+                $this->removePasswordResetInfo($login);
+                return;
+            }
         } catch (Exception $ex) {
             // remove password reset info
             $this->removePasswordResetInfo($login);
@@ -274,20 +284,17 @@ class PasswordResetter
     }
 
     /**
-     * Confirms a password reset. This should be called after {@link initiatePasswordResetProcess()}
-     * is called.
+     * Sets the given already-hashed password as the specified user's password (executed as super
+     * user, so it can run before the user is authenticated during a password reset).
      *
-     * This method will get the new password associated with a reset token and set it
-     * as the specified user's password.
-     *
-     * @param string $login The login of the user whose password is being reset.
-     * @param string $passwordHash The generated string token contained in the reset password
-     *                           email.
-     * @throws Exception If there is no user with login '$login', if $resetToken is not a
-     *                   valid token or if the token has expired.
+     * @param string $login The login of the user whose password is being set.
+     * @param string $passwordHash The already-hashed password to set for the user.
      */
-    public function setHashedPasswordForLogin($login, $passwordHash)
-    {
+    public function setHashedPasswordForLogin(
+        $login,
+        #[\SensitiveParameter]
+        $passwordHash
+    ) {
         /*
          * Executed as super user, as we need to update the password, without the current user being authenticated yet.
          */
@@ -363,8 +370,12 @@ class PasswordResetter
         return $token;
     }
 
-    public function doesResetPasswordHashMatchesPassword($passwordPlain, $passwordHash)
-    {
+    public function doesResetPasswordHashMatchesPassword(
+        #[\SensitiveParameter]
+        $passwordPlain,
+        #[\SensitiveParameter]
+        $passwordHash
+    ) {
         $passwordPlain = UsersManager::getPasswordHash($passwordPlain);
         return $this->passwordHelper->verify($passwordPlain, $passwordHash);
     }
@@ -445,8 +456,10 @@ class PasswordResetter
      * @param string $newPassword The password to check.
      * @throws Exception if $newPassword is inferior in some way.
      */
-    protected function checkNewPassword($newPassword)
-    {
+    protected function checkNewPassword(
+        #[\SensitiveParameter]
+        $newPassword
+    ) {
         UsersManager::checkPassword($newPassword);
     }
 
@@ -457,8 +470,8 @@ class PasswordResetter
      *
      * Derived classes can override this method to provide custom user querying logic.
      *
-     * @param string $loginMail user login or email address
-     * @return array `array("login" => '...', "email" => '...', "password" => '...')` or null, if user not found.
+     * @param string $loginOrMail user login or email address
+     * @return array<string, mixed>|null `array("login" => '...', "email" => '...', "password" => '...')` or null, if user not found.
      */
     protected function getUserInformation($loginOrMail)
     {
@@ -468,14 +481,48 @@ class PasswordResetter
             return null;
         }
 
-        $user = null;
+        return UserLoginHelper::findUserByLoginOrEmail($loginOrMail);
+    }
 
-        if ($userModel->userExists($loginOrMail)) {
-            $user = $userModel->getUser($loginOrMail);
-        } elseif ($userModel->userEmailExists($loginOrMail)) {
-            $user = $userModel->getUserByEmail($loginOrMail);
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function getUserInformationForPasswordResetInitiation(string $loginOrMail): ?array
+    {
+        $user = $this->getUserInformation($loginOrMail);
+        if ($user !== null) {
+            return $user;
         }
-        return $user;
+
+        $pendingUser = $this->getPendingUserInformation($loginOrMail);
+        if (empty($pendingUser['invite_token']) || empty($pendingUser['invite_expired_at'])) {
+            return null;
+        }
+
+        try {
+            $inviteExpiresAt = Date::factory($pendingUser['invite_expired_at']);
+        } catch (Exception $e) {
+            return null;
+        }
+
+        if ($inviteExpiresAt->isEarlier(Date::now())) {
+            return null;
+        }
+
+        return $pendingUser;
+    }
+
+    /**
+     * Returns pending user information based on a login or email.
+     *
+     * Derived classes can override this method to provide custom pending user
+     * querying logic.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function getPendingUserInformation(string $loginOrMail): ?array
+    {
+        return UserLoginHelper::findUserByLoginOrEmail($loginOrMail);
     }
 
     /**
@@ -488,8 +535,10 @@ class PasswordResetter
      * @param string $passwordHash The password hash to check.
      * @throws Exception if the password hash length is incorrect.
      */
-    protected function checkPasswordHash($passwordHash)
-    {
+    protected function checkPasswordHash(
+        #[\SensitiveParameter]
+        $passwordHash
+    ) {
         $hashInfo = $this->passwordHelper->info($passwordHash);
 
         if (!isset($hashInfo['algo']) || 0 >= $hashInfo['algo']) {
@@ -524,23 +573,45 @@ class PasswordResetter
      *
      * @param array $user User info for the requested password reset.
      * @param string $keySuffix The suffix used in generating a token.
+     * @return bool Whether an email send was attempted.
      */
-    private function sendEmailConfirmationLink($user, $keySuffix)
+    private function sendEmailConfirmationLink($user, $keySuffix): bool
     {
         $login = $user['login'];
         $email = $user['email'];
-
-        // construct a password reset token from user information
-        $resetToken = $this->generatePasswordResetToken($user, $keySuffix);
-
         $ip = IP::getIpFromHeader();
-        $urlBase = Url::getCurrentUrlWithoutQueryString()
-            . "?module={$this->confirmPasswordModule}"
-            . "&login=" . urlencode($login)
-            . "&resetToken=" . urlencode($resetToken);
+        $linkValidity = null;
 
-        $urlCancel = $urlBase . "&action={$this->cancelResetPasswordAction}";
-        $urlConfirm = $urlBase . "&action={$this->confirmPasswordAction}";
+        if (!empty($user['invite_token'])) {
+            $inviteToken = StaticContainer::get(UserRepository::class)->refreshInviteToken(
+                $login,
+                $user['invite_token'],
+                $email
+            );
+            if ($inviteToken === null) {
+                return false;
+            }
+
+            $urlConfirm = Url::getCurrentUrlWithoutQueryString()
+                . '?module=' . urlencode(Piwik::getLoginPluginName())
+                . '&action=acceptInvitation'
+                . '&token=' . urlencode($inviteToken);
+            $urlCancel = '';
+
+            $expiryInSeconds = Date::factory($user['invite_expired_at'])->getTimestamp()
+                - Date::now()->getTimestamp();
+            $linkValidity = (new Formatter())->getPrettyTimeFromSeconds($expiryInSeconds, true);
+        } else {
+            // construct a password reset token from user information
+            $resetToken = $this->generatePasswordResetToken($user, $keySuffix);
+            $urlBase = Url::getCurrentUrlWithoutQueryString()
+                . "?module={$this->confirmPasswordModule}"
+                . "&login=" . urlencode($login)
+                . "&resetToken=" . urlencode($resetToken);
+
+            $urlCancel = $urlBase . "&action={$this->cancelResetPasswordAction}";
+            $urlConfirm = $urlBase . "&action={$this->confirmPasswordAction}";
+        }
 
         // send email with new password
         $mail = StaticContainer::getContainer()->make(PasswordResetEmail::class, [
@@ -548,6 +619,7 @@ class PasswordResetter
             'ip' => $ip,
             'resetUrl' => $urlConfirm,
             'cancelUrl' => $urlCancel,
+            'linkValidity' => $linkValidity,
         ]);
         $mail->addTo($email, $login);
 
@@ -558,6 +630,8 @@ class PasswordResetter
         }
 
         @$mail->send();
+
+        return true;
     }
 
     /**
@@ -569,8 +643,12 @@ class PasswordResetter
      *
      * @throws Exception if a password reset was already requested within one hour
      */
-    private function savePasswordResetInfo($login, $newPassword, $keySuffix)
-    {
+    private function savePasswordResetInfo(
+        $login,
+        #[\SensitiveParameter]
+        $newPassword,
+        $keySuffix
+    ) {
         $optionName = self::getPasswordResetInfoOptionName($login);
 
         $existingResetInfo = Option::get($optionName);

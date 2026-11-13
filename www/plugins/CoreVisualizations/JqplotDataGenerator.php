@@ -62,12 +62,8 @@ class JqplotDataGenerator
     }
 
     /**
-     * Constructor.
-     *
      * @param array $properties
      * @param string $graphType
-     *
-     * @internal param \Piwik\Plugin\ViewDataTable $visualization
      */
     public function __construct($properties, $graphType, JqplotGraph $graph)
     {
@@ -81,7 +77,7 @@ class JqplotDataGenerator
      * Generates JSON graph data and returns it.
      *
      * @param DataTable|DataTable\Map $dataTable
-     * @return string
+     * @return array
      */
     public function generate($dataTable)
     {

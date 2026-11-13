@@ -11,7 +11,6 @@ namespace Piwik\Plugins\SitesManager;
 
 use Piwik\Access;
 use Piwik\API\Request;
-use Piwik\Common;
 use Piwik\Config;
 use Piwik\Container\StaticContainer;
 use Piwik\Date;
@@ -30,9 +29,6 @@ use Piwik\Tracker\TrackerCodeGenerator;
 use Piwik\Url;
 use Piwik\View;
 
-/**
- *
- */
 class SitesManager extends \Piwik\Plugin
 {
     public const KEEP_URL_FRAGMENT_USE_DEFAULT = 0;
@@ -46,7 +42,7 @@ class SitesManager extends \Piwik\Plugin
     public const URL_PARAM_EXCLUSION_TYPES =  [
         self::URL_PARAM_EXCLUSION_TYPE_NAME_COMMON_SESSION_PARAMETERS,
         self::URL_PARAM_EXCLUSION_TYPE_NAME_MATOMO_RECOMMENDED_PII,
-        self::URL_PARAM_EXCLUSION_TYPE_NAME_CUSTOM
+        self::URL_PARAM_EXCLUSION_TYPE_NAME_CUSTOM,
     ];
 
     /**
@@ -61,7 +57,6 @@ class SitesManager extends \Piwik\Plugin
             'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
             'SitesManager.deleteSite.end'            => 'onSiteDeleted',
             'System.addSystemSummaryItems'           => 'addSystemSummaryItems',
-            'Request.dispatch'                       => 'redirectDashboardToWelcomePage',
         ];
     }
 
@@ -94,42 +89,42 @@ class SitesManager extends \Piwik\Plugin
         }
     }
 
-    public function redirectDashboardToWelcomePage(&$module, &$action)
+    /**
+     * Returns whether the "site has no data" tracker-setup screen should be shown for the given site.
+     * Only answers the data question (never tracked, check not suppressed, not dismissed this session);
+     * the reporting UI decides where to render it, as the active group lives in the URL hash.
+     */
+    public static function shouldShowEmptySiteMessage(int $idSite): bool
     {
-        if ($module !== 'CoreHome' || $action !== 'index') {
-            return;
+        if (!$idSite) {
+            return false;
         }
 
-        $siteId = Common::getRequestVar('idSite', false, 'int');
-        if (!$siteId) {
-            return;
+        if (!self::shouldPerformEmptySiteCheck($idSite)) {
+            return false;
         }
 
-        $shouldPerformEmptySiteCheck = self::shouldPerformEmptySiteCheck($siteId);
-        if (!$shouldPerformEmptySiteCheck) {
-            return;
-        }
-
-        $hadTrafficKey = 'SitesManagerHadTrafficInPast_' . (int) $siteId;
+        $hadTrafficKey = 'SitesManagerHadTrafficInPast_' . $idSite;
         $hadTrafficBefore = Option::get($hadTrafficKey);
         if (!empty($hadTrafficBefore)) {
             // user had traffic at some stage in the past... not needed to show tracking code
-            return;
-        } elseif (self::hasTrackedAnyTraffic($siteId)) {
+            return false;
+        }
+
+        if (self::hasTrackedAnyTraffic($idSite)) {
             // remember the user had traffic in the past so we won't show the tracking screen again
             // if all visits are deleted for example
             Option::set($hadTrafficKey, 1);
-            return;
-        } else {
-            // never had any traffic
-            $session = new SessionNamespace('siteWithoutData');
-            if (!empty($session->ignoreMessage)) {
-                return;
-            }
-
-            $module = 'SitesManager';
-            $action = 'siteWithoutData';
+            return false;
         }
+
+        // never had any traffic - the screen can be temporarily hidden for an hour (see Controller)
+        $session = new SessionNamespace('siteWithoutData');
+        if (!empty($session->ignoreMessage)) {
+            return false;
+        }
+
+        return true;
     }
 
     public static function hasTrackedAnyTraffic($siteId)
@@ -232,7 +227,7 @@ class SitesManager extends \Piwik\Plugin
     }
 
     /**
-     * Returns whether we should keep URL fragments for a specific site.
+     * Returns the timezone configured for a specific site.
      *
      * @param array $site DB data for the site.
      * @return ?string
@@ -242,6 +237,8 @@ class SitesManager extends \Piwik\Plugin
         if (!empty($site['timezone'])) {
             return $site['timezone'];
         }
+
+        return null;
     }
 
     /**
@@ -339,7 +336,7 @@ class SitesManager extends \Piwik\Plugin
     public static function getTrackerExcludedQueryParameters($website)
     {
         $excludedQueryParameters = $website['excluded_parameters'];
-        $globalExcludedQueryParameters = API::getInstance()->getExcludedQueryParametersGlobal();
+        $globalExcludedQueryParameters = API::getInstance()->getExcludedQueryParametersGlobal($website['idsite']);
 
         $excludedQueryParameters .= ',' . $globalExcludedQueryParameters;
         return self::filterBlankFromCommaSepList($excludedQueryParameters);
@@ -362,7 +359,6 @@ class SitesManager extends \Piwik\Plugin
 
     /**
      * Returns the hosts alias URLs
-     * @param int $idSite
      * @return array
      */
     private function getTrackerHosts($urls)
@@ -382,6 +378,7 @@ class SitesManager extends \Piwik\Plugin
         $translationKeys[] = 'Actions_SubmenuSitesearch';
         $translationKeys[] = 'General_Actions';
         $translationKeys[] = 'General_Cancel';
+        $translationKeys[] = 'General_Description';
         $translationKeys[] = 'General_ClickToSearch';
         $translationKeys[] = 'General_Loading';
         $translationKeys[] = 'General_Measurables';
@@ -395,12 +392,16 @@ class SitesManager extends \Piwik\Plugin
         $translationKeys[] = 'General_Share';
         $translationKeys[] = 'Goals_Ecommerce';
         $translationKeys[] = 'Goals_Optional';
+        $translationKeys[] = 'PrivacyManager_ManagePrivacySettings';
+        $translationKeys[] = 'PrivacyManager_TrackingDataAnonymizationSettings';
         $translationKeys[] = 'SitesManager_AddMeasurable';
         $translationKeys[] = 'SitesManager_AddSite';
         $translationKeys[] = 'SitesManager_AdvancedTimezoneSupportNotFound';
         $translationKeys[] = 'SitesManager_AliasUrlHelp';
         $translationKeys[] = 'SitesManager_ChangingYourTimezoneWillOnlyAffectDataForward';
         $translationKeys[] = 'SitesManager_ChooseMeasurableTypeHeadline';
+        $translationKeys[] = 'SitesManager_ChooseMeasurableTypeSubheader';
+        $translationKeys[] = 'SitesManager_ChooseMeasurableTypeSubheaderRollUp';
         $translationKeys[] = 'SitesManager_Currency';
         $translationKeys[] = 'SitesManager_CurrencySymbolWillBeUsedForGoals';
         $translationKeys[] = 'SitesManager_DefaultCurrencyForNewWebsites';
@@ -444,6 +445,10 @@ class SitesManager extends \Piwik\Plugin
         $translationKeys[] = 'SitesManager_ListOfQueryParametersToBeExcludedOnAllWebsites';
         $translationKeys[] = 'SitesManager_ListOfQueryParametersToExclude';
         $translationKeys[] = 'SitesManager_MainDescription';
+        $translationKeys[] = 'SitesManager_MeasurableNameHelpText';
+        $translationKeys[] = 'SitesManager_MeasurableNamePlaceholder';
+        $translationKeys[] = 'SitesManager_MeasurableDescriptionHelpText';
+        $translationKeys[] = 'SitesManager_MeasurableDescriptionPlaceholder';
         $translationKeys[] = 'SitesManager_NotAnEcommerceSite';
         $translationKeys[] = 'SitesManager_NotFound';
         $translationKeys[] = 'SitesManager_OnlyMatchedUrlsAllowed';

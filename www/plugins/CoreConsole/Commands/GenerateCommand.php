@@ -11,8 +11,6 @@ namespace Piwik\Plugins\CoreConsole\Commands;
 
 use Piwik\Plugin\Manager;
 
-/**
- */
 class GenerateCommand extends GeneratePluginBase
 {
     protected function configure()
@@ -37,7 +35,7 @@ class GenerateCommand extends GeneratePluginBase
             'examplecommand:helloworld' => strtolower($pluginName) . ':' . $this->buildCommandName($commandName),
             'examplecommand' => strtolower($pluginName),
             'HelloWorld'     => $commandName,
-            'helloworld'     => strtolower($commandName)
+            'helloworld'     => strtolower($commandName),
          );
 
         $whitelistFiles = array('/Commands', '/Commands/HelloWorld.php');

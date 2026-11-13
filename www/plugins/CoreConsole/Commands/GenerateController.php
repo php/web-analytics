@@ -11,8 +11,6 @@ namespace Piwik\Plugins\CoreConsole\Commands;
 
 use Piwik\Plugin\Manager;
 
-/**
- */
 class GenerateController extends GeneratePluginBase
 {
     protected function configure()
@@ -36,7 +34,7 @@ class GenerateController extends GeneratePluginBase
         $this->writeSuccessMessage(array(
              sprintf('Controller for %s generated.', $pluginName),
              'You can now start adding Controller actions',
-             'Enjoy!'
+             'Enjoy!',
         ));
 
         return self::SUCCESS;

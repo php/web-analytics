@@ -24,7 +24,7 @@ class Schema extends Singleton
     /**
      * Type of database schema
      *
-     * @var SchemaInterface
+     * @var SchemaInterface|null
      */
     private $schema = null;
 
@@ -32,7 +32,6 @@ class Schema extends Singleton
      * Get schema class name
      *
      * @param string $schemaName
-     * @return string
      */
     private static function getSchemaClassName($schemaName): string
     {
@@ -50,9 +49,6 @@ class Schema extends Singleton
 
     /**
      * Return the default port for the provided database schema
-     *
-     * @param string $schemaName
-     * @return int
      */
     public static function getDefaultPortForSchema(string $schemaName): int
     {
@@ -77,8 +73,6 @@ class Schema extends Singleton
 
     /**
      * Returns an instance that subclasses Schema
-     *
-     * @return SchemaInterface
      */
     private function getSchema(): SchemaInterface
     {
@@ -90,10 +84,15 @@ class Schema extends Singleton
     }
 
     /**
+     * Unset schema instance
+     */
+    public function unsetSchema(): void
+    {
+        $this->schema = null;
+    }
+
+    /**
      * Returns the default collation for a charset.
-     *
-     * @param string $charset
-     * @return string
      */
     public function getDefaultCollationForCharset(string $charset): string
     {
@@ -102,8 +101,6 @@ class Schema extends Singleton
 
     /**
      * Get the table options to use for a CREATE TABLE statement.
-     *
-     * @return string
      */
     public function getTableCreateOptions(): string
     {
@@ -249,7 +246,6 @@ class Schema extends Singleton
      *
      * @param string $sql  query to add hint to
      * @param float $limit  time limit in seconds
-     * @return string
      */
     public function addMaxExecutionTimeHintToQuery(string $sql, float $limit): string
     {
@@ -258,8 +254,6 @@ class Schema extends Singleton
 
     /**
      * Returns if the schema support complex column updates
-     *
-     * @return bool
      */
     public function supportsComplexColumnUpdates(): bool
     {
@@ -268,8 +262,6 @@ class Schema extends Singleton
 
     /**
      * Returns if the schema supports `OPTIMIZE TABLE` statements for innodb tables
-     *
-     * @return bool
      */
     public function isOptimizeInnoDBSupported(): bool
     {
@@ -282,10 +274,9 @@ class Schema extends Singleton
      * Tables will only be optimized if the `[General] enable_sql_optimize_queries` INI config option is
      * set to **1**.
      *
-     * @param string|array $tables The name of the table to optimize or an array of tables to optimize.
+     * @param array $tables The name of the table to optimize or an array of tables to optimize.
      *                             Table names must be prefixed (see {@link Piwik\Common::prefixTable()}).
      * @param bool $force If true, the `OPTIMIZE TABLE` query will be run even if InnoDB tables are being used.
-     * @return bool
      */
     public function optimizeTables(array $tables, bool $force = false): bool
     {
@@ -293,9 +284,16 @@ class Schema extends Singleton
     }
 
     /**
+     * Returns if the database engine can provide a rollup ranking query result
+     * without needing additional sorting.
+     */
+    public function supportsRankingRollupWithoutExtraSorting(): bool
+    {
+        return $this->getSchema()->supportsRankingRollupWithoutExtraSorting();
+    }
+
+    /**
      * Returns if the database engine is able to use sorted subqueries
-     *
-     * @return bool
      */
     public function supportsSortingInSubquery(): bool
     {
@@ -313,5 +311,37 @@ class Schema extends Singleton
     public function getSupportedReadIsolationTransactionLevel(): string
     {
         return $this->getSchema()->getSupportedReadIsolationTransactionLevel();
+    }
+
+    /**
+     * Returns the type of the current database (e.g. MySQL, MariaDb, ...)
+     */
+    public function getDatabaseType(): string
+    {
+        return $this->getSchema()->getDatabaseType();
+    }
+
+    /**
+     * Returns the version of the currently used database server
+     */
+    public function getVersion(): string
+    {
+        return $this->getSchema()->getVersion();
+    }
+
+    /**
+     * Returns the minimum supported version of the currently used database server
+     */
+    public function getMinimumSupportedVersion(): string
+    {
+        return $this->getSchema()->getMinimumSupportedVersion();
+    }
+
+    /**
+     * Returns if the currently used database version has reach its EOL
+     */
+    public function hasReachedEOL(): string
+    {
+        return $this->getSchema()->hasReachedEOL();
     }
 }

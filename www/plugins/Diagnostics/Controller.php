@@ -9,6 +9,7 @@
 
 namespace Piwik\Plugins\Diagnostics;
 
+use Piwik\Config;
 use Piwik\Piwik;
 use Piwik\Plugin\SettingsProvider;
 
@@ -35,9 +36,11 @@ class Controller extends \Piwik\Plugin\ControllerAdmin
         $configValues = $this->configReader->getConfigValuesFromFiles();
         $configValues = $this->configReader->addConfigValuesFromSystemSettings($configValues, $allSettings);
         $configValues = $this->sortConfigValues($configValues);
+        $configValues = array_filter($configValues);
 
         return $this->renderTemplate('configfile', array(
-            'allConfigValues' => $configValues
+            'allConfigValues' => $configValues,
+            'configFilePath' => Config::getInstance()->getLocalPath(),
         ));
     }
 

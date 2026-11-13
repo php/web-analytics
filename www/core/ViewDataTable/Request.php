@@ -58,7 +58,7 @@ class Request
         // - the format = original specifies that we want to get the original DataTable structure itself, not rendered
         $requestArray = array(
             'method' => $this->requestConfig->apiMethodToRequestDataTable,
-            'format' => 'original'
+            'format' => 'original',
         );
 
         $toSetEventually = array_merge(array(
@@ -72,6 +72,7 @@ class Request
             'filter_column',
             'filter_pattern',
             'flat',
+            'show_dimensions',
             'totals',
             'expanded',
             'pivotBy',

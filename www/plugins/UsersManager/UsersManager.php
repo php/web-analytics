@@ -14,9 +14,12 @@ use Piwik\Access\Role\Admin;
 use Piwik\Access\Role\Write;
 use Piwik\API\Request;
 use Piwik\Config;
+use Piwik\Container\StaticContainer;
 use Piwik\Option;
 use Piwik\Piwik;
 use Piwik\Plugins\CoreHome\SystemSummary;
+use Piwik\Plugins\SitesManager\API as SitesManagerAPI;
+use Piwik\Settings\Storage\UserScopedSettingsAccessManager;
 use Piwik\SettingsPiwik;
 
 /**
@@ -81,8 +84,7 @@ class UsersManager extends \Piwik\Plugin
 
     public function onPlatformInitialized()
     {
-        $lastSeenTimeLogger = new LastSeenTimeLogger();
-        $lastSeenTimeLogger->logCurrentUserLastSeenTime();
+        LastSeenTimeLogger::logCurrentUserLastSeenTime();
     }
 
     /**
@@ -112,8 +114,11 @@ class UsersManager extends \Piwik\Plugin
         }
     }
 
-    public static function hashTrackingToken($tokenAuth, $idSite)
-    {
+    public static function hashTrackingToken(
+        #[\SensitiveParameter]
+        $tokenAuth,
+        $idSite
+    ) {
         return sha1($idSite . $tokenAuth . SettingsPiwik::getSalt());
     }
 
@@ -122,7 +127,43 @@ class UsersManager extends \Piwik\Plugin
      */
     public function deleteSite($idSite)
     {
+        // TODO: remove in Matomo 6 - users should be using new userScopedSettings
         Option::deleteLike('%\_' . API::PREFERENCE_DEFAULT_REPORT, $idSite);
+
+        $preferencesStore = StaticContainer::get(UserScopedSettingsAccessManager::class);
+        $usersPreferences = $preferencesStore->getValuesForAllUsers('UsersManager', [API::PREFERENCE_DEFAULT_REPORT]);
+
+        foreach ($usersPreferences as $login => $preferences) {
+            if (empty($preferences[API::PREFERENCE_DEFAULT_REPORT])) {
+                continue;
+            }
+
+            if ((string) $preferences[API::PREFERENCE_DEFAULT_REPORT] !== (string) $idSite) {
+                continue;
+            }
+
+            $fallbackSiteId = $this->getFallbackDefaultReportForLogin($login);
+            if ($fallbackSiteId === false) {
+                $preferencesStore->delete('UsersManager', $login, API::PREFERENCE_DEFAULT_REPORT);
+                continue;
+            }
+
+            $preferencesStore->set('UsersManager', $login, API::PREFERENCE_DEFAULT_REPORT, $fallbackSiteId);
+        }
+    }
+
+    /**
+     * @return false|int
+     */
+    private function getFallbackDefaultReportForLogin(string $login)
+    {
+        if (Piwik::hasTheUserSuperUserAccess($login)) {
+            $siteIds = SitesManagerAPI::getInstance()->getAllSitesId();
+        } else {
+            $siteIds = array_column((new Model())->getSitesAccessFromUser($login), 'site');
+        }
+
+        return reset($siteIds) ?: false;
     }
 
     /**
@@ -135,14 +176,17 @@ class UsersManager extends \Piwik\Plugin
         $stylesheets[] = "plugins/UsersManager/vue/src/UsersManager/UsersManager.less";
         $stylesheets[] = "plugins/UsersManager/vue/src/PagedUsersList/PagedUsersList.less";
         $stylesheets[] = "plugins/UsersManager/vue/src/UserEditForm/UserEditForm.less";
+        $stylesheets[] = "plugins/UsersManager/vue/src/UserInvite/UserInvite.less";
         $stylesheets[] = "plugins/UsersManager/vue/src/UserPermissionsEdit/UserPermissionsEdit.less";
         $stylesheets[] = "plugins/UsersManager/vue/src/CapabilitiesEdit/CapabilitiesEdit.less";
     }
 
     /**
-     * Returns true if the password is complex enough (at least 6 characters and max 26 characters)
+     * Returns true if the password string is considered valid. When the credentials sanity check is
+     * disabled, any non-empty password is accepted; otherwise the password must be at least
+     * PASSWORD_MIN_LENGTH characters.
      *
-     * @param $input string
+     * @param string $input
      * @return bool
      */
     public static function isValidPasswordString($input)
@@ -159,8 +203,10 @@ class UsersManager extends \Piwik\Plugin
         return $l >= self::PASSWORD_MIN_LENGTH;
     }
 
-    public static function checkPassword($password)
-    {
+    public static function checkPassword(
+        #[\SensitiveParameter]
+        $password
+    ) {
         /**
          * Triggered before core password validator check password.
          *
@@ -194,8 +240,10 @@ class UsersManager extends \Piwik\Plugin
         }
     }
 
-    public static function getPasswordHash($password)
-    {
+    public static function getPasswordHash(
+        #[\SensitiveParameter]
+        $password
+    ) {
         if (SettingsPiwik::isUserCredentialsSanityCheckEnabled()) {
             self::checkBasicPasswordStrength($password);
         }
@@ -204,8 +252,10 @@ class UsersManager extends \Piwik\Plugin
         return md5($password);
     }
 
-    public static function checkBasicPasswordStrength($password)
-    {
+    public static function checkBasicPasswordStrength(
+        #[\SensitiveParameter]
+        $password
+    ) {
         $ex = new \Exception('This password is too weak, please supply another value or reset it.');
 
         $numDistinctCharacters = strlen(count_chars($password, 3));
@@ -225,8 +275,11 @@ class UsersManager extends \Piwik\Plugin
      * @param string $exceptionMessage Message of the exception thrown.
      * @throws Exception if the password hash length is incorrect.
      */
-    public static function checkPasswordHash($passwordHash, $exceptionMessage)
-    {
+    public static function checkPasswordHash(
+        #[\SensitiveParameter]
+        $passwordHash,
+        $exceptionMessage
+    ) {
         if (strlen($passwordHash) != 32 || !ctype_xdigit($passwordHash)) {  // MD5 hash length
             throw new Exception($exceptionMessage);
         }
@@ -244,6 +297,7 @@ class UsersManager extends \Piwik\Plugin
         $translationKeys[] = 'General_Done';
         $translationKeys[] = 'General_Language';
         $translationKeys[] = 'General_Never';
+        $translationKeys[] = 'General_NotAvailable';
         $translationKeys[] = 'General_Note';
         $translationKeys[] = 'General_Ok';
         $translationKeys[] = 'General_OrCancel';
@@ -265,6 +319,7 @@ class UsersManager extends \Piwik\Plugin
         $translationKeys[] = 'UsersManager_AddExistingUser';
         $translationKeys[] = 'UsersManager_AddNewUser';
         $translationKeys[] = 'UsersManager_AddSuperuserAccessConfirm';
+        $translationKeys[] = 'UsersManager_AdminUserRoleChangeWarning';
         $translationKeys[] = 'UsersManager_AllUsersAreSelected';
         $translationKeys[] = 'UsersManager_AllWebsitesAreSelected';
         $translationKeys[] = 'UsersManager_AnonymousUserRoleChangeWarning';
@@ -272,7 +327,7 @@ class UsersManager extends \Piwik\Plugin
         $translationKeys[] = 'UsersManager_AreYouSureAddCapability';
         $translationKeys[] = 'UsersManager_AreYouSureChangeDetails';
         $translationKeys[] = 'UsersManager_AreYouSureRemoveCapability';
-        $translationKeys[] = 'UsersManager_AuthTokenSecureOnlyHelp';
+        $translationKeys[] = 'UsersManager_AuthTokenSecureOnlyHelp2';
         $translationKeys[] = 'UsersManager_AuthTokenSecureOnlyHelpForced';
         $translationKeys[] = 'UsersManager_AuthTokenPurpose';
         $translationKeys[] = 'UsersManager_AuthTokens';
@@ -296,6 +351,7 @@ class UsersManager extends \Piwik\Plugin
         $translationKeys[] = 'UsersManager_ConfirmThisChange';
         $translationKeys[] = 'UsersManager_ConfirmTokenCopied';
         $translationKeys[] = 'UsersManager_ConfirmWithPassword';
+        $translationKeys[] = 'UsersManager_ConfirmWithReAuthentication';
         $translationKeys[] = 'UsersManager_CopyDenied';
         $translationKeys[] = 'UsersManager_CopyDeniedHints';
         $translationKeys[] = 'UsersManager_CopyLink';
@@ -406,9 +462,12 @@ class UsersManager extends \Piwik\Plugin
         $translationKeys[] = 'UsersManager_SuperUsersPermissionsNotice';
         $translationKeys[] = 'UsersManager_TheDisplayedUsersAreSelected';
         $translationKeys[] = 'UsersManager_TheDisplayedWebsitesAreSelected';
+        $translationKeys[] = 'UsersManager_ThemeModeHelp1';
+        $translationKeys[] = 'UsersManager_ThemeModeHelp2';
+        $translationKeys[] = 'UsersManager_ThemeModeHelp3';
+        $translationKeys[] = 'UsersManager_ThemeModeMatchBrowser';
         $translationKeys[] = 'UsersManager_TokenAuthIntro';
         $translationKeys[] = 'UsersManager_TokenSuccessfullyGenerated';
-        $translationKeys[] = 'UsersManager_TokensWithExpireDateCreationBySystem';
         $translationKeys[] = 'UsersManager_TwoFactorAuthentication';
         $translationKeys[] = 'UsersManager_TypeYourCurrentPassword';
         $translationKeys[] = 'UsersManager_TypeYourPasswordAgain';
@@ -423,5 +482,15 @@ class UsersManager extends \Piwik\Plugin
         $translationKeys[] = 'UsersManager_YourVisitsAreIgnoredOnDomain';
         $translationKeys[] = 'UsersManager_YourVisitsAreNotIgnored';
         $translationKeys[] = 'UsersManager_InviteEmailChange';
+        $translationKeys[] = 'UsersManager_TokenExpireDate';
+        $translationKeys[] = 'UsersManager_TokenExpireDateCheckboxLabel';
+        $translationKeys[] = 'UsersManager_TokenExpireDateCheckboxHelp';
+        $translationKeys[] = 'UsersManager_TokenExpireDateHelpText';
+        $translationKeys[] = 'UsersManager_InvalidTokenExpireDateFormat';
+        $translationKeys[] = 'UsersManager_XAgo';
+        $translationKeys[] = 'UsersManager_CannotRevokeOwnSuperuserAccess';
+        $translationKeys[] = 'UsersManager_SignOutUser';
+        $translationKeys[] = 'UsersManager_SignOutUserConfirm';
+        $translationKeys[] = 'UsersManager_SignOutUserSuccess';
     }
 }

@@ -11,6 +11,9 @@ namespace Piwik;
 
 use Exception;
 use Piwik\API\Request;
+use Piwik\Exception\PluginNotFoundException;
+use Piwik\Http\HttpCodeException;
+use Piwik\Request\AuthenticationToken;
 use Piwik\Config\GeneralConfig;
 use Piwik\Container\StaticContainer;
 use Piwik\DataTable\Manager;
@@ -24,7 +27,6 @@ use Piwik\Http\Router;
 use Piwik\Plugins\CoreAdminHome\CustomLogo;
 use Piwik\Session\SessionAuth;
 use Piwik\Session\SessionInitializer;
-use Piwik\SupportedBrowser;
 use Piwik\Log\LoggerInterface;
 
 /**
@@ -68,6 +70,7 @@ class FrontController extends Singleton
     public const DEFAULT_MODULE = 'CoreHome';
     public const DEFAULT_LOGIN = 'anonymous';
     public const DEFAULT_TOKEN_AUTH = 'anonymous';
+    private const SESSION_TIMEOUT_COOKIE_NAME = 'matomo_session_timed_out';
 
     // public for tests
     public static $requestId = null;
@@ -112,10 +115,17 @@ class FrontController extends Singleton
      */
     public static function generateSafeModeOutputFromException($e)
     {
-        StaticContainer::get(LoggerInterface::class)->error('Uncaught exception: {exception}', [
-            'exception' => $e,
-            'ignoreInScreenWriter' => true,
-        ]);
+        if ($e instanceof HttpCodeException && $e->getCode() >= 400 && $e->getCode() < 500) {
+            StaticContainer::get(LoggerInterface::class)->debug('Uncaught client error: {exception}', [
+                'exception'            => $e,
+                'ignoreInScreenWriter' => true,
+            ]);
+        } else {
+            StaticContainer::get(LoggerInterface::class)->error('Uncaught exception: {exception}', [
+                'exception'            => $e,
+                'ignoreInScreenWriter' => true,
+            ]);
+        }
 
         $error = array(
             'message' => $e->getMessage(),
@@ -208,7 +218,7 @@ class FrontController extends Singleton
      * @param string $module The name of the plugin whose controller to execute, eg, `'UserCountryMap'`.
      * @param string $actionName The controller action name, eg, `'realtimeMap'`.
      * @param array $parameters Array of parameters to pass to the controller action method.
-     * @return string The `echo`'d data or the return value of the controller action.
+     * @return mixed The `echo`'d data (as a string) or the return value of the controller action.
      */
     public function fetchDispatch($module = null, $actionName = null, $parameters = null)
     {
@@ -416,6 +426,9 @@ class FrontController extends Singleton
         $sessionAuth = $this->makeSessionAuthenticator();
         if ($sessionAuth) {
             $loggedIn = Access::getInstance()->reloadAccess($sessionAuth);
+            if (!$loggedIn && $sessionAuth->wasSessionExpired()) {
+                Access::getInstance()->setSessionExpired(true);
+            }
         }
 
         // ... if session auth fails try normal auth (which will login the anonymous user)
@@ -440,12 +453,13 @@ class FrontController extends Singleton
             $this->makeAuthenticator($sessionAuth); // Piwik\Auth must be set to the correct Login plugin
         }
 
-
+        $this->consumeSessionTimeoutCookie();
+        $this->sendSessionTimedOutHeaderIfNeeded();
 
         // Force the auth to use the token_auth if specified, so that embed dashboard
         // and all other non widgetized controller methods works fine
         if (
-            Common::getRequestVar('token_auth', '', 'string') !== ''
+            StaticContainer::get(AuthenticationToken::class)->getAuthToken() !== ''
             && Request::shouldReloadAuthUsingTokenAuth(null)
         ) {
             Request::reloadAuthUsingTokenAuth();
@@ -491,10 +505,14 @@ class FrontController extends Singleton
             throw new Exception("Invalid module name '$module'");
         }
 
-        list($module, $action) = Request::getRenamedModuleAndAction($module, $action);
+        [$module, $action] = Request::getRenamedModuleAndAction($module, $action);
 
         if (!SettingsPiwik::isInternetEnabled() && \Piwik\Plugin\Manager::getInstance()->doesPluginRequireInternetConnection($module)) {
             throw new PluginRequiresInternetException($module);
+        }
+
+        if (!\Piwik\Plugin\Manager::getInstance()->isPluginInFilesystem($module)) {
+            throw new PluginNotFoundException($module);
         }
 
         if (!\Piwik\Plugin\Manager::getInstance()->isPluginActivated($module)) {
@@ -565,6 +583,10 @@ class FrontController extends Singleton
         if (!SettingsPiwik::isHttpsForced()) {
             return;
         }
+        // TODO: remove in Matomo 6 - avoid update redirect loops before proxy_scheme_headers migration runs.
+        if (Piwik::getModule() === 'CoreUpdater' && ProxyHeaders::getProtocolInformation() !== null) {
+            return;
+        }
         Url::redirectToHttps();
     }
 
@@ -575,7 +597,7 @@ class FrontController extends Singleton
 
         if (
             $isDashboardReferrer
-            && !empty($_POST['token_auth'])
+            && StaticContainer::get(AuthenticationToken::class)->wasTokenAuthProvidedSecurely()
             && Common::getRequestVar('widget', 0, 'int') === 1
         ) {
             Session::close();
@@ -610,7 +632,7 @@ class FrontController extends Singleton
      */
     private function doDispatch($module, $action, $parameters)
     {
-        list($module, $action, $parameters) = $this->prepareDispatch($module, $action, $parameters);
+        [$module, $action, $parameters] = $this->prepareDispatch($module, $action, $parameters);
 
         /**
          * Triggered directly before controller actions are dispatched.
@@ -695,7 +717,7 @@ class FrontController extends Singleton
                 Piwik::translate('General_ExceptionDatabaseVersionNewerThanCodebase', array($current, $dbSchemaVersion)),
                 Piwik::translate('General_ExceptionDatabaseVersionNewerThanCodebaseWait'),
                 // we cannot fill in the Super User emails as we are failing before Authentication was ready
-                Piwik::translate('General_ExceptionContactSupportGeneric', array('', ''))
+                Piwik::translate('General_ExceptionContactSupportGeneric', array('', '')),
             );
             throw new DatabaseSchemaIsNewerThanCodebaseException(implode(" ", $messages));
         }
@@ -710,7 +732,9 @@ class FrontController extends Singleton
             return null;
         }
 
-        if (Common::getRequestVar('token_auth', '', 'string') !== '' && !Common::getRequestVar('force_api_session', 0)) {
+        $token = StaticContainer::get(AuthenticationToken::class);
+
+        if ($token->getAuthToken() !== '' && !$token->isSessionToken()) {
              return null;
         }
 
@@ -736,7 +760,7 @@ class FrontController extends Singleton
         return null;
     }
 
-    private function makeAuthenticator(SessionAuth $auth = null)
+    private function makeAuthenticator(?SessionAuth $auth = null)
     {
         /**
          * Triggered before the user is authenticated, when the global authentication object
@@ -791,6 +815,21 @@ class FrontController extends Singleton
         Common::sendHeader("X-Matomo-Request-Id: $requestId");
     }
 
+    private function consumeSessionTimeoutCookie(): void
+    {
+        $cookie = new Cookie(self::SESSION_TIMEOUT_COOKIE_NAME);
+
+        if (!$cookie->isCookieFound()) {
+            return;
+        }
+
+        $cookie->delete();
+
+        if (Piwik::isUserIsAnonymous()) {
+            Access::getInstance()->setSessionExpired(true);
+        }
+    }
+
     private function isSupportedBrowserCheckNeeded()
     {
         if (defined('PIWIK_ENABLE_DISPATCH') && !PIWIK_ENABLE_DISPATCH) {
@@ -820,7 +859,7 @@ class FrontController extends Singleton
             return true;
         }
 
-        if (Common::getRequestVar('token_auth', '', 'string') !== '') {
+        if (StaticContainer::get(AuthenticationToken::class)->getAuthToken() !== '') {
             return true;
         }
 
@@ -829,5 +868,13 @@ class FrontController extends Singleton
         }
 
         return false;
+    }
+
+    private function sendSessionTimedOutHeaderIfNeeded()
+    {
+        if (!Access::getInstance()->wasSessionExpired()) {
+            return;
+        }
+        Common::sendHeader('X-Matomo-Session-Timed-Out: 1');
     }
 }

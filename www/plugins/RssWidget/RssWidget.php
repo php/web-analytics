@@ -14,9 +14,6 @@ use Piwik\Plugins\RssWidget\Widgets\RssPiwik;
 use Piwik\SettingsPiwik;
 use Piwik\Widget\WidgetsList;
 
-/**
- *
- */
 class RssWidget extends \Piwik\Plugin
 {
     /**
@@ -27,7 +24,7 @@ class RssWidget extends \Piwik\Plugin
         return array(
             'AssetManager.getStylesheetFiles' => 'getStylesheetFiles',
             'Request.getRenamedModuleAndAction' => 'renameExampleRssWidgetModule',
-            'Widget.filterWidgets' => 'filterWidgets'
+            'Widget.filterWidgets' => 'filterWidgets',
         );
     }
 

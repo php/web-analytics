@@ -308,7 +308,6 @@ class Report
      * whether your report supports a "search" or not. EG `$view->config->show_search = false`. You can also change the
      * default request config. For instance you can change how many rows are displayed by default:
      * `$view->requestConfig->filter_limit = 10;`. See {@link ViewDataTable} for more information.
-     * @param ViewDataTable $view
      * @api
      */
     public function configureView(ViewDataTable $view)
@@ -346,7 +345,6 @@ class Report
     }
 
     /**
-     *
      * Processing a uniqueId for each report, can be used by UIs as a key to match a given report
      * @return string
      */
@@ -380,8 +378,6 @@ class Report
      * this:
      * $widgetsList->addToContainerWidget($containerId = 'Products', $factory->createWidget());
      *
-     * @param WidgetsList $widgetsList
-     * @param ReportWidgetFactory $factory
      * @api
      */
     public function configureWidgets(WidgetsList $widgetsList, ReportWidgetFactory $factory)
@@ -603,6 +599,14 @@ class Report
     }
 
     /**
+     * @ignore
+     */
+    public function hasConstantRowsCount(): bool
+    {
+        return $this->constantRowsCount;
+    }
+
+    /**
      * If the report is enabled the report metadata for this report will be built and added to the list of available
      * reports. Overwrite this method and leave it empty in case you do not want your report to be added to the report
      * metadata. In this case your report won't be visible for instance in the mobile app and scheduled reports
@@ -649,7 +653,7 @@ class Report
             'subcategory' => $this->getSubcategoryId(),
             'name'     => $this->getName(),
             'module'   => $this->getModule(),
-            'action'   => $this->getAction()
+            'action'   => $this->getAction(),
         );
 
         if (null !== $this->parameters) {
@@ -700,11 +704,11 @@ class Report
             $report['relatedReports'] = array();
             foreach ($relatedReports as $relatedReport) {
                 if (!empty($relatedReport)) {
-                    $report['relatedReports'][] = array(
-                        'name' => $relatedReport->getName(),
+                    $report['relatedReports'][] = [
+                        'name'   => $relatedReport->getName(),
                         'module' => $relatedReport->getModule(),
-                        'action' => $relatedReport->getAction()
-                    );
+                        'action' => $relatedReport->getAction(),
+                    ];
                 }
             }
         }
@@ -762,7 +766,7 @@ class Report
      * Get the list of related reports if there are any. They will be displayed for instance below a report as a
      * recommended related report.
      *
-     * @return Report[]
+     * @return (Report|null)[]
      * @api
      */
     public function getRelatedReports()
@@ -826,7 +830,7 @@ class Report
     }
 
     /**
-     * @return \Piwik\Columns\Dimension
+     * @return \Piwik\Columns\Dimension|null
      * @ignore
      */
     public function getDimension()
@@ -970,7 +974,7 @@ class Report
     {
         $paramOverride = array('idSubtable' => $idSubtable) + $paramOverride;
 
-        list($module, $action) = $this->getSubtableApiMethod();
+        [$module, $action] = $this->getSubtableApiMethod();
         return Request::processRequest($module . '.' . $action, $paramOverride);
     }
 
@@ -1067,8 +1071,6 @@ class Report
      *
      * Includes ProcessedMetrics and Metrics.
      *
-     * @param DataTable $dataTable
-     * @param Report|null $report
      * @param string $baseType The base type each metric class needs to be of.
      * @return Metric[]
      * @api
@@ -1100,8 +1102,6 @@ class Report
      * certain report. The ProcessedMetrics returned are those specified by the Report metadata
      * as well as the DataTable metadata.
      *
-     * @param DataTable $dataTable
-     * @param Report|null $report
      * @return ProcessedMetric[]
      * @api
      */
@@ -1149,8 +1149,6 @@ class Report
     /**
      * Returns the name of the column/metadata that uniquely identifies rows in this report. See
      * {@link self::$rowIdentifier} for more information.
-     *
-     * @return string
      */
     public function getRowIdentifier(): string
     {

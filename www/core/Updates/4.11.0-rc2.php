@@ -42,15 +42,13 @@ class Updates_4_11_0_rc2 extends PiwikUpdates
     }
 
     /**
-     * @param Updater $updater
-     *
      * @return Migration[]
      */
     public function getMigrations(Updater $updater)
     {
         try {
             $this->pendingUsers = Db::fetchAll(
-                "SELECT * FROM $this->userTable WHERE invite_status = ? ",
+                "SELECT * FROM `$this->userTable` WHERE invite_status = ? ",
                 ['pending']
             );
         } catch (\Exception $e) {
@@ -94,7 +92,7 @@ class Updates_4_11_0_rc2 extends PiwikUpdates
                   'invitedUser'  => $user,
                   'siteName'     => $siteName,
                   'token'        => $generatedToken,
-                  'expiryInDays' => 7
+                  'expiryInDays' => 7,
                 ]);
                 $email->safeSend();
             }

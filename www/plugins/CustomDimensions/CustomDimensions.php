@@ -30,9 +30,6 @@ class CustomDimensions extends Plugin
      */
     private $configuration;
 
-    /**
-     * Constructor.
-     */
     public function __construct()
     {
         parent::__construct();
@@ -64,7 +61,7 @@ class CustomDimensions extends Plugin
                 'name'     => $dimension['name'],
                 'module'   => $this->pluginName,
                 'action'   => 'getCustomDimension',
-                'parameters' => array('idDimension' => $dimension['idcustomdimension'])
+                'parameters' => array('idDimension' => $dimension['idcustomdimension']),
             );
         }
     }
@@ -321,13 +318,18 @@ class CustomDimensions extends Plugin
         $translationKeys[] = 'CustomDimensions_ExtractionsHelp';
         $translationKeys[] = 'CustomDimensions_ExtractValue';
         $translationKeys[] = 'CustomDimensions_ExampleValue';
+        $translationKeys[] = 'CustomDimensions_NameHelpText';
+        $translationKeys[] = 'CustomDimensions_DescriptionHelpText';
         $translationKeys[] = 'CustomDimensions_NoCustomDimensionConfigured';
         $translationKeys[] = 'CustomDimensions_ConfigureNewDimension';
         $translationKeys[] = 'CustomDimensions_ConfigureDimension';
+        $translationKeys[] = 'Goals_Optional';
         $translationKeys[] = 'CustomDimensions_XofYLeft';
         $translationKeys[] = 'CustomDimensions_CannotBeDeleted';
         $translationKeys[] = 'CustomDimensions_PageUrlParam';
         $translationKeys[] = 'CustomDimensions_NameAllowedCharacters';
+        $translationKeys[] = 'CustomDimensions_NamePlaceholder';
+        $translationKeys[] = 'CustomDimensions_DescriptionPlaceholder';
         $translationKeys[] = 'CustomDimensions_NameIsRequired';
         $translationKeys[] = 'CustomDimensions_NameIsTooLong';
         $translationKeys[] = 'CustomDimensions_ExceptionDimensionDoesNotExist';
@@ -432,8 +434,7 @@ class CustomDimensions extends Plugin
     }
 
     /**
-     * These are public scopes that are actually visible to the user, scope Conversion
-     * is not really directly visible to the user and a user cannot manage/configure dimensions in scope conversion.
+     * Returns whether the given scope supports value extractions (only the action scope does).
      */
     public static function doesScopeSupportExtractions($scope)
     {

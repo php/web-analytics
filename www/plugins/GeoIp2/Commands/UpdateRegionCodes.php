@@ -51,9 +51,6 @@ class UpdateRegionCodes extends ConsoleCommand
         return Development::isEnabled();
     }
 
-    /**
-     * @return int
-     */
     protected function doExecute(): int
     {
         $output = $this->getOutput();
@@ -89,7 +86,7 @@ class UpdateRegionCodes extends ConsoleCommand
             $newRegions[$countryCode][$regionCode] = [
                 'name' => $region['name'],
                 'altNames' => [],
-                'current' => true
+                'current' => true,
             ];
         }
 
@@ -135,6 +132,7 @@ class UpdateRegionCodes extends ConsoleCommand
 
         $content = <<<CONTENT
 <?php
+
 // The below list contains all ISO region codes and names known to Matomo
 // Format:
 // <CountryCode> => [
@@ -146,10 +144,12 @@ class UpdateRegionCodes extends ConsoleCommand
 //         'current' => <bool> indicating if the iso code is currently used
 //     ]
 // ]
-return 
+return
 CONTENT;
 
-        $content .= var_export($newRegions, true) . ';';
+        $content .= ' ' . var_export($newRegions, true) . ';' . "\n";
+        // strip trailing whitespace so the regenerated file matches the coding style
+        $content = preg_replace('/[ \t]+$/m', '', $content);
 
         file_put_contents($regionsFile, $content);
 
@@ -174,7 +174,7 @@ CONTENT;
 
         $output->writeln('Iterating through all IPv4 addresses...');
 
-        $this->initProgressBar(6396645);
+        $this->initProgressBar(8072539);
 
         $handle = fopen($dbIpCsvFile, 'r');
 

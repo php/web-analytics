@@ -10,8 +10,7 @@
 namespace Piwik\Plugins\Live;
 
 use Piwik\API\Request;
-use Piwik\Common;
-use Piwik\Config;
+use Piwik\Config\GeneralConfig;
 use Piwik\Piwik;
 use Piwik\DataTable;
 use Piwik\Plugins\Live\Exception\MaxExecutionTimeExceededException;
@@ -19,8 +18,6 @@ use Piwik\Plugins\Live\Visualizations\VisitorLog;
 use Piwik\Url;
 use Piwik\View;
 
-/**
- */
 class Controller extends \Piwik\Plugin\Controller
 {
     public const SIMPLE_VISIT_COUNT_WIDGET_LAST_MINUTES_CONFIG_KEY = 'live_widget_visitor_count_last_minutes';
@@ -41,16 +38,20 @@ class Controller extends \Piwik\Plugin\Controller
     public function widget()
     {
         Piwik::checkUserHasViewAccess($this->idSite);
-        Live::checkIsVisitorLogEnabled($this->idSite);
+
+        // When the detailed visits log is disabled we still render the widget if the aggregated
+        // real-time reports are enabled, but limited to the aggregated counters only. Otherwise the
+        // visits log check throws and the widget stays unavailable, as before.
+        $aggregatedOnly = Live::shouldShowAggregatedRealtimeOnly((int) $this->idSite);
+        if (!$aggregatedOnly) {
+            Live::checkIsVisitorLogEnabled($this->idSite);
+        }
 
         $view = new View('@Live/index');
         $view->idSite = $this->idSite;
-        $view->isWidgetized = Common::getRequestVar('widget', 0, 'int');
-        $view = $this->setCounters($view);
-        $view->liveRefreshAfterMs = (int)Config::getInstance()->General['live_widget_refresh_after_seconds'] * 1000;
-        $view->visitors = $this->getLastVisitsStart();
-        $view->initialTotalVisitors = $this->ajaxTotalVisitors();
-        $view->liveTokenAuth = Piwik::getCurrentUserTokenAuth();
+        $view->aggregatedOnly = $aggregatedOnly;
+        $view->isWidgetized = \Piwik\Request::fromRequest()->getIntegerParameter('widget', 0);
+        $view->liveRefreshAfterMs = GeneralConfig::getIntegerConfigValue('live_widget_refresh_after_seconds', 0, $this->idSite) * 1000;
         return $this->render($view);
     }
 
@@ -105,8 +106,16 @@ class Controller extends \Piwik\Plugin\Controller
         $error = '';
         $visitors = new DataTable();
         try {
-            $api = new Request("method=Live.getLastVisitsDetails&idSite={$this->idSite}&filter_limit=10&format=original&serialize=0&disable_generic_filters=1");
+            $api = new Request([
+                'method' => 'Live.getLastVisitsDetails',
+                'idSite' => $this->idSite,
+                'filter_limit' => 10,
+                'format' => 'original',
+                'serialize' => 0,
+                'disable_generic_filters' => 1,
+            ]);
             $visitors = $api->process();
+            $this->decodeActionUrls($visitors);
         } catch (\Exception $e) {
             $error = $e->getMessage();
         }
@@ -114,6 +123,36 @@ class Controller extends \Piwik\Plugin\Controller
         $view->visitors = $visitors;
 
         return $this->render($view);
+    }
+
+    /**
+     * The real-time widget template renders action URLs inline instead of going through the
+     * `Live.renderAction` event. As tracked URLs are returned HTML-entity encoded (e.g. `&` as
+     * `&amp;`), they would be escaped a second time when output into the href attribute, resulting
+     * in broken links like `download.pdf?a=b&amp;c=d`. Decode the entities here so the template's
+     * output escaping produces a single, correct encoding - matching VisitorDetails::renderAction().
+     */
+    private function decodeActionUrls(DataTable $visitors): void
+    {
+        foreach ($visitors->getRows() as $visitor) {
+            $actionDetails = $visitor->getColumn('actionDetails');
+
+            if (!is_array($actionDetails)) {
+                continue;
+            }
+
+            foreach ($actionDetails as &$action) {
+                if (
+                    isset($action['type'], $action['url'])
+                    && in_array($action['type'], ['outlink', 'download'], true)
+                ) {
+                    $action['url'] = html_entity_decode($action['url'], ENT_QUOTES, 'UTF-8');
+                }
+            }
+            unset($action);
+
+            $visitor->setColumn('actionDetails', $actionDetails);
+        }
     }
 
     private function setCounters($view)
@@ -161,7 +200,7 @@ class Controller extends \Piwik\Plugin\Controller
     }
 
     /**
-     * Echo's HTML for visitor profile popup.
+     * Returns the rendered HTML for the visitor profile popup.
      */
     public function getVisitorProfilePopup()
     {
@@ -212,9 +251,9 @@ class Controller extends \Piwik\Plugin\Controller
         $this->checkSitePermission();
         Piwik::checkUserHasViewAccess($this->idSite);
 
-        $filterLimit = Common::getRequestVar('filter_offset', 0, 'int');
-        $startCounter = Common::getRequestVar('start_number', 0, 'int');
-        $limit = Config::getInstance()->General['live_visitor_profile_max_visits_to_aggregate'];
+        $filterLimit  = \Piwik\Request::fromRequest()->getIntegerParameter('filter_offset', 0);
+        $startCounter = \Piwik\Request::fromRequest()->getIntegerParameter('start_number', 0);
+        $limit        = GeneralConfig::getIntegerConfigValue('live_visitor_profile_max_visits_to_aggregate', 0, $this->idSite);
 
         if ($startCounter >= $limit) {
             return ''; // do not return more visits than configured for profile
@@ -225,7 +264,7 @@ class Controller extends \Piwik\Plugin\Controller
                                                                                 'filter_limit'            => VisitorProfile::VISITOR_PROFILE_MAX_VISITS_TO_SHOW,
                                                                                 'filter_offset'           => $filterLimit,
                                                                                 'period'                  => false,
-                                                                                'date'                    => false
+                                                                                'date'                    => false,
                                                                            ));
 
         if (empty($nextVisits)) {
@@ -248,7 +287,7 @@ class Controller extends \Piwik\Plugin\Controller
                                                                      'action'   => 'index',
                                                                      'method'   => 'Live.getVisitorProfile',
                                                                      'format'   => 'XML',
-                                                                     'expanded' => 1
+                                                                     'expanded' => 1,
                                                                 ));
     }
 
@@ -259,7 +298,7 @@ class Controller extends \Piwik\Plugin\Controller
                                                                                           'module'            => 'Widgetize',
                                                                                           'action'            => 'iframe',
                                                                                           'moduleToWidgetize' => 'Live',
-                                                                                          'actionToWidgetize' => 'getVisitorProfilePopup'
+                                                                                          'actionToWidgetize' => 'getVisitorProfilePopup',
                                                                                      ));
         }
     }

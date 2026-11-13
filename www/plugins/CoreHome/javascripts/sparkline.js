@@ -24,39 +24,57 @@ piwik.getSparklineColors = function () {
     return colors;
 };
 
+piwik.refreshSparklines = function () {
+    $('.sparkline img').each(function () {
+        var $self = $(this);
+        var dataSrc = $self.attr('data-src');
+
+        if (!dataSrc) {
+            return;
+        }
+
+        var seriesIndices = $self.closest('.sparkline').data('series-indices');
+        var sparklineColors = piwik.getSparklineColors();
+
+        if (seriesIndices && sparklineColors.lineColor instanceof Array) {
+            sparklineColors.lineColor = sparklineColors.lineColor.filter(function (c, index) {
+                return seriesIndices.indexOf(index) !== -1;
+            });
+        }
+
+        var colors = JSON.stringify(sparklineColors);
+        var appendToSparklineUrl = '&colors=' + encodeURIComponent(colors);
+
+        // The img's own width/height attributes are the displayed size (falling back to the
+        // legacy 100x25). Render the PNG at twice the displayed size so it stays crisp on
+        // hi-DPI screens.
+        var width = parseInt($self.attr('width'), 10) || sparklineDisplayWidth;
+        var height = parseInt($self.attr('height'), 10) || sparklineDisplayHeight;
+        appendToSparklineUrl += '&width=' + encodeURIComponent(width * 2)
+            + '&height=' + encodeURIComponent(height * 2);
+
+        // Append the token_auth to the URL if it was set (eg. embed dashboard)
+        var token_auth = broadcast.getValueFromUrl('token_auth');
+        if (token_auth.length && piwik.shouldPropagateTokenAuth) {
+            appendToSparklineUrl += '&token_auth=' + token_auth;
+        }
+
+        $self.attr('width', width);
+        $self.attr('height', height);
+        $self.attr('src', dataSrc + appendToSparklineUrl);
+    });
+};
+
 // initializes each sparkline so they use colors defined in CSS
 piwik.initSparklines = function() {
     $(function () {
-        $('.sparkline img').each(function () {
-          var $self = $(this);
-
-          if ($self.attr('src')) {
-            return;
-          }
-
-          var seriesIndices = $self.closest('.sparkline').data('series-indices');
-          var sparklineColors = piwik.getSparklineColors();
-
-          if (seriesIndices && sparklineColors.lineColor instanceof Array) {
-            sparklineColors.lineColor = sparklineColors.lineColor.filter(function (c, index) {
-              return seriesIndices.indexOf(index) !== -1;
-            });
-          }
-
-          var colors = JSON.stringify(sparklineColors);
-          var appendToSparklineUrl = '&colors=' + encodeURIComponent(colors);
-
-          // Append the token_auth to the URL if it was set (eg. embed dashboard)
-          var token_auth = broadcast.getValueFromUrl('token_auth');
-          if (token_auth.length && piwik.shouldPropagateTokenAuth) {
-            appendToSparklineUrl += '&token_auth=' + token_auth;
-          }
-          $self.attr('width', sparklineDisplayWidth);
-          $self.attr('height', sparklineDisplayHeight);
-          $self.attr('src', $self.attr('data-src') + appendToSparklineUrl);
-        });
+      piwik.refreshSparklines();
     });
 };
+
+window.addEventListener('themeModeChange', function () {
+    piwik.refreshSparklines();
+});
 
 window.initializeSparklines = function () {
     $('.dataTableVizEvolution[data-report]').each(function () {
@@ -99,6 +117,9 @@ window.initializeSparklines = function () {
                     }
                     if (urlParams.rows) {
                         params.rows = decodeURIComponent(urlParams.rows);
+                    }
+                    if (urlParams.idGoal) {
+                        params.idGoal = decodeURIComponent(urlParams.idGoal);
                     }
                 }
 

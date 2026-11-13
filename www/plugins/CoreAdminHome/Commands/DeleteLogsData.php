@@ -29,7 +29,7 @@ class DeleteLogsData extends ConsoleCommand
         'log_link_visit_action',
         'log_conversion',
         'log_conversion_item',
-        'log_action'
+        'log_action',
     );
 
     /**
@@ -110,7 +110,7 @@ class DeleteLogsData extends ConsoleCommand
     }
 
     /**
-     * @return Date[]
+     * @return string[]
      */
     private function getDateRangeToDeleteFrom()
     {

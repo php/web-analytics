@@ -10,6 +10,8 @@
 namespace Piwik\Plugins\Referrers\Columns;
 
 use Piwik\Common;
+use Piwik\Metrics\Formatter;
+use Piwik\Plugins\PrivacyManager\Settings\CampaignParameterValuesMasked;
 use Piwik\Tracker\Request;
 use Piwik\Tracker\Visitor;
 use Piwik\Tracker\Action;
@@ -27,8 +29,6 @@ class ReferrerName extends Base
     protected $category = 'Referrers_Referrers';
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
      * @return mixed
      */
@@ -52,13 +52,16 @@ class ReferrerName extends Base
     }
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
      * @return mixed
      */
     public function onAnyGoalConversion(Request $request, Visitor $visitor, $action)
     {
         return $this->getValueForRecordGoal($request, $visitor);
+    }
+
+    public function formatValue($value, $idSite, Formatter $formatter)
+    {
+        return CampaignParameterValuesMasked::formatValue($value);
     }
 }

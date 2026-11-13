@@ -30,6 +30,7 @@ class ArchiveTableDao
      * - number of segment archives
      * - number of numeric rows
      * - number of blob rows
+     * - sum of blob column byte length
      *
      * @param string $tableDate ie `'2015_01'`
      * @return array
@@ -99,8 +100,6 @@ class ArchiveTableDao
 
     /**
      * Return invalidation queue table data
-     *
-     * @param bool $prettyTime
      *
      * @return array
      * @throws \Exception

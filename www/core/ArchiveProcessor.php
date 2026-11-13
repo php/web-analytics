@@ -11,6 +11,7 @@ namespace Piwik;
 
 use Exception;
 use Piwik\Archive\DataTableFactory;
+use Piwik\ArchiveProcessor\BlobTableAggregator;
 use Piwik\ArchiveProcessor\Parameters;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\Container\StaticContainer;
@@ -95,7 +96,7 @@ class ArchiveProcessor
     private $logAggregator;
 
     /**
-     * @var Archive
+     * @var \Piwik\Archive\ArchiveQuery|null
      */
     public $archive = null;
 
@@ -105,7 +106,7 @@ class ArchiveProcessor
     private $params;
 
     /**
-     * @var int
+     * @var int|false
      */
     private $numberOfVisits = false;
 
@@ -192,9 +193,13 @@ class ArchiveProcessor
      * @param array $columnsToRenameAfterAggregation Columns mapped to new names for columns that must change names
      *                                               when summed because they cannot be summed, eg,
      *                                               `array('nb_uniq_visitors' => 'sum_daily_nb_uniq_visitors')`.
-     * @param bool|array $countRowsRecursive if set to true, will calculate the recursive rows count for all record names
-     *                                       which makes it slower. If you only need it for some records pass an array of
-     *                                       recordNames that defines for which ones you need a recursive row count.
+     * @param string[]|bool $countRowsRecursive array of recordNames that defines for which ones you need a recursive row count, or true if it should be done for all
+     * @param string[] $countLeafRows array of recordNames that defines for which ones you need a leaf row count.
+     * @param callable|null $postAggregationTransform Optional callback applied to each aggregated DataTable after the
+     *                                                subperiods have been aggregated together and before it is truncated
+     *                                                and stored. Signature: function (DataTable $table): void; the
+     *                                                callback mutates $table in place. Use it to recompute columns that
+     *                                                cannot be summed across periods.
      * @return array Returns the row counts of each aggregated report before truncation, eg,
      *
      *                   array(
@@ -213,7 +218,9 @@ class ArchiveProcessor
         $defaultColumnToSortByBeforeTruncation = null,
         &$columnsAggregationOperation = null,
         $columnsToRenameAfterAggregation = null,
-        $countRowsRecursive = true
+        $countRowsRecursive = true,
+        array $countLeafRows = [],
+        ?callable $postAggregationTransform = null
     ) {
         /** @var LoggerInterface $logger */
         $logger = StaticContainer::get(LoggerInterface::class);
@@ -235,9 +242,16 @@ class ArchiveProcessor
 
             $table = $this->aggregateDataTableRecord($recordName, $columnsAggregationOperation, $columnsToRenameAfterAggregation);
 
+            if (null !== $postAggregationTransform) {
+                $postAggregationTransform($table);
+            }
+
             $nameToCount[$recordName]['level0'] = $table->getRowsCount();
             if ($countRowsRecursive === true || (is_array($countRowsRecursive) && in_array($recordName, $countRowsRecursive))) {
                 $nameToCount[$recordName]['recursive'] = $table->getRowsCountRecursive();
+            }
+            if (in_array($recordName, $countLeafRows)) {
+                $nameToCount[$recordName]['leafs'] = $table->getLeafRowsCount();
             }
 
             $columnToSortByBeforeTruncation = $defaultColumnToSortByBeforeTruncation;
@@ -266,8 +280,8 @@ class ArchiveProcessor
      * as metrics for the current period.
      *
      * @param array|string $columns Array of metric names to aggregate.
-     * @param bool|string|string[] $operationToApply The operation to apply to the metric. Either `'sum'`, `'max'` or `'min'`.
-     *                                               Can also be an array mapping record names to operations.
+     * @param string|string[]|false $operationsToApply The operation to apply to the metric. Either `'sum'`, `'max'` or `'min'`.
+     *                                                Can also be an array mapping record names to operations.
      * @return array|int Returns the array of aggregate values. If only one metric was aggregated,
      *                   the aggregate value will be returned as is, not in an array.
      *                   For example, if `array('nb_visits', 'nb_hits')` is supplied for `$columns`,
@@ -367,8 +381,8 @@ class ArchiveProcessor
      * All these DataTables are then added together, and the resulting DataTable is returned.
      *
      * @param string $name
-     * @param array $columnsAggregationOperation Operations for aggregating columns, @see Row::sumRow()
-     * @param array $columnsToRenameAfterAggregation columns in the array (old name, new name) to be renamed as the sum operation is not valid on them (eg. nb_uniq_visitors->sum_daily_nb_uniq_visitors)
+     * @param array|null $columnsAggregationOperation Operations for aggregating columns, @see Row::sumRow()
+     * @param array|null $columnsToRenameAfterAggregation columns in the array (old name, new name) to be renamed as the sum operation is not valid on them (eg. nb_uniq_visitors->sum_daily_nb_uniq_visitors)
      * @return DataTable
      */
     protected function aggregateDataTableRecord($name, $columnsAggregationOperation = null, $columnsToRenameAfterAggregation = null)
@@ -387,25 +401,12 @@ class ArchiveProcessor
 
     protected function getAggregatedDataTableMapFromBlobs(\Iterator $dataTableBlobs, $columnsAggregationOperation, $columnsToRenameAfterAggregation, $name)
     {
-        // maps period & subtable ID in database to the Row instance in $result that subtable should be added to when encountered
-        // [$row['date1'].','.$row['date2']][$tableId] = $row in $result
-        /** @var Row[][] */
-        $tableIdToResultRowMapping = [];
-
-        $result = new DataTable();
-
-        if (!empty($columnsAggregationOperation)) {
-            $result->setMetadata(DataTable::COLUMN_AGGREGATION_OPS_METADATA_NAME, $columnsAggregationOperation);
-        }
-
-        foreach ($dataTableBlobs as $archiveDataRow) {
-            $period = $archiveDataRow['date1'] . ',' . $archiveDataRow['date2'];
-            $tableId = $archiveDataRow['name'] == $name ? null : $this->getSubtableIdFromBlobName($archiveDataRow['name']);
-
-            $blobTable = DataTable::fromSerializedArray($archiveDataRow['value']);
-
-            // see https://github.com/piwik/piwik/issues/4377
-            $blobTable->filter(function ($table) use ($columnsToRenameAfterAggregation, $name) {
+        [$result, $hasRows] = BlobTableAggregator::aggregateBlobRows(
+            $dataTableBlobs,
+            $name,
+            $columnsAggregationOperation,
+            function (DataTable $table) use ($columnsToRenameAfterAggregation): void {
+                // see https://github.com/piwik/piwik/issues/4377
                 if ($this->areColumnsNotAlreadyRenamed($table)) {
                     /**
                      * This makes archiving and range dates a lot faster. Imagine we archive a week, then we will
@@ -417,71 +418,29 @@ class ArchiveProcessor
                      */
                     $this->renameColumnsAfterAggregation($table, $columnsToRenameAfterAggregation);
                 }
-            });
-
-            $tableToAddTo = null;
-            if ($tableId === null) {
-                $tableToAddTo = $result;
-            } elseif (empty($tableIdToResultRowMapping[$period][$tableId])) { // sanity check
+            },
+            null,
+            function (string $sitePeriod, int $tableId): void {
                 StaticContainer::get(LoggerInterface::class)->info(
-                    'Unexpected state when aggregating DataTable, unknown period/table ID combination encountered: {period} - {tableId}.'
+                    'Unexpected state when aggregating DataTable, unknown site/period/table ID combination encountered: {sitePeriod} - {tableId}.'
                     . ' This either means the SQL to order blobs is behaving incorrectly or the blob data is corrupt in some way.',
                     [
-                        'period' => $period,
+                        'sitePeriod' => $sitePeriod,
                         'tableId' => $tableId,
                     ]
                 );
-                continue;
-            } else {
-                $rowToAddTo = $tableIdToResultRowMapping[$period][$tableId];
-
-                if (!$rowToAddTo->getIdSubDataTable()) {
-                    $newTable = new DataTable();
-                    $newTable->setMetadata(DataTable::COLUMN_AGGREGATION_OPS_METADATA_NAME, $columnsAggregationOperation);
-                    $rowToAddTo->setSubtable($newTable);
-                }
-
-                $tableToAddTo = $rowToAddTo->getSubtable();
             }
-
-            $tableToAddTo->addDataTable($blobTable);
-
-            // add subtable IDs for $blobTableRow to $tableIdToResultRowMapping
-            foreach ($blobTable->getRows() as $blobTableRow) {
-                $label = $blobTableRow->getColumn('label');
-                $subtableId = $blobTableRow->getIdSubDataTable();
-                if (empty($subtableId)) {
-                    continue;
-                }
-
-                $rowToAddTo = $tableToAddTo->getRowFromLabel($label);
-                $tableIdToResultRowMapping[$period][$subtableId] = $rowToAddTo;
-            }
-
-            Common::destroy($blobTable);
-            unset($blobTable);
-        }
+        );
+        unset($hasRows);
 
         return $result;
-    }
-
-    private function getSubtableIdFromBlobName($recordName)
-    {
-        $parts = explode('_', $recordName);
-        $id = end($parts);
-
-        if (is_numeric($id)) {
-            return $id;
-        }
-
-        return null;
     }
 
     /**
      * Note: public only for use in closure in PHP 5.3.
      *
-     * @param $table
-     * @return \Piwik\Period
+     * @param DataTable $table
+     * @return bool
      */
     public function areColumnsNotAlreadyRenamed($table)
     {
@@ -552,7 +511,7 @@ class ArchiveProcessor
 
         $metrics = array(
             Metrics::INDEX_NB_USERS,
-            $uniqueVisitorsMetric
+            $uniqueVisitorsMetric,
         );
 
         $uniques = $this->computeNbUniques($metrics, $sites);
@@ -629,9 +588,8 @@ class ArchiveProcessor
     /**
      * If the DataTable is a Map, sums all DataTable in the map and return the DataTable.
      *
-     *
-     * @param $data DataTable|DataTable\Map
-     * @param $columnsToRenameAfterAggregation array
+     * @param DataTable|DataTable\Map $data
+     * @param array|null $columnsAggregationOperation
      * @return DataTable
      */
     protected function getAggregatedDataTableMap($data, $columnsAggregationOperation)
@@ -654,8 +612,6 @@ class ArchiveProcessor
 
     /**
      * Aggregates the DataTable\Map into the destination $aggregated
-     * @param $map
-     * @param $aggregated
      */
     protected function aggregatedDataTableMapsAsOne(Map $map, DataTable $aggregated)
     {
@@ -703,6 +659,10 @@ class ArchiveProcessor
         $operationForColumn = $this->getOperationForColumns($columns, $operationsToApply);
 
         $dataTable = $this->getArchive()->getDataTableFromNumeric($columns);
+
+        if ($dataTable->wasBuiltWithoutArchives()) {
+            return (new Row())->getColumns();
+        }
 
         $results = $this->getAggregatedDataTableMap($dataTable, $operationForColumn);
         if ($results->getRowsCount() > 1) {

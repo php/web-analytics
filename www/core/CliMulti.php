@@ -53,7 +53,7 @@ class CliMulti
 
     /**
      * If set it will issue at most concurrentProcessesLimit requests
-     * @var int
+     * @var int|null
      */
     private $concurrentProcessesLimit = null;
 
@@ -72,14 +72,14 @@ class CliMulti
     /**
      * Only used when doing synchronous curl requests.
      *
-     * @var string
+     * @var string|null
      */
     private $urlToPiwik = null;
 
     private $phpCliOptions = '';
 
     /**
-     * @var callable
+     * @var callable|null
      */
     private $onProcessFinish = null;
 
@@ -139,7 +139,8 @@ class CliMulti
      *                               **Make sure query parameter values are properly encoded in the URLs.**
      *
      * @return array The response of each URL in the same order as the URLs. The array can contain null values in case
-     *               there was a problem with a request, for instance if the process died unexpected.
+     *               there was a problem with a request, for instance if the process died unexpected. If a shutdown
+     *               signal is received mid-execution, remaining URLs are skipped and omitted from the result.
      */
     public function request(array $piwikUrls)
     {
@@ -182,7 +183,7 @@ class CliMulti
     /**
      * Ok, this sounds weird. Why should we care about ssl certificates when we are in CLI mode? It is needed for
      * our simple fallback mode for Windows where we initiate HTTP requests instead of CLI.
-     * @param $acceptInvalidSSLCertificate
+     * @param bool $acceptInvalidSSLCertificate
      */
     public function setAcceptInvalidSSLCertificate($acceptInvalidSSLCertificate)
     {
@@ -190,7 +191,7 @@ class CliMulti
     }
 
     /**
-     * @param $limit int Maximum count of requests to issue in parallel
+     * @param int $limit Maximum count of requests to issue in parallel
      */
     public function setConcurrentProcessesLimit($limit)
     {
@@ -245,7 +246,7 @@ class CliMulti
         $this->outputs[] = $output;
     }
 
-    private function buildCommand($hostname, $query, $outputFileIfAsync, $doEsacpeArg = true)
+    private function buildCommand($hostname, $query, $outputFileIfAsync, $doEscapeArg = true)
     {
         $bin = $this->findPhpBinary();
         $superuserCommand = $this->runAsSuperUser ? "--superuser" : "";
@@ -255,7 +256,7 @@ class CliMulti
             $append = sprintf(' > %s 2>&1 &', $outputFileIfAsync);
         }
 
-        if ($doEsacpeArg) {
+        if ($doEscapeArg) {
             $hostname = escapeshellarg($hostname);
             $query = escapeshellarg($query);
         }
@@ -278,7 +279,7 @@ class CliMulti
 
         foreach ($this->outputs as $output) {
             $content = $output->get();
-            // Remove output that can be ignored in climulti . works around some worpdress setups where the hash bang may
+            // Remove output that can be ignored in climulti . works around some WordPress setups where the hash bang may
             // be printed
             $search = '#!/usr/bin/env php';
             if (
@@ -414,8 +415,6 @@ class CliMulti
      *
      * Several of the regular supportsAsync requirements may be obsolete after
      * a complete switch has been done.
-     *
-     * @return bool
      */
     public function supportsAsyncSymfony(): bool
     {
@@ -591,6 +590,8 @@ class CliMulti
             $requestBody = 'token_auth=' . $tokenAuth;
         }
 
+        $response = null;
+
         try {
             $this->logger->debug("Execute HTTP API request: "  . $url);
             $response = Http::sendHttpRequestBy('curl', $url, $timeout = 0, $userAgent = null, $destinationPath = null, $file = null, $followDepth = 0, $acceptLanguage = false, $this->acceptInvalidSSLCertificate, false, false, 'POST', null, null, $requestBody, [], $forcePost = true);
@@ -598,7 +599,7 @@ class CliMulti
         } catch (\Exception $e) {
             $message = "Got invalid response from API request: $url. ";
 
-            if (isset($response) && empty($response)) {
+            if (empty($response)) {
                 $message .= "The response was empty. This usually means a server error. This solution to this error is generally to increase the value of 'memory_limit' in your php.ini file. Please check your Web server Error Log file for more details.";
             } else {
                 $message .= "Response was '" . $e->getMessage() . "'";

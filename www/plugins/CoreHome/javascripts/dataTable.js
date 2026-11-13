@@ -17,7 +17,7 @@ var exports = require('piwik/UI'),
 
 /**
  * This class contains the client side logic for viewing and interacting with
- * Piwik datatables.
+ * Matomo datatables.
  *
  * The id attribute for DataTables is set dynamically by the initNewDataTables
  * method, and this class instance is stored using the jQuery $.data function
@@ -305,6 +305,13 @@ $.extend(DataTable.prototype, UIControl.prototype, {
         }
         ajaxRequest.withTokenInUrl();
 
+        // store filtering parameters for given widget id
+        var widgetId = this.findUniqueWidgetId(this.$element);
+        if (widgetId) {
+            var filterParams = this.getFilterParams(Object.assign({}, params, extraParams));
+            window.CoreHome.SearchFiltersPersistenceStore.setSearchFilters(widgetId, filterParams);
+        }
+
         ajaxRequest.setCallback(
             function (response) {
                 container.trigger('piwikDestroyPlot');
@@ -441,7 +448,9 @@ $.extend(DataTable.prototype, UIControl.prototype, {
 
             var widthOfAllColumns = 0;
             columnsInFirstRow.each(function (index, column) {
-                widthOfAllColumns += $(column).outerWidth();
+                // Round each measurement so the sum is a stable integer; raw sub-pixel widths
+                // made the label width (and where labels get truncated) jitter between runs.
+                widthOfAllColumns += Math.round($(column).outerWidth());
             });
 
             if (tableWidth - widthOfAllColumns >= minLabelWidth) {
@@ -886,34 +895,47 @@ $.extend(DataTable.prototype, UIControl.prototype, {
                 searchForPattern();
             }
         }
-        function showSearch(event) {
-            event.preventDefault();
-            event.stopPropagation();
 
-            var triggerField;
-            if (typeof self.param.filter_trigger_id != "undefined"
-              && self.param.filter_trigger_id.length > 0) {
-              triggerField = document.getElementById(self.param.filter_trigger_id);
-            } else if (event && event.target) {
+        function getTriggerField(event) {
+          if (typeof self.param.filter_trigger_id !== "undefined" &&
+            self.param.filter_trigger_id.length > 0) {
+            return document.getElementById(self.param.filter_trigger_id);
+          } else {
+            if (event && event.target) {
               if (event.target.nodeName.toLowerCase() === 'span') {
-                triggerField = $(event.target).siblings('input');
+                return $(event.target).siblings('input');
               } else {
-                triggerField = $(event.target).children('input');
+                return $(event.target).children('input');
               }
             }
+          }
+        }
 
-            var $searchAction = $(this);
-            $searchAction.addClass('searchActive forceActionVisible');
-            var width = getOptimalWidthForSearchField($searchAction);
-            $searchAction.css('width', width + 'px');
+        function restoreSearchFieldFocus(event)
+        {
+            var triggerField = getTriggerField(event);
 
             if (triggerField) {
               triggerField.focus();
             }
+        }
 
+        function showSearchInputFields($searchAction) {
+            $searchAction.addClass('searchActive forceActionVisible');
+            var width = getOptimalWidthForSearchField($searchAction);
+            $searchAction.css('width', width + 'px');
             $searchAction.find('.icon-search').on('click', searchForPattern);
             $searchAction.off('click', showSearch);
         }
+
+        function showSearch(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            showSearchInputFields($(this));
+            restoreSearchFieldFocus(event);
+        }
+
 
         function searchForPattern(event) {
             var keyword = '';
@@ -967,11 +989,16 @@ $.extend(DataTable.prototype, UIControl.prototype, {
             }
         });
 
-        const $dataTable = $searchInput.parents('.dataTable').first();
+        $searchInput.on("blur", function () {
+            delete self.param.filter_trigger_id;
+        });
+
+        var $dataTable = $searchInput.parents('.dataTable').first();
         if (currentPattern) {
             $dataTable.addClass('hasSearchKeyword');
             $searchInput.val(currentPattern);
-            $searchAction.click();
+            showSearchInputFields($searchAction);
+            restoreSearchFieldFocus();
         } else {
             $dataTable.removeClass('hasSearchKeyword');
         }
@@ -1009,12 +1036,13 @@ $.extend(DataTable.prototype, UIControl.prototype, {
         var $next = $('.dataTableNext', domElem);
 
         // Display the next link if the total Rows is greater than the current end row
+        // and filter_limit is a positive number (not "show all")
         $next.each(function () {
             var offsetEnd = Number(self.param.filter_offset)
                 + Number(self.param.filter_limit);
             var totalRows = Number(self.param.totalRows);
             if (self.param.keep_summary_row == 1) --totalRows;
-            if (offsetEnd < totalRows) {
+            if (offsetEnd < totalRows && Number(self.param.filter_limit) > 0) {
                 $(this).css('visibility', 'visible');
             }
         });
@@ -1077,8 +1105,7 @@ $.extend(DataTable.prototype, UIControl.prototype, {
 
                     piwik.annotations.placeEvolutionIcons(annotations, domElem);
 
-                    // add new section under axis
-                    annotations.insertBefore($('.dataTableFooterNavigation', domElem));
+                    piwik.annotations.placeEvolutionAnnotations(annotations, domElem);
 
                     // reposition annotation icons every time the graph is resized
                     $('.piwik-graph', domElem).on('resizeGraph', function () {
@@ -1273,10 +1300,10 @@ $.extend(DataTable.prototype, UIControl.prototype, {
             && (typeof self.param.flat == 'undefined' || self.param.flat != 1)
         ) {
             // if there are no subtables, remove the flatten action from all data table actions
-            const dataTableActionsVueApps = $('[vue-entry="CoreHome.DataTableActions"]', domElem);
+            var dataTableActionsVueApps = $('[vue-entry="CoreHome.DataTableActions"]', domElem);
             if (dataTableActionsVueApps.length) {
               dataTableActionsVueApps.each(function() {
-                const appData = $(this).data('vueAppInstance');
+                var appData = $(this).data('vueAppInstance');
                 if (appData) {
                   appData.showFlattenTable_ = false;
                 }
@@ -1318,6 +1345,10 @@ $.extend(DataTable.prototype, UIControl.prototype, {
         $('.dataTableShowTotalsRow', domElem)
             .click(generateClickCallback('keep_totals_row'));
 
+        // handle percentage values
+        $('.dataTableShowPercentageValues', domElem)
+            .click(generateClickCallback('show_percentage_values'));
+
         $('.dataTableIncludeAggregateRows', domElem)
             .click(generateClickCallback('include_aggregate_rows', function () {
                 if (self.param.include_aggregate_rows == 1) {
@@ -1352,6 +1383,31 @@ $.extend(DataTable.prototype, UIControl.prototype, {
             }));
     },
 
+    findUniqueWidgetId: function (domWidget) {
+        // on dashboards, widget have widgetId attribute
+        var widget = $(domWidget).closest('[widgetId]');
+        if (widget && widget.length && widget[0].hasAttribute('widgetId')) {
+            return widget[0].getAttribute('widgetId');
+        }
+
+        // on pages other than the dashboard the ID is on a different element
+        widget = $(domWidget).closest('.matomo-widget');
+        if (widget && widget.length && widget[0].hasAttribute('id')) {
+            return widget[0].getAttribute('id');
+        }
+
+        return '';
+    },
+
+    getFilterParams: function (params) {
+        return Object.keys(params)
+           .filter(key => key.startsWith('filter_column') || key.startsWith('filter_pattern'))
+           .reduce((filterParams, key) => {
+               filterParams[key] = params[key];
+               return filterParams;
+           }, {});
+    },
+
     notifyWidgetParametersChange: function (domWidget, parameters) {
         var widget = $(domWidget).closest('[widgetId],[containerid]');
         // trigger setParameters event on base element
@@ -1362,23 +1418,26 @@ $.extend(DataTable.prototype, UIControl.prototype, {
         if (widget && widget.length && widget[0].hasAttribute('widgetId')) {
             widget.trigger('setParameters', parameters);
         } else {
-            var containerId = widget && widget.length ? widget.attr('containerid') : undefined;
-            var reportId = $(domWidget).closest('[data-report]').attr('data-report');
+            if (!piwik.isUserIsAnonymous) {
+              var containerId = widget && widget.length ? widget.attr('containerid') : undefined;
+              var reportId = $(domWidget).closest('[data-report]').attr('data-report');
 
-            var ajaxRequest = new ajaxHelper();
-            ajaxRequest.addParams({
+              var ajaxRequest = new ajaxHelper();
+              ajaxRequest.addParams({
                 module: 'CoreHome',
                 action: 'saveViewDataTableParameters',
                 report_id: reportId,
                 containerId: containerId
-            }, 'get');
-            ajaxRequest.withTokenInUrl();
-            ajaxRequest.addParams({
+              }, 'get');
+              ajaxRequest.withTokenInUrl();
+              ajaxRequest.addParams({
                 parameters: JSON.stringify(parameters)
-            }, 'post');
-            ajaxRequest.setCallback(function () {});
-            ajaxRequest.setFormat('html');
-            ajaxRequest.send();
+              }, 'post');
+              ajaxRequest.setCallback(function () {
+              });
+              ajaxRequest.setFormat('html');
+              ajaxRequest.send();
+            }
         }
     },
 
@@ -1397,11 +1456,15 @@ $.extend(DataTable.prototype, UIControl.prototype, {
 
         $domElement.data('tooltip', 'enabled');
 
-        if (!isTextEllipsized($domElement)) {
+        // a label with a title of its own always needs the tooltip to render it; one that only
+        // repeats the cell text needs it just when that text is cut off
+        if (!$domElement.attr('title') && !isTextEllipsized($domElement)) {
             return;
         }
 
-        var customToolTipText = $domElement.attr('title') || $domElement.text();
+        // the cell's own text is escaped once, as the tooltip renders its title as HTML
+        var customToolTipText = $domElement.attr('title')
+            || piwikHelper.htmlEntities($domElement.text());
 
         if (customToolTipText) {
             $domElement.attr('title', customToolTipText);
@@ -1409,6 +1472,7 @@ $.extend(DataTable.prototype, UIControl.prototype, {
 
         $domElement.tooltip({
             track: true,
+            content: window.CoreHome.tooltipContent,
             show: false,
             hide: false
         });
@@ -1507,7 +1571,7 @@ $.extend(DataTable.prototype, UIControl.prototype, {
                         '<tr class="subDataTableContainer">' +
                             '<td colspan="' + numberOfColumns + '" class="cellSubDataTable">' +
                             '<div id="' + divIdToReplaceWithSubTable + '">' +
-                            '<span class="loadingPiwik" style="display:inline"><img src="plugins/Morpheus/images/loading-blue.gif" />' + _pk_translate('General_Loading') + '</span>' +
+                            '<span class="loadingPiwik" style="display:inline"><span class="matomo-loader"><span></span><span></span><span></span></span>' + _pk_translate('General_Loading') + '</span>' +
                             '</div>' +
                             '</td>' +
                             '</tr>'
@@ -1622,7 +1686,7 @@ $.extend(DataTable.prototype, UIControl.prototype, {
 			track: true,
 			items: 'span',
 			content: function() {
-				return $(this).parent().data('tooltip');
+				return window.vueSanitizeTooltip($(this).parent().data('tooltip'));
 			},
 			show: false,
 			hide: false,
@@ -1630,10 +1694,7 @@ $.extend(DataTable.prototype, UIControl.prototype, {
 		});
         domElem.find('span.ratio').tooltip({
             track: true,
-            content: function() {
-                var title = $(this).attr('title');
-                return piwikHelper.escape(title.replace(/\n/g, '<br />'));
-            },
+            content: window.CoreHome.tooltipContent,
             show: {delay: 700, duration: 200},
             hide: false
         })
@@ -1714,6 +1775,7 @@ $.extend(DataTable.prototype, UIControl.prototype, {
                 // modify parameters
                 self.resetAllFilters();
                 var newParams = broadcast.getValuesFromUrl(url);
+                var isSecondaryDimensionReport = self.param.module === newParams.module && self.param.action === newParams.action && newParams.secondaryDimension;
 
                 for (var key in newParams) {
                     self.param[key] = decodeURIComponent(newParams[key]);
@@ -1725,14 +1787,16 @@ $.extend(DataTable.prototype, UIControl.prototype, {
                 var relatedReportName = $this.text();
 
                 // do ajax request
-                self.reloadAjaxDataTable(true, (function (relatedReportName) {
+                self.reloadAjaxDataTable(true, (function (relatedReportName, isSecondaryDimensionReport) {
 
                     return function (newReport) {
                         var newDomElem = self.dataTableLoaded(newReport, self.workingDivId);
                         hideShowRelatedReports(clicked);
-                        replaceReportTitleAndHelp(newDomElem, relatedReportName);
+                        if (!isSecondaryDimensionReport) {
+                            replaceReportTitleAndHelp(newDomElem, relatedReportName);
+                        }
                     }
-                })(relatedReportName));
+                })(relatedReportName, isSecondaryDimensionReport));
             });
         });
     },
@@ -1766,7 +1830,7 @@ $.extend(DataTable.prototype, UIControl.prototype, {
 
     handleSummaryRow: function (domElem) {
         var details = _pk_translate('General_LearnMore', [' (<a href="'
-        + _pk_externalRawLink('https://matomo.org/faq/how-to/faq_54/') + '" rel="noreferrer noopener" target="_blank">', '</a>)']);
+        + _pk_externalRawLink('https://matomo.org/faq/reports/understanding-row-limits-and-others-rows/') + '" rel="noreferrer noopener" target="_blank">', '</a>)']);
 
         domElem.find('tr.summaryRow').each(function () {
             var labelSpan = $(this).find('.label .value').filter(function(index, elem){
@@ -1775,7 +1839,7 @@ $.extend(DataTable.prototype, UIControl.prototype, {
             var defaultLabel = labelSpan.text();
 
             $(this).hover(function() {
-                    labelSpan.html(defaultLabel + details);
+                    labelSpan.html(piwikHelper.htmlEntities(defaultLabel) + details);
                 },
                 function() {
                     labelSpan.text(defaultLabel);

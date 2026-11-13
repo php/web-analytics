@@ -20,15 +20,30 @@ widgetsHelper.firstGetAvailableWidgetsCall = null;
  */
 widgetsHelper.getAvailableWidgets = function (callback) {
 
+    function resetFirstGetAvailableWidgetsCall(promise) {
+        if (widgetsHelper.firstGetAvailableWidgetsCall === promise) {
+            widgetsHelper.firstGetAvailableWidgetsCall = null;
+        }
+    }
+
+    if (!widgetsHelper.availableWidgets && widgetsHelper.firstGetAvailableWidgetsCall) {
+        return widgetsHelper.firstGetAvailableWidgetsCall.then(function () {
+            if (callback) {
+                callback(widgetsHelper.availableWidgets);
+            }
+        });
+    }
+
     function mergeCategoriesAndSubCategories(availableWidgets)
     {
-        var categorized = {};
+        var categorized = Object.create(null);
 
         $.each(availableWidgets, function (index, widget) {
             var category = widget.category.name;
 
             if (!categorized[category]) {
-                categorized[category] = {'-': []};
+                categorized[category] = Object.create(null);
+                categorized[category]['-'] = [];
             }
 
             var subcategory = '-';
@@ -43,7 +58,7 @@ widgetsHelper.getAvailableWidgets = function (callback) {
             categorized[category][subcategory].push(widget);
         });
 
-        var moved = {};
+        var moved = Object.create(null);
 
         $.each(categorized, function (category, widgets) {
             $.each(widgets, function (subcategory, subwidgets) {
@@ -87,15 +102,25 @@ widgetsHelper.getAvailableWidgets = function (callback) {
           function (data) {
             widgetsHelper.availableWidgets = mergeCategoriesAndSubCategories(data);
 
+            resetFirstGetAvailableWidgetsCall(promise);
             resolve();
           }
         );
         ajaxRequest.setErrorCallback(function (deferred, status) {
-          if (status == 'abort' || !deferred || deferred.status < 400 || deferred.status >= 600) {
+          resetFirstGetAvailableWidgetsCall(promise);
+
+          if (status == 'abort') {
+            reject(new Error('Loading widget metadata was aborted'));
             return;
           }
+
+          if (!deferred || deferred.status < 400 || deferred.status >= 600) {
+            reject(new Error('Loading widget metadata failed'));
+            return;
+          }
+
           $('#loadingError').show();
-          reject();
+          reject(new Error('Loading widget metadata failed'));
         });
         ajaxRequest.send();
         return;
@@ -108,7 +133,7 @@ widgetsHelper.getAvailableWidgets = function (callback) {
       widgetsHelper.firstGetAvailableWidgetsCall = promise;
     }
 
-    promise.then(function () {
+    return promise.then(function () {
       if (callback) {
         callback(widgetsHelper.availableWidgets);
       }
@@ -121,6 +146,7 @@ widgetsHelper.getAvailableWidgets = function (callback) {
  */
 widgetsHelper.clearAvailableWidgets = function () {
     delete widgetsHelper.availableWidgets;
+    widgetsHelper.firstGetAvailableWidgetsCall = null;
 };
 
 /**
@@ -131,17 +157,25 @@ widgetsHelper.clearAvailableWidgets = function () {
  */
 widgetsHelper.getWidgetObjectFromUniqueId = function (uniqueId, callback) {
     widgetsHelper.getAvailableWidgets(function(widgets){
-        for (var widgetCategory in widgets) {
-            var widgetInCategory = widgets[widgetCategory];
-            for (var i in widgetInCategory) {
-                if (widgetInCategory[i]["uniqueId"] == uniqueId) {
-                    callback(widgetInCategory[i]);
-                    return;
-                }
+        callback(widgetsHelper.findWidgetObjectFromUniqueId(uniqueId, widgets));
+    });
+};
+
+widgetsHelper.findWidgetObjectFromUniqueId = function (uniqueId, widgets) {
+    if (!widgets) {
+        return false;
+    }
+
+    for (var widgetCategory in widgets) {
+        var widgetInCategory = widgets[widgetCategory];
+        for (var i in widgetInCategory) {
+            if (widgetInCategory[i]["uniqueId"] == uniqueId) {
+                return widgetInCategory[i];
             }
         }
-        callback(false);
-    });
+    }
+
+    return false;
 };
 
 /**
@@ -161,7 +195,7 @@ widgetsHelper.getWidgetNameFromUniqueId = function (uniqueId, callback) {
 };
 
 /**
- * Sends and ajax request to query for the widgets html
+ * Sends an ajax request to query for the widget's html
  *
  * @param {string} widgetUniqueId             unique id of the widget
  * @param {object} widgetParameters           parameters to be used for loading the widget
@@ -174,15 +208,76 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
 
     widgetParameters['widget'] = 1;
 
-    var ajaxRequest = new ajaxHelper();
-    ajaxRequest.addParams(widgetParameters, 'get');
-    ajaxRequest.setCallback(onWidgetLoadedCallback);
-    if (onWidgetErrorCallback) {
-        ajaxRequest.setErrorCallback(onWidgetErrorCallback);
+    var widgetRequest = {
+        aborted: false,
+        ajaxRequest: null,
+        abort: function () {
+            this.aborted = true;
+            if (this.ajaxRequest) {
+                this.ajaxRequest.abort();
+            }
+        }
+    };
+
+    function loadLegacyWidget() {
+        if (widgetRequest.aborted) {
+            return;
+        }
+
+        var ajaxRequest = new ajaxHelper();
+        ajaxRequest.addParams(widgetParameters, 'get');
+        ajaxRequest.setCallback(function () {
+            if (widgetRequest.aborted) {
+                return;
+            }
+
+            onWidgetLoadedCallback.apply(this, arguments);
+        });
+        if (onWidgetErrorCallback) {
+            ajaxRequest.setErrorCallback(function () {
+                if (widgetRequest.aborted) {
+                    return;
+                }
+
+                onWidgetErrorCallback.apply(this, arguments);
+            });
+        }
+        ajaxRequest.setFormat('html');
+        ajaxRequest.send();
+        widgetRequest.ajaxRequest = ajaxRequest;
     }
-    ajaxRequest.setFormat('html');
-    ajaxRequest.send();
-    return ajaxRequest;
+
+    var metadataReady = widgetsHelper.availableWidgets
+        ? Promise.resolve()
+        : widgetsHelper.getAvailableWidgets();
+
+    metadataReady.then(function () {
+        if (widgetRequest.aborted) {
+            return;
+        }
+
+        var clientWidget = widgetsHelper.findWidgetObjectFromUniqueId(
+            widgetUniqueId,
+            widgetsHelper.availableWidgets
+        );
+
+        if (clientWidget && clientWidget.clientComponent) {
+            clientWidget = $.extend(true, {}, clientWidget);
+            clientWidget.parameters = $.extend({}, clientWidget.parameters, widgetParameters);
+
+            var html = '<div vue-entry="CoreHome.Widget"'
+                + ' widget="' + piwikHelper.htmlEntities(JSON.stringify(clientWidget)) + '"'
+                + ' widgetized="true"></div>';
+            onWidgetLoadedCallback(html);
+            return;
+        }
+
+        loadLegacyWidget();
+    }).catch(function () {
+        loadLegacyWidget();
+    });
+
+    return widgetRequest;
 };
 
 (function ($, require) {
@@ -232,8 +327,8 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
 /**
  * widgetPreview jQuery Extension
  *
- * Converts an dom element to a widget preview
- * Widget preview contains an categorylist, widgetlist and a preview
+ * Converts a dom element to a widget preview
+ * Widget preview contains a categorylist, a widgetlist and a preview
  */
 (function ($) {
     $.extend({
@@ -256,7 +351,7 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
                 onSelect: function () {},
                 /**
                  * callback used to determine if a widget is available or not
-                 * unavailable widgets aren't chooseable in widgetlist
+                 * unavailable widgets aren't selectable in widgetlist
                  * @type {function}
                  */
                 isWidgetAvailable: function (widgetUniqueId) { return true; },
@@ -279,8 +374,8 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
 
             /**
              * Returns the div to show category list in
-             * - if element doesn't exist it will be created and added
-             * - if element already exist it's content will be removed
+             * - if element doesn't exist, it will be created and added
+             * - if element already exists, its content will be removed
              *
              * @return {$} category list element
              */
@@ -303,8 +398,8 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
 
             /**
              * Returns the div to show widget list in
-             * - if element doesn't exist it will be created and added
-             * - if element already exist it's content will be removed
+             * - if element doesn't exist, it will be created and added
+             * - if element already exists, its content will be removed
              *
              * @return {$} widget list element
              */
@@ -321,16 +416,11 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
 
                 if ($('.' + settings.categorylistClass + ' .' + settings.choosenClass, widgetPreview).length) {
                     var position = $('.' + settings.categorylistClass + ' .' + settings.choosenClass, widgetPreview).position().top -
-                        $('.' + settings.categorylistClass, widgetPreview).position().top +
-                        ($('.dashboard-manager .addWidget').outerHeight() || 0);
-
-                    if (!$('#content.admin').length) {
-                        position += 5; // + padding defined in dashboard view
-                    }
+                        $('.' + settings.categorylistClass, widgetPreview).position().top;
 
                     $('.' + settings.widgetlistClass, widgetPreview).css({
                         top: position,
-                        marginBottom: position
+                        marginBottom: position + 10
                     });
                 }
 
@@ -360,10 +450,12 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
 
                     widgetName = piwikHelper.escape(piwikHelper.htmlEntities(widgetName));
 
-                    widgetList.append('<li class="' + widgetClass + '" uniqueid="' + widgetUniqueId + '">' + widgetName + '</li>');
+                    var $widget = $('<li></li>').addClass(widgetClass.trim()).attr('uniqueid', widgetUniqueId);
+                    $widget.append(widgetName);
+                    widgetList.append($widget);
                 }
 
-                // delay widget preview a few millisconds
+                // delay widget preview a few milliseconds
                 $('li', widgetList).on('mouseenter', function () {
                     var that = this,
                         widgetUniqueId = $(this).attr('uniqueid');
@@ -384,7 +476,6 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
                 $('li', widgetList).on('click', function () {
                     if (!$('.widgetLoading', widgetPreview).length) {
                         settings.onSelect($(this).attr('uniqueid'));
-                        $(widgetPreview).closest('.dashboard-manager').removeClass('expanded');
                         if (settings.resetOnSelect) {
                             resetWidgetPreview(widgetPreview);
                         }
@@ -395,8 +486,8 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
 
             /**
              * Returns the div to show widget preview in
-             * - if element doesn't exist it will be created and added
-             * - if element already exist it's content will be removed
+             * - if element doesn't exist, it will be created and added
+             * - if element already exists, its content will be removed
              *
              * @return {$} preview element
              */
@@ -439,16 +530,26 @@ widgetsHelper.loadWidgetAjax = function (widgetUniqueId, widgetParameters, onWid
                     );
                     previewElement.html(emptyWidgetHtml);
 
+                    // Render the shared ReportHeader (title only, no controls) into the preview
+                    // chrome. The widget title lives in ReportHeader now, not in a `.widgetName`
+                    // node, so it must be passed as the `title` prop here.
+                    piwikHelper.compileVueEntryComponents($('.widgetTop', previewElement), {
+                        title: _pk_translate('Dashboard_WidgetPreview'),
+                        context: 'preview'
+                    });
+
                     var onWidgetLoadedCallback = function (response) {
-                        var widgetElement = $(document.getElementById(widgetUniqueId));
-                        // document.getElementById needed for widgets with uniqueid like widgetOpens+Contact+Form
+                        var widgetElement = previewElement.children('.widget').first();
                         $('.widgetContent', widgetElement).html($(response));
                         piwikHelper.compileVueEntryComponents($('.widgetContent', widgetElement));
-                        $('.widgetContent', widgetElement).trigger('widget:create');
+                        // `widget:create` handlers should only rely on `.element`, the widget's
+                        // root jQuery node. Dashboard widgets pass their full plugin instance;
+                        // previews pass `{ element }` so handlers scope to this preview instead
+                        // of grabbing the first matching node in the document.
+                        $('.widgetContent', widgetElement).trigger('widget:create', [{ element: widgetElement }]);
                         settings.onPreviewLoaded(widgetUniqueId, widgetElement);
                         $('.' + settings.widgetpreviewClass + ' .widgetTop', widgetPreview).on('click', function () {
                             settings.onSelect(widgetUniqueId);
-                            $(widgetPreview).closest('.dashboard-manager').removeClass('expanded');
                             if (settings.resetOnSelect) {
                                 resetWidgetPreview(widgetPreview);
                             }

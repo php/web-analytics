@@ -20,11 +20,11 @@ class UIAssetCacheBuster extends Singleton
     /**
      * Cache buster based on
      *  - Piwik version
+     *  - PHP version
      *  - Loaded plugins (name and version)
-     *  - Super user salt
-     *  - Latest
+     *  - Latest git hash of the master branch (if available)
      *
-     * @param string[] $pluginNames
+     * @param string[]|false $pluginNames
      * @return string
      */
     public function piwikVersionBasedCacheBuster($pluginNames = false)
@@ -47,7 +47,7 @@ class UIAssetCacheBuster extends Singleton
                 }
             }
 
-            $cacheBuster = md5($pluginsInfo . PHP_VERSION . Version::VERSION . trim($currentGitHash ?? ''));
+            $cacheBuster = md5($pluginsInfo . PHP_VERSION . Version::VERSION . trim($currentGitHash ?: ''));
 
             if ($pluginNames !== false) {
                 return $cacheBuster;

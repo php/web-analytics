@@ -14,19 +14,40 @@
   border-radius: 2px;
   font-size: 14px;
   position: relative;
-  &:before {
+
+  @media (max-width: 480px) {
+    padding: 15px;
+  }
+
+  .inDarkMode({
+    color: #ccc !important;
+  });
+
+  &::before {
     font-family: "matomo";
     content: "\e88f";
     position: absolute;
     left: 20px;
     line-height: 100%; // line-height = font-size
     font-size: 24px;
-    margin-top: -3px
+    margin-top: -3px;
+
+    @media (max-width: 480px) {
+      position: static;
+      display: block;
+      margin-bottom: 0.5em;
+      text-align: center;
+    }
   }
 
   a {
     color: #212121 !important;
     text-decoration: underline;
+
+    .inDarkMode({
+      color: #ccc !important;
+    });
+
     &:hover {
       text-decoration: underline;
     }
@@ -36,34 +57,50 @@
 .alert-success {
   background-color: #ebf2eb;
   border-color: #378039;
-  &:before {
+  &::before {
     content: "\e63d";
     color: #378039;
   }
+
+  .inDarkMode({
+    background-color: transparent;
+  });
 }
 
 .alert-info {
   background-color: #ecf7fe;
   border-color: #0d94e3;
-  &:before {
+  &::before {
     color: #0d94e3;
   }
+
+  .inDarkMode({
+    background-color: transparent;
+  });
 }
 
 .alert-warning {
   background-color: #fefbe9;
   border-color: #a18a0b;
-  &:before {
+  &::before {
     content: "\e621";
     color: #a18a0b;
   }
+
+  .inDarkMode({
+    background-color: transparent;
+  });
 }
 
 .alert-danger {
   background-color: #faeaea;
   border-color: @color-red-matomo;
-  &:before {
+  &::before {
     content: "\e616";
     color: @color-red-matomo;
   }
+
+  .inDarkMode({
+    background-color: transparent;
+  });
 }

@@ -30,8 +30,18 @@ class Mysql implements SchemaInterface
 {
     public const OPTION_NAME_MATOMO_INSTALL_VERSION = 'install_version';
     public const MAX_TABLE_NAME_LENGTH = 64;
-
     private $tablesInstalled = null;
+    protected $minimumSupportedVersion = '5.5';
+
+    public function getDatabaseType(): string
+    {
+        return 'MySQL';
+    }
+
+    public function getMinimumSupportedVersion(): string
+    {
+        return $this->minimumSupportedVersion;
+    }
 
     /**
      * Get the SQL to create Piwik tables
@@ -59,6 +69,8 @@ class Mysql implements SchemaInterface
                           invite_expired_at TIMESTAMP NULL,
                           invite_accept_at TIMESTAMP NULL,
                           ts_changes_shown TIMESTAMP NULL,
+                          ts_last_seen TIMESTAMP NULL,
+                          ts_inactivity_notified TIMESTAMP NULL,
                             PRIMARY KEY(login),
                             UNIQUE INDEX `uniq_email` (`email`)
                           ) $tableOptions
@@ -74,6 +86,8 @@ class Mysql implements SchemaInterface
                           date_created DATETIME NOT NULL,
                           date_expired DATETIME NULL,
                           secure_only TINYINT(2) unsigned NOT NULL DEFAULT '0',
+                          ts_rotation_notified DATETIME NULL,
+                          ts_expiration_warning_notified DATETIME NULL,
                             PRIMARY KEY(idusertokenauth),
                             UNIQUE KEY uniq_password(password)
                           ) $tableOptions
@@ -100,6 +114,7 @@ class Mysql implements SchemaInterface
             'site'    => "CREATE TABLE {$prefixTables}site (
                           idsite INTEGER(10) UNSIGNED NOT NULL AUTO_INCREMENT,
                           name VARCHAR(90) NOT NULL,
+                          description VARCHAR(255) NOT NULL DEFAULT '',
                           main_url VARCHAR(255) NOT NULL,
                             ts_created TIMESTAMP NULL,
                             ecommerce TINYINT DEFAULT 0,
@@ -314,9 +329,29 @@ class Mysql implements SchemaInterface
                                       date2 DATE NULL,
                                       period TINYINT UNSIGNED NULL,
                                       ts_archived DATETIME NULL,
-                                      value MEDIUMBLOB NULL,
+                                      value LONGBLOB NULL,
                                         PRIMARY KEY(idarchive, name),
                                         INDEX index_period_archived(period, ts_archived)
+                                      ) $tableOptions
+            ",
+
+            'archiving_metrics'     => "CREATE TABLE {$prefixTables}archiving_metrics (
+                                      metadataid BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                                      idarchive BIGINT UNSIGNED NOT NULL,
+                                      idsite INTEGER UNSIGNED NOT NULL,
+                                      archive_name VARCHAR(255) NOT NULL,
+                                      date1 DATE NOT NULL,
+                                      date2 DATE NOT NULL,
+                                      period TINYINT UNSIGNED NOT NULL,
+                                      ts_started DATETIME NOT NULL,
+                                      ts_finished DATETIME NOT NULL,
+                                      total_time BIGINT UNSIGNED NOT NULL,
+                                      total_time_exclusive BIGINT UNSIGNED NOT NULL,
+                                      is_temporary TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
+                                        PRIMARY KEY(metadataid),
+                                        INDEX index_idarchive(idarchive),
+                                        INDEX index_idsite_archive_name(idsite, archive_name),
+                                        INDEX index_idsite_date1_period(idsite, date1, period)
                                       ) $tableOptions
             ",
 
@@ -384,6 +419,17 @@ class Mysql implements SchemaInterface
                                       UNIQUE KEY unique_plugin_version_title (`plugin_name`, `version`, `title`(100))                            
                                   ) $tableOptions
             ",
+            'annotations'         => "CREATE TABLE `{$prefixTables}annotations` (
+                                      `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                                      `idsite` INTEGER UNSIGNED NOT NULL,
+                                      `date` DATETIME NOT NULL,
+                                      `note` TEXT NOT NULL,
+                                      `starred` TINYINT(1) NOT NULL DEFAULT 0,
+                                      `user` VARCHAR(100) NOT NULL,
+                                      PRIMARY KEY(`id`),
+                                      INDEX index_idsite_date (`idsite`, `date`)                            
+                                  ) $tableOptions
+            ",
         );
 
         return $tables;
@@ -437,7 +483,7 @@ class Mysql implements SchemaInterface
     {
         $db = $this->getDb();
 
-        $allColumns = $db->fetchAll("SHOW COLUMNS FROM " . $tableName);
+        $allColumns = $db->fetchAll("SHOW COLUMNS FROM `$tableName`");
 
         $fields = array();
         foreach ($allColumns as $column) {
@@ -515,7 +561,7 @@ class Mysql implements SchemaInterface
     /**
      * Create database
      *
-     * @param string $dbName Name of the database to create
+     * @param string|null $dbName Name of the database to create
      */
     public function createDatabase($dbName = null)
     {
@@ -644,7 +690,6 @@ class Mysql implements SchemaInterface
      *
      * @param string $sql  query to add hint to
      * @param float $limit  time limit in seconds
-     * @return string
      */
     public function addMaxExecutionTimeHintToQuery(string $sql, float $limit): string
     {
@@ -652,18 +697,10 @@ class Mysql implements SchemaInterface
             return $sql;
         }
 
-        $sql = trim($sql);
-        $pos = stripos($sql, 'SELECT');
-        $isMaxExecutionTimeoutAlreadyPresent = (stripos($sql, 'MAX_EXECUTION_TIME(') !== false);
-        if ($pos !== false && !$isMaxExecutionTimeoutAlreadyPresent) {
-            $timeInMs = $limit * 1000;
-            $timeInMs = (int) $timeInMs;
-            $maxExecutionTimeHint = ' /*+ MAX_EXECUTION_TIME(' . $timeInMs . ') */ ';
+        $timeInMs = $limit * 1000;
+        $timeInMs = (int) $timeInMs;
 
-            $sql = substr_replace($sql, 'SELECT ' . $maxExecutionTimeHint, $pos, strlen('SELECT'));
-        }
-
-        return $sql;
+        return DbHelper::addOptimizerHintToQuery($sql, 'MAX_EXECUTION_TIME(' . $timeInMs . ')');
     }
 
     public function supportsComplexColumnUpdates(): bool
@@ -677,16 +714,18 @@ class Mysql implements SchemaInterface
      * Will return an empty string for an unknown charset
      * (can happen for alias charsets like "utf8").
      *
-     * @param string $charset
-     *
-     * @return string
      * @throws Exception
      */
     public function getDefaultCollationForCharset(string $charset): string
     {
-        $result = $this->getDb()->fetchRow('SHOW CHARACTER SET WHERE `Charset` = ?', [$charset]);
+        if (!DbHelper::isValidCharset($charset)) {
+            return '';
+        }
 
-        return $result['Default collation'] ?? '';
+        $result = $this->getDb()->fetchRow('SHOW CHARACTER SET WHERE `Charset` = ?', [$charset]);
+        $collation = $result['Default collation'] ?? '';
+
+        return DbHelper::isValidCollation($collation) ? $collation : '';
     }
 
     public function getDefaultPort(): int
@@ -777,6 +816,11 @@ class Mysql implements SchemaInterface
         return version_compare($semanticVersion, '10.1.1', '>=');
     }
 
+    public function supportsRankingRollupWithoutExtraSorting(): bool
+    {
+        return true;
+    }
+
     public function supportsSortingInSubquery(): bool
     {
         return true;
@@ -785,6 +829,45 @@ class Mysql implements SchemaInterface
     public function getSupportedReadIsolationTransactionLevel(): string
     {
         return 'READ UNCOMMITTED';
+    }
+
+    public function hasReachedEOL(): bool
+    {
+        $currentVersion = $this->getVersion();
+
+        // Aurora is managed by AWS and is updated automatically if EOL, therefor we can ignore that here
+        $auroraQuery = $this->getDb()->query('SHOW VARIABLES LIKE "aurora%"');
+
+        if ($this->getDb()->rowCount($auroraQuery) > 0) {
+            return false;
+        }
+
+        // End of security update for certain MySQL versions as of https://en.wikipedia.org/wiki/MySQL#Release_history
+
+        // Support for 8.0 LTS ends in April 2026
+        if (
+            version_compare($currentVersion, '8.0', '>=') &&
+            version_compare($currentVersion, '8.1', '<') &&
+            Date::today()->isEarlier(Date::factory('2026-05-01'))
+        ) {
+            return false;
+        }
+
+        // Support for 8.4 LTS ends in April 2032
+        if (
+            version_compare($currentVersion, '8.4', '>=') &&
+            version_compare($currentVersion, '8.5', '<') &&
+            Date::today()->isEarlier(Date::factory('2032-05-01'))
+        ) {
+            return false;
+        }
+
+        // Support for all other versions prior to 9.3 (not covered by conditions above) already ended
+        if (version_compare($currentVersion, '9.3', '<')) {
+            return true;
+        }
+
+        return false;
     }
 
     protected function getDatabaseCreateOptions(): string
@@ -826,7 +909,7 @@ class Mysql implements SchemaInterface
         return $this->getDbSettings()->getTablePrefix();
     }
 
-    protected function getVersion(): string
+    public function getVersion(): string
     {
         return Db::fetchOne("SELECT VERSION()");
     }

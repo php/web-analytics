@@ -11,6 +11,8 @@ namespace Piwik\Plugins\UsersManager;
 
 use Piwik\Access;
 use Piwik\Date;
+use Piwik\Plugins\UsersManager\TokenNotifications\TokenNotifierTask;
+use Piwik\Plugins\UsersManager\UserNotifications\UserNotifierTask;
 
 class Tasks extends \Piwik\Plugin\Tasks
 {
@@ -20,7 +22,7 @@ class Tasks extends \Piwik\Plugin\Tasks
     private $usersModel;
 
     /**
-     * @param API
+     * @var API
      */
     private $usersManagerApi;
 
@@ -35,6 +37,9 @@ class Tasks extends \Piwik\Plugin\Tasks
         $this->daily("cleanupExpiredTokens");
         $this->daily("setUserDefaultReportPreference");
         $this->daily("cleanUpExpiredInvites");
+
+        $this->scheduleTask(new TokenNotifierTask());
+        $this->scheduleTask(new UserNotifierTask());
     }
 
     public function cleanupExpiredTokens()

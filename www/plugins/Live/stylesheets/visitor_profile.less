@@ -1,6 +1,6 @@
 .visitor-profile-popup {
-
-  width: 1150px;
+  width: 100%;
+  max-width: 1150px;
   height: auto;
   padding: 0;
 
@@ -17,7 +17,6 @@
 
 .visitor-profile {
   position: relative;
-  width: 1150px;
   box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.22);
   text-align: left;
   font-size: 13px;
@@ -33,7 +32,7 @@
   }
 
   a {
-    color: #255792;
+    color: @theme-color-link;
   }
 
   h1 {
@@ -61,6 +60,10 @@
     margin: 8px 20px 20px 0 !important;
     font-size: 13px;
   }
+}
+
+.ui-widget-content .visitor-profile a {
+  color: @theme-color-link;
 }
 
 .visitor-profile-options {
@@ -131,13 +134,17 @@
 
 .visitor-profile-visits-info,
 .visitor-profile-overview {
-  display: inline-block;
-  vertical-align: top;
+  display: block;
   height: auto;
   border: none;
   box-sizing: border-box;
   float: left;
   width: 50%;
+
+  @media (max-width: 768px) {
+    float: none;
+    width: auto;
+  }
 
   & > * {
     box-sizing: content-box;
@@ -185,14 +192,11 @@
 }
 
 .visitor-profile-header {
-  overflow: hidden;
+  display: flex;
   font-size: 14px;
 
-  > div {
-    float: left;
-  }
-
   .visitor-profile-avatar {
+    flex: none;
     width: 149px;
     height: 154px;
 
@@ -203,7 +207,7 @@
   }
 
   .visitor-profile-header-details {
-    width: 376px;
+    flex: auto;
   }
 
   .visitor-profile-prev-visitor {
@@ -337,6 +341,7 @@
 
 .visitor-profile-map {
   padding: 10px 21px 13px 2px;
+  filter: @theme-filter-on-illustration;
 }
 
 .visitor-profile-visit-title {
@@ -346,7 +351,7 @@
   border: none;
   color: @theme-color-text;
   cursor: pointer;
-  background-color: @color-silver-l95;
+  background-color: @theme-color-background-tinyContrast;
   margin-right: 1px;
 
   &:hover {
@@ -358,6 +363,10 @@
     float: right;
     font-size: 13px;
     margin-top: 4px;
+
+    @media (max-width: 768px) {
+      float: none;
+    }
   }
 }
 
@@ -366,7 +375,7 @@
   padding: 10px 15px;
   font-size: 13px;
   line-height: 1.5em;
-  background-color: @color-silver-l95;
+  background-color: @theme-color-background-tinyContrast;
 
   .visitor-log-datetime {
     display: none;
@@ -395,6 +404,10 @@
   .visitorDetails {
     display: inline-block;
     visibility: hidden;
+
+    @media (max-width: 768px) {
+      visibility: visible;
+    }
   }
 
   &:hover .visitorDetails {

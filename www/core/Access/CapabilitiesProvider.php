@@ -26,6 +26,7 @@ class CapabilitiesProvider
         $cache   = PiwikCache::getTransientCache();
 
         if (!$cache->contains($cacheId)) {
+            /** @var Capability[] $capabilities */
             $capabilities = [];
 
             /**
@@ -38,7 +39,7 @@ class CapabilitiesProvider
              *         $capabilities[] = new MyNewCapability();
              *     }
              *
-             * @param Capability[] $reports An array of reports
+             * @param Capability[] $capabilities An array of capabilities
              * @internal
              */
             Piwik::postEvent('Access.Capability.addCapabilities', array(&$capabilities));
@@ -57,7 +58,7 @@ class CapabilitiesProvider
              *         }
              *     }
              *
-             * @param Capability[] $reports An array of reports
+             * @param Capability[] $capabilities An array of capabilities
              * @internal
              */
             Piwik::postEvent('Access.Capability.filterCapabilities', array(&$capabilities));
@@ -70,12 +71,11 @@ class CapabilitiesProvider
             return $capabilities;
         }
 
+        /** @var Capability[] */
         return $cache->fetch($cacheId);
     }
 
     /**
-     * @param $capabilityId
-     * @return Capability|null
      * @throws Exception
      */
     public function getCapability(string $capabilityId): ?Capability
@@ -103,11 +103,9 @@ class CapabilitiesProvider
     }
 
     /**
-     * @param $capabilityId
-     * @return bool
      * @throws Exception
      */
-    public function isValidCapability($capabilityId): bool
+    public function isValidCapability(string $capabilityId): bool
     {
         $capabilities = $this->getAllCapabilityIds();
 
@@ -115,10 +113,9 @@ class CapabilitiesProvider
     }
 
     /**
-     * @param $capabilityId
      * @throws Exception
      */
-    public function checkValidCapability($capabilityId): void
+    public function checkValidCapability(string $capabilityId): void
     {
         if (!$this->isValidCapability($capabilityId)) {
             $capabilities = $this->getAllCapabilityIds();

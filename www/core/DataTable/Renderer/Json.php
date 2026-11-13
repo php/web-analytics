@@ -22,10 +22,8 @@ class Json extends Renderer
 {
     /**
      * Computes the dataTable output and returns the string/binary
-     *
-     * @return string
      */
-    public function render()
+    public function render(): string
     {
         return $this->renderTable($this->table);
     }
@@ -33,8 +31,8 @@ class Json extends Renderer
     /**
      * Computes the output for the given data table
      *
-     * @param DataTable $table
-     * @return string
+     * @param DataTable\DataTableInterface|array $table
+     * @return string|false
      */
     protected function renderTable($table)
     {
@@ -48,7 +46,6 @@ class Json extends Renderer
                 if (
                     $tab instanceof DataTable\Map
                     || $tab instanceof DataTable
-                    || $tab instanceof DataTable\Simple
                 ) {
                     $array[$key] = $this->convertDataTableToArray($tab);
 

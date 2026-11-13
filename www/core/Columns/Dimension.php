@@ -154,7 +154,7 @@ abstract class Dimension
      *
      * If the closure returns NULL, then Piwik assumes the segment sub-string will not match any visitor.
      *
-     * @var string|\Closure
+     * @var string|\Closure|callable
      * @api since Piwik 3.2.0
      */
     protected $sqlFilter;
@@ -279,7 +279,7 @@ abstract class Dimension
         // we need to do this in column updater etc!
 
         return array(
-            $this->dbTableName => array("ADD COLUMN `$this->columnName` $this->columnType")
+            $this->dbTableName => array("ADD COLUMN `$this->columnName` $this->columnType"),
         );
     }
 
@@ -308,7 +308,7 @@ abstract class Dimension
         }
 
         return array(
-            $this->dbTableName => array("MODIFY COLUMN `$this->columnName` $this->columnType")
+            $this->dbTableName => array("MODIFY COLUMN `$this->columnName` $this->columnType"),
         );
     }
 
@@ -433,7 +433,6 @@ abstract class Dimension
      *
      * @param mixed $value
      * @param int $idSite
-     * @param Formatter $formatter
      * @return mixed
      * @api since Piwik 3.2.0
      */
@@ -485,8 +484,6 @@ abstract class Dimension
      * $segmentsList->addSegment($segment);
      * ```
      *
-     * @param SegmentsList            $segmentsList
-     * @param DimensionSegmentFactory $dimensionSegmentFactory
      * @throws Exception
      */
     public function configureSegments(SegmentsList $segmentsList, DimensionSegmentFactory $dimensionSegmentFactory)
@@ -505,9 +502,6 @@ abstract class Dimension
      * Configures metrics for this dimension.
      *
      * For certain dimension types, some metrics will be added automatically.
-     *
-     * @param MetricsList $metricsList
-     * @param DimensionMetricFactory $dimensionMetricFactory
      */
     public function configureMetrics(MetricsList $metricsList, DimensionMetricFactory $dimensionMetricFactory)
     {
@@ -621,11 +615,15 @@ abstract class Dimension
      */
     public function getAcceptValues()
     {
+        if (!empty($this->acceptValues) && strpos($this->acceptValues, '_')) {
+            return Piwik::translate($this->acceptValues);
+        }
+
         return $this->acceptValues;
     }
 
     /**
-     * @return \Closure|string|null
+     * @return callable|\Closure|string|null
      * @ignore
      */
     public function getSqlFilter()

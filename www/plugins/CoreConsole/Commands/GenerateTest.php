@@ -12,8 +12,6 @@ namespace Piwik\Plugins\CoreConsole\Commands;
 use Piwik\Common;
 use Piwik\Plugin\Manager;
 
-/**
- */
 class GenerateTest extends GeneratePluginBase
 {
     protected function configure()
@@ -171,7 +169,7 @@ class GenerateTest extends GeneratePluginBase
                 '/tests/System/processed',
                 '/tests/System/processed/.gitignore',
                 '/tests/Fixtures',
-                '/tests/Fixtures/SimpleFixtureTrackFewVisits.php'
+                '/tests/Fixtures/SimpleFixtureTrackFewVisits.php',
             );
         }
 
@@ -179,14 +177,14 @@ class GenerateTest extends GeneratePluginBase
             return array(
                 '/tests',
                 '/tests/Integration',
-                '/tests/Integration/SimpleTest.php'
+                '/tests/Integration/SimpleTest.php',
             );
         }
 
         return array(
             '/tests',
             '/tests/Unit',
-            '/tests/Unit/SimpleTest.php'
+            '/tests/Unit/SimpleTest.php',
         );
     }
 }

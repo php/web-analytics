@@ -43,7 +43,7 @@ class Sequence
      * The name of the table or sequence you want to get an id for.
      *
      * @param string $name eg 'archive_numeric_2014_11'
-     * @param AdapterInterface $db You can optionally pass a DB adapter to make it work against another database.
+     * @param AdapterInterface|null $db You can optionally pass a DB adapter to make it work against another database.
      * @param string|null $tablePrefix
      */
     public function __construct($name, $db = null, $tablePrefix = null)
@@ -77,7 +77,7 @@ class Sequence
      */
     public function exists()
     {
-        $query = $this->db->query('SELECT * FROM ' . $this->table . ' WHERE name = ?', $this->name);
+        $query = $this->db->query('SELECT * FROM `' . $this->table . '` WHERE name = ?', $this->name);
 
         return $query->rowCount() > 0;
     }
@@ -112,7 +112,7 @@ class Sequence
      */
     public function getCurrentId()
     {
-        $sql   = 'SELECT value FROM ' . $this->table . ' WHERE name = ?';
+        $sql   = 'SELECT value FROM `' . $this->table . '` WHERE name = ?';
 
         $id = $this->db->fetchOne($sql, array($this->name));
 

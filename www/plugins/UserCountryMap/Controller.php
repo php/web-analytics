@@ -21,9 +21,6 @@ use Piwik\View;
 
 require_once PIWIK_INCLUDE_PATH . '/plugins/UserCountry/functions.php';
 
-/**
- *
- */
 class Controller extends \Piwik\Plugin\Controller
 {
     // By default plot up to the last 3 days of visitors on the map, for low traffic sites
@@ -65,15 +62,16 @@ class Controller extends \Piwik\Plugin\Controller
         $view = new View('@UserCountryMap/visitorMap');
 
         // request visits summary
-        $request = new Request(
-            'method=VisitsSummary.get&format=json'
-            . '&idSite=' . $this->idSite
-            . '&period=' . $period
-            . '&date=' . $date
-            . '&segment=' . $segment
-            . '&token_auth=' . $token_auth
-            . '&filter_limit=-1'
-        );
+        $request = new Request([
+            'method' => 'VisitsSummary.get',
+            'format' => 'json',
+            'idSite' => $this->idSite,
+            'period' => $period,
+            'date' => $date,
+            'segment' => $segment,
+            'token_auth' => $token_auth,
+            'filter_limit' => -1,
+        ]);
         $config = [];
         $config['visitsSummary'] = json_decode($request->process(), true);
         $config['countryDataUrl'] = $this->report(
@@ -153,7 +151,7 @@ class Controller extends \Piwik\Plugin\Controller
             'segment'                     => $segment,
             'token_auth'                  => $token_auth,
             'enable_filter_excludelowpop' => 1,
-            'filter_excludelowpop_value'  => -1
+            'filter_excludelowpop_value'  => -1,
         ]);
 
         $view->metrics = $config['metrics'] = $this->getMetrics($this->idSite, $period, $date, $token_auth);
@@ -178,7 +176,7 @@ class Controller extends \Piwik\Plugin\Controller
             'EU' => \Piwik\Plugins\UserCountry\continentTranslate('eur'),
             'NA' => \Piwik\Plugins\UserCountry\continentTranslate('amn'),
             'OC' => \Piwik\Plugins\UserCountry\continentTranslate('oce'),
-            'SA' => \Piwik\Plugins\UserCountry\continentTranslate('ams')
+            'SA' => \Piwik\Plugins\UserCountry\continentTranslate('ams'),
         ];
 
         return $view->render();
@@ -268,7 +266,7 @@ class Controller extends \Piwik\Plugin\Controller
             'showDateTime'       => Common::getRequestVar('showDateTime', true, 'int'),
             'doNotRefreshVisits' => Common::getRequestVar('doNotRefreshVisits', false, 'int'),
             'enableAnimation'    => Common::getRequestVar('enableAnimation', true, 'int'),
-            'forceNowValue'      => Common::getRequestVar('forceNowValue', false, 'int')
+            'forceNowValue'      => Common::getRequestVar('forceNowValue', false, 'int'),
         ];
 
         return $view->render();
@@ -303,17 +301,24 @@ class Controller extends \Piwik\Plugin\Controller
         }
     }
 
-    private function getMetrics($idSite, $period, $date, $token_auth)
-    {
-        $request = new Request(
-            'method=API.getMetadata&format=json'
-            . '&apiModule=UserCountry&apiAction=getCountry'
-            . '&idSite=' . $idSite
-            . '&period=' . $period
-            . '&date=' . $date
-            . '&token_auth=' . $token_auth
-            . '&filter_limit=-1'
-        );
+    private function getMetrics(
+        $idSite,
+        $period,
+        $date,
+        #[\SensitiveParameter]
+        $token_auth
+    ) {
+        $request = new Request([
+            'method' => 'API.getMetadata',
+            'format' => 'json',
+            'apiModule' => 'UserCountry',
+            'apiAction' => 'getCountry',
+            'idSite' => $idSite,
+            'period' => $period,
+            'date' => $date,
+            'token_auth' => $token_auth,
+            'filter_limit' => -1,
+        ]);
         $metaData = json_decode($request->process(), true);
 
         $metrics = [];
@@ -330,8 +335,17 @@ class Controller extends \Piwik\Plugin\Controller
         return $metrics;
     }
 
-    private function getApiRequestUrl($module, $action, $idSite, $period, $date, $token_auth, $filter_by_country = false, $segmentOverride = false)
-    {
+    private function getApiRequestUrl(
+        $module,
+        $action,
+        $idSite,
+        $period,
+        $date,
+        #[\SensitiveParameter]
+        $token_auth,
+        $filter_by_country = false,
+        $segmentOverride = false
+    ) {
         // use processed reports
         $url = "?module=" . $module
             . "&method=" . $module . "." . $action . "&format=JSON"
@@ -354,8 +368,17 @@ class Controller extends \Piwik\Plugin\Controller
         return $url;
     }
 
-    private function report($module, $action, $idSite, $period, $date, $token_auth, $filter_by_country = false, $segmentOverride = false)
-    {
+    private function report(
+        $module,
+        $action,
+        $idSite,
+        $period,
+        $date,
+        #[\SensitiveParameter]
+        $token_auth,
+        $filter_by_country = false,
+        $segmentOverride = false
+    ) {
         return $this->getApiRequestUrl(
             'API',
             'getProcessedReport&apiModule=' . $module . '&apiAction=' . $action,

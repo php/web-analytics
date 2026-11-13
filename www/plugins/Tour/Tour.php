@@ -12,10 +12,12 @@ namespace Piwik\Plugins\Tour;
 use Piwik\Common;
 use Piwik\Container\StaticContainer;
 use Piwik\Piwik;
+use Piwik\Request;
 use Piwik\Plugins\CoreVisualizations\Visualizations\JqplotGraph\Evolution;
 use Piwik\Plugins\CoreVisualizations\Visualizations\Sparkline;
 use Piwik\Plugins\Tour\Engagement\Challenge;
 use Piwik\Plugins\Tour\Engagement\ChallengeAddedAnnotation;
+use Piwik\Plugins\Tour\Engagement\ChallengeAddRecommendedGoals;
 use Piwik\Plugins\Tour\Engagement\ChallengeInvitedUser;
 use Piwik\Plugins\Tour\Engagement\ChallengeBrowseMarketplace;
 use Piwik\Plugins\Tour\Engagement\ChallengeChangeVisualisation;
@@ -32,7 +34,7 @@ class Tour extends \Piwik\Plugin
     {
         return array(
             'AssetManager.getStylesheetFiles' => 'getStylesheetFiles',
-            'AssetManager.getJavaScriptFiles' => 'getJsFiles',
+            'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
             'Dashboard.changeDefaultDashboardLayout' => 'changeDefaultDashboardLayout',
             'API.Annotations.add.end' => 'onAnnotationAdded',
             'API.Goals.addGoal.end' => 'onGoalAdded',
@@ -109,6 +111,11 @@ class Tour extends \Piwik\Plugin
         if (Piwik::hasUserSuperUserAccess() && !empty($response)) {
             $annotation = new ChallengeCreatedGoal();
             $annotation->setCompleted(Piwik::getCurrentUserLogin());
+
+            if (Request::fromRequest()->getIntegerParameter(ChallengeAddRecommendedGoals::REQUEST_PARAMETER, 0)) {
+                $recommendedGoal = new ChallengeAddRecommendedGoals();
+                $recommendedGoal->setCompleted(Piwik::getCurrentUserLogin());
+            }
         }
     }
 
@@ -137,8 +144,20 @@ class Tour extends \Piwik\Plugin
         $stylesheets[] = "plugins/Tour/stylesheets/engagement.less";
     }
 
-    public function getJsFiles(&$jsFiles)
+    public function getClientSideTranslationKeys(&$translationKeys)
     {
-        $jsFiles[] = "plugins/Tour/javascripts/engagement.js";
+        $translationKeys[] = 'Tour_CompletionTitle';
+        $translationKeys[] = 'Tour_CompletionMessage';
+        $translationKeys[] = 'Tour_YouCanCallYourselfExpert';
+        $translationKeys[] = 'Tour_ShareYourAchievementOn';
+        $translationKeys[] = 'Tour_ShareAllChallengesCompleted';
+        $translationKeys[] = 'Tour_StatusLevel';
+        $translationKeys[] = 'Tour_ChallengeCompleted';
+        $translationKeys[] = 'Tour_SkipThisChallenge';
+        $translationKeys[] = 'Tour_PreviousChallenges';
+        $translationKeys[] = 'Tour_NextChallenges';
+        $translationKeys[] = 'Tour_OnlyVisibleToSuperUser';
+        $translationKeys[] = 'General_Previous';
+        $translationKeys[] = 'General_Next';
     }
 }

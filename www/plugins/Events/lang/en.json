@@ -16,8 +16,10 @@
         "EventNames": "Event Names",
         "EventNamesReportDocumentation": "This report shows you the names associated with each tracked event and how many times they occurred. You can view the event actions and categories that were tracked along with each event name in each row's subtable. You can change which is shown by changing the secondary dimension with the link at the bottom of the report.",
         "EventUrl": "Event URL",
+        "EventUrlSegmentHelp": "The URL must be URL encoded, for example: %s",
         "EventUrls": "Event URLs",
         "Events": "Events",
+        "EventsSegmentHelp": "To select all visits who triggered an Event, use: %s",
         "EventsWithValue": "Events with a value",
         "EventsWithValueDocumentation": "Number of events where an Event value was set",
         "EventValue": "Event value",
@@ -26,8 +28,6 @@
         "MaxValueDocumentation": "The maximum value for this event",
         "MinValue": "Minimum Event value",
         "MinValueDocumentation": "The minimum value for this event",
-        "SecondaryDimension": "Secondary dimension is %s.",
-        "SwitchToSecondaryDimension": "Switch to %s",
         "TopEvents": "Top Events",
         "TotalEvents": "Total events",
         "TotalEventsDocumentation": "Total number of events",
@@ -35,6 +35,8 @@
         "TotalValueDocumentation": "The sum of event values",
         "ViewEvents": "View Events",
         "EventsSubcategoryHelp1": "The Events section offers reports on the custom events associated with your site. Events typically require custom configuration. Once configured you can review reports broken down by category, action and name.",
-        "EventsSubcategoryHelp2": "Learn more about event tracking here."
+        "EventsSubcategoryHelp2": "Learn more about event tracking here.",
+        "ColumnNbVisitsDocumentation": "The total number of visits where at least one event was triggered.",
+        "ColumnNbUniqVisitorsDocumentation": "The number of deduplicated visitors who triggered an event on your website. Every visitor is only counted once, even if they visit or trigger multiple events on the website."
     }
 }

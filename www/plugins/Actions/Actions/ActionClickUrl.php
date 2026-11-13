@@ -38,7 +38,7 @@ class ActionClickUrl extends Action
     {
         return array(
             // Note: we do not normalize outlink URL
-            'idaction_url' => array($this->getActionUrl(), $this->getActionType())
+            'idaction_url' => array($this->getActionUrl(), $this->getActionType()),
         );
     }
 
@@ -54,7 +54,6 @@ class ActionClickUrl extends Action
     /**
      * Detect whether action is an outlink given host aliases
      *
-     * @param Action $action
      * @return bool true if the outlink the visitor clicked on points to one of the known hosts for this website
      */
     protected function detectActionIsOutlinkOnAliasHost(Action $action, $idSite)

@@ -12,8 +12,6 @@ namespace Piwik\Period;
 use Piwik\Date;
 use Piwik\Period;
 
-/**
- */
 class Year extends Period
 {
     public const PERIOD_ID = 4;
@@ -73,7 +71,7 @@ class Year extends Period
     }
 
     /**
-     * Returns the current period as a string
+     * Returns a list of strings representing the current period (one date per month).
      *
      * @param string $format
      * @return array

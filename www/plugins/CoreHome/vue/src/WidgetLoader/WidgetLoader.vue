@@ -41,6 +41,7 @@ import AjaxHelper from '../AjaxHelper/AjaxHelper';
 import { NotificationsStore } from '../Notification';
 import MatomoUrl from '../MatomoUrl/MatomoUrl';
 import ComparisonsStoreInstance from '../Comparisons/Comparisons.store.instance';
+import SearchFiltersPersistenceStoreInstance from '../SearchFiltersPersistence/SearchFiltersPersistence.store';
 
 interface WidgetLoaderState {
   loading: boolean;
@@ -67,6 +68,7 @@ export default defineComponent({
     widgetParams: Object,
     widgetName: String,
     loadingMessage: String,
+    suppressNotifications: Boolean,
   },
   components: {
     ActivityIndicator,
@@ -188,7 +190,12 @@ export default defineComponent({
 
       this.lastWidgetAbortController = new AbortController();
 
-      AjaxHelper.fetch(this.getWidgetUrl(parameters), {
+      let searchFilters = {};
+      if (parameters.uniqueId) {
+        searchFilters = SearchFiltersPersistenceStoreInstance.getSearchFilters(parameters.uniqueId);
+      }
+
+      AjaxHelper.fetch(this.getWidgetUrl(Object.assign(parameters, searchFilters)), {
         format: 'html',
         abortController: this.lastWidgetAbortController,
       }).then((response) => {
@@ -220,7 +227,9 @@ export default defineComponent({
 
         Matomo.helper.compileVueEntryComponents($content);
 
-        NotificationsStore.parseNotificationDivs();
+        if (!this.suppressNotifications) {
+          NotificationsStore.parseNotificationDivs();
+        }
 
         setTimeout(() => {
           Matomo.postEvent('widget:loaded', {

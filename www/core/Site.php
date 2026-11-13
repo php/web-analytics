@@ -11,6 +11,7 @@ namespace Piwik;
 
 use Exception;
 use Piwik\Exception\UnexpectedWebsiteFoundException;
+use Piwik\Http\BadRequestException;
 use Piwik\Plugins\SitesManager\API;
 
 /**
@@ -52,7 +53,7 @@ class Site
     ];
 
     /**
-     * @var int|null
+     * @var int
      */
     protected $id = null;
 
@@ -64,8 +65,6 @@ class Site
     private $site = array();
 
     /**
-     * Constructor.
-     *
      * @param int $idsite The ID of the site we want data for.
      * @throws UnexpectedWebsiteFoundException
      */
@@ -415,38 +414,47 @@ class Site
     /**
      * Checks the given string for valid site IDs and returns them as an array.
      *
-     * @param string|array $ids Comma separated idSite list, eg, `'1,2,3,4'` or an array of IDs, eg,
-     *                          `array(1, 2, 3, 4)`.
+     * @param bool|int|string|array<string|int|null> $ids Comma separated idSite list, eg, `'1,2,3,4'` or an array of IDs, eg,
+     *                                                    `array(1, 2, 3, 4)`, or 'all'.
      * @param bool|string $_restrictSitesToLogin Implementation detail. Used only when running as a scheduled task.
-     * @return array An array of valid, unique integers.
+     * @param bool $throwOnInvalid If true, throw when an invalid id is supplied.
+     * @return list<int> An array of valid, unique integers.
      */
-    public static function getIdSitesFromIdSitesString($ids, $_restrictSitesToLogin = false)
+    public static function getIdSitesFromIdSitesString($ids, $_restrictSitesToLogin = false, bool $throwOnInvalid = false): array
     {
         if (empty($ids)) {
             return [];
         }
 
-        if ($ids === 'all') {
+        if ($ids === 'all' || $ids === ['all']) {
             return API::getInstance()->getSitesIdWithAtLeastViewAccess($_restrictSitesToLogin);
         }
 
         if (is_bool($ids)) {
-            return array();
+            if ($throwOnInvalid) {
+                throw new BadRequestException("The parameter 'idSite=' contains an invalid value.");
+            }
+            return [];
         }
         if (!is_array($ids)) {
             $ids = explode(',', $ids);
         }
-        $validIds = array();
+        $validIds = [];
         foreach ($ids as $id) {
             $id = is_string($id) ? trim($id) : $id;
-            if (!empty($id) && is_numeric($id) && $id > 0) {
-                $validIds[] = $id;
+            if (is_null($id) || $id === '') {
+                continue;
+            }
+            if (is_numeric($id) && (string)$id === (string)(int)$id && (int)$id > 0) {
+                $validIds[] = (int)$id;
+                continue;
+            }
+            if ($throwOnInvalid) {
+                throw new BadRequestException("The parameter 'idSite=' contains an invalid value.");
             }
         }
         $validIds = array_filter($validIds);
-        $validIds = array_unique($validIds);
-
-        return $validIds;
+        return array_unique($validIds);
     }
 
     /**
@@ -478,7 +486,7 @@ class Site
      * @param string $field The name of the field to get.
      * @return string
      */
-    protected static function getFor($idsite, $field)
+    protected static function getFor(int $idsite, string $field)
     {
         if (!isset(self::$infoSites[$idsite])) {
             $site = API::getInstance()->getSiteFromId($idsite);
@@ -521,7 +529,7 @@ class Site
      */
     public static function getNameFor($idsite)
     {
-        return self::getFor($idsite, 'name');
+        return self::getFor((int)$idsite, 'name');
     }
 
     /**
@@ -532,7 +540,7 @@ class Site
      */
     public static function getGroupFor($idsite)
     {
-        return self::getFor($idsite, 'group');
+        return self::getFor((int)$idsite, 'group');
     }
 
     /**
@@ -543,7 +551,7 @@ class Site
      */
     public static function getTimezoneFor($idsite)
     {
-        return self::getFor($idsite, 'timezone');
+        return self::getFor((int)$idsite, 'timezone');
     }
 
     /**
@@ -554,7 +562,7 @@ class Site
      */
     public static function getTypeFor($idsite)
     {
-        return self::getFor($idsite, 'type');
+        return self::getFor((int)$idsite, 'type');
     }
 
     /**
@@ -565,7 +573,7 @@ class Site
      */
     public static function getCreationDateFor($idsite)
     {
-        return self::getFor($idsite, 'ts_created');
+        return self::getFor((int)$idsite, 'ts_created');
     }
 
     /**
@@ -576,7 +584,7 @@ class Site
      */
     public static function getMainUrlFor($idsite)
     {
-        return self::getFor($idsite, 'main_url');
+        return self::getFor((int)$idsite, 'main_url');
     }
 
     /**
@@ -587,7 +595,7 @@ class Site
      */
     public static function isEcommerceEnabledFor($idsite)
     {
-        return self::getFor($idsite, 'ecommerce') == 1;
+        return self::getFor((int)$idsite, 'ecommerce') == 1;
     }
 
     /**
@@ -598,7 +606,7 @@ class Site
      */
     public static function isSiteSearchEnabledFor($idsite)
     {
-        return self::getFor($idsite, 'sitesearch') == 1;
+        return self::getFor((int)$idsite, 'sitesearch') == 1;
     }
 
     /**
@@ -609,7 +617,7 @@ class Site
      */
     public static function getCurrencyFor($idsite)
     {
-        return self::getFor($idsite, 'currency');
+        return self::getFor((int)$idsite, 'currency');
     }
 
     /**
@@ -639,7 +647,7 @@ class Site
      */
     public static function getExcludedIpsFor($idsite)
     {
-        return self::getFor($idsite, 'excluded_ips');
+        return self::getFor((int)$idsite, 'excluded_ips');
     }
 
     /**
@@ -650,7 +658,7 @@ class Site
      */
     public static function getExcludedQueryParametersFor($idsite)
     {
-        return self::getFor($idsite, 'excluded_parameters');
+        return self::getFor((int)$idsite, 'excluded_parameters');
     }
 
     /**
@@ -661,6 +669,6 @@ class Site
      */
     public static function getCreatorLoginFor($idsite)
     {
-        return self::getFor($idsite, 'creator_login');
+        return self::getFor((int)$idsite, 'creator_login');
     }
 }

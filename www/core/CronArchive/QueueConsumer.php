@@ -9,7 +9,6 @@
 
 namespace Piwik\CronArchive;
 
-use Piwik\ArchiveProcessor\Loader;
 use Piwik\ArchiveProcessor\Parameters;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\CronArchive;
@@ -78,7 +77,7 @@ class QueueConsumer
     private $periodIdsToLabels;
 
     /**
-     * @var int
+     * @var int|null
      */
     private $idSite;
 
@@ -247,7 +246,7 @@ class QueueConsumer
                 continue;
             }
 
-            list($isUsableExists, $archivedTime) = $this->usableArchiveExists($invalidatedArchive);
+            [$isUsableExists, $archivedTime] = $this->usableArchiveExists($invalidatedArchive);
             if ($isUsableExists) {
                 $now = Date::now()->getDatetime();
                 $this->addInvalidationToExclude($invalidatedArchive);
@@ -272,13 +271,6 @@ class QueueConsumer
                     $this->logger->debug("Skipping invalidated archive {$invalidatedArchive['idinvalidation']}, invalidation already in progress. Since in progress is newer, will remove invalidation.");
                     $this->model->deleteInvalidations([$invalidatedArchive]);
                 }
-                continue;
-            }
-
-            if ($this->canSkipArchiveBecauseNoPoint($invalidatedArchive)) {
-                $this->logger->debug("Found invalidated archive we can skip (no visits): $invalidationDesc");
-                $this->addInvalidationToExclude($invalidatedArchive);
-                $this->model->deleteInvalidations([$invalidatedArchive]);
                 continue;
             }
 
@@ -309,7 +301,7 @@ class QueueConsumer
             && empty($invalidationsToExcludeInBatch)
         ) { // no invalidated archive left
             /**
-             * This event is triggered immediately after the cron archiving process starts archiving data for a single
+             * This event is triggered immediately after the cron archiving process finishes archiving data for a single
              * site.
              *
              * Note: multiple archiving processes can post this event.
@@ -400,26 +392,6 @@ class QueueConsumer
         }
 
         return false;
-    }
-
-    // public for tests
-    public function canSkipArchiveBecauseNoPoint(array $invalidatedArchive): bool
-    {
-        $site = new Site($invalidatedArchive['idsite']);
-
-        $periodLabel = $this->periodIdsToLabels[$invalidatedArchive['period']];
-        $dateStr = $periodLabel == 'range' ? ($invalidatedArchive['date1'] . ',' . $invalidatedArchive['date2']) : $invalidatedArchive['date1'];
-        $period = PeriodFactory::build($periodLabel, $dateStr);
-
-        $segment = new Segment($invalidatedArchive['segment'], [$invalidatedArchive['idsite']]);
-
-        $params = new Parameters($site, $period, $segment);
-        if (!empty($invalidatedArchive['plugin'])) {
-            $params->setRequestedPlugin($invalidatedArchive['plugin']);
-        }
-
-        $loader = new Loader($params);
-        return $loader->canSkipThisArchive(); // if no point in archiving, skip
     }
 
     public function shouldSkipArchiveBecauseLowerPeriodOrSegmentIsInProgress(array $archiveToProcess): ?string
@@ -613,10 +585,17 @@ class QueueConsumer
     public function usableArchiveExists(array $invalidatedArchive): array
     {
         $site = new Site($invalidatedArchive['idsite']);
-
         $periodLabel = $this->periodIdsToLabels[$invalidatedArchive['period']];
         $dateStr = $periodLabel == 'range' ? ($invalidatedArchive['date1'] . ',' . $invalidatedArchive['date2']) : $invalidatedArchive['date1'];
         $period = PeriodFactory::build($periodLabel, $dateStr);
+
+        // if requested period does not include today, invalidation always needs to be processed
+        // so we always return no usable archive was found
+        $today = Date::factoryInTimezone('today', Site::getTimezoneFor($site->getId()));
+        $isArchiveIncludesToday = $period->isDateInPeriod($today);
+        if (!$isArchiveIncludesToday) {
+            return [false, null];
+        }
 
         $segment = new Segment($invalidatedArchive['segment'], [$invalidatedArchive['idsite']]);
 
@@ -624,15 +603,11 @@ class QueueConsumer
         if (!empty($invalidatedArchive['plugin'])) {
             $params->setRequestedPlugin($invalidatedArchive['plugin']);
         }
-
-        // if latest archive includes today and is usable (DONE_OK or DONE_INVALIDATED and recent enough), skip
-        $today = Date::factoryInTimezone('today', Site::getTimezoneFor($site->getId()));
-        $isArchiveIncludesToday = $period->isDateInPeriod($today);
-        if (!$isArchiveIncludesToday) {
-            return [false, null];
+        if (!empty($invalidatedArchive['report'])) {
+            $params->setArchiveOnlyReport($invalidatedArchive['report']);
         }
 
-        // if valid archive already exists, do not re-archive
+        // For archives including today we look if there are existing usable archives (DONE_OK or DONE_INVALIDATED) that are recent enough
         $minDateTimeProcessedUTC = Date::now()->subSeconds(Rules::getPeriodArchiveTimeToLiveDefault($periodLabel));
         $archiveIdAndVisits = ArchiveSelector::getArchiveIdAndVisits($params, $minDateTimeProcessedUTC, $includeInvalidated = false);
         $idArchives = $archiveIdAndVisits['idArchives'];

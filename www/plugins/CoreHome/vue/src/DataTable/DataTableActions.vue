@@ -14,6 +14,7 @@
       href
       @click.prevent
       :data-target="`dropdownConfigure${randomIdForDropdown}`"
+      :title="translate('CoreHome_ReportConfigure')"
       style="margin-right:3.5px"
       v-if="hasConfigItems && (isAnyConfigureIconHighlighted || isTableView)"
     >
@@ -88,6 +89,7 @@
         apiMethod: apiMethodToRequestDataTable,
         reportFormats,
         maxFilterLimit,
+        canExportFlat: exportSupportsFlat,
       }"
       :title="translate('General_ExportThisReport')"
       href=""
@@ -178,6 +180,13 @@
           v-html="$sanitize(keepTotalsRowText)"
         ></div>
       </li>
+      <li v-if="showPercentageValuesConfigItem">
+        <div
+          class="configItem dataTableShowPercentageValues"
+          :aria-label="percentageValuesLabel"
+          v-html="$sanitize(percentageValuesText)"
+        ></div>
+      </li>
       <li v-if="showExcludeLowPopulation">
         <div
           class="configItem dataTableExcludeLowPopulation"
@@ -232,6 +241,7 @@ import Passthrough from '../Passthrough/Passthrough.vue';
 import DropdownButton from '../DropdownButton/DropdownButton';
 import ReportExport from '../ReportExport/ReportExport';
 import { translate } from '../translate';
+import { isBooleanLikeSet, resolveExportSupportsFlat } from './DataTableActions.utils';
 
 interface FooterIcon {
   id: string;
@@ -269,10 +279,6 @@ function getToggledIconText(toggled: boolean, textToggled: string, textUntoggled
   return getSingleStateIconText(textUntoggled);
 }
 
-function isBooleanLikeSet(value: number|string|boolean) {
-  return !!value && value !== '0';
-}
-
 export default defineComponent({
   props: {
     showPeriods: Boolean,
@@ -280,6 +286,9 @@ export default defineComponent({
     showFooterIcons: Boolean,
     showSearch: Boolean,
     showFlattenTable: Boolean,
+    reportSupportsFlatten: Boolean,
+    reportSupportsPercentageValues: Boolean,
+    exportSupportsFlatten: Boolean,
     footerIcons: {
       type: Array,
       required: true,
@@ -385,14 +394,20 @@ export default defineComponent({
     },
     reportFormats(): Record<string, string> {
       const formats: Record<string, string> = {
-        CSV: 'CSV',
         TSV: 'TSV (Excel)',
-        XML: 'XML',
-        JSON: 'Json',
         HTML: 'HTML',
+        JSON: 'JSON',
+        XML: 'XML',
+        CSV: 'CSV',
+        RSS: 'RSS',
       };
-      formats.RSS = 'RSS';
       return formats;
+    },
+    exportSupportsFlat() {
+      return resolveExportSupportsFlat(
+        !!this.exportSupportsFlatten,
+        this.clientSideParameters.flat as number|string|boolean,
+      );
     },
     showDimensionsConfigItem() {
       return this.showFlattenTable
@@ -405,13 +420,17 @@ export default defineComponent({
     showTotalsConfigItem() {
       return !this.isDataTableEmpty && this.showTotalsRow;
     },
+    showPercentageValuesConfigItem() {
+      return !this.isDataTableEmpty && this.reportSupportsPercentageValues;
+    },
     hasConfigItems() {
       return this.showFlattenTable
         || this.showDimensionsConfigItem
         || this.showFlatConfigItem
         || this.showTotalsConfigItem
         || this.showExcludeLowPopulation
-        || this.showPivotBySubtable;
+        || this.showPivotBySubtable
+        || this.showPercentageValuesConfigItem;
     },
     flattenItemText() {
       const params = this.clientSideParameters as Record<string, string|number|boolean>;
@@ -428,6 +447,20 @@ export default defineComponent({
         'CoreHome_RemoveTotalsRowDataTable',
         'CoreHome_AddTotalsRowDataTable',
       );
+    },
+    percentageValuesText() {
+      const params = this.clientSideParameters as Record<string, string|number|boolean>;
+      return getToggledIconText(
+        isBooleanLikeSet(params.show_percentage_values),
+        'CoreHome_ShowAbsoluteValuesDataTable',
+        'CoreHome_ShowPercentageValuesDataTable',
+      );
+    },
+    percentageValuesLabel() {
+      const params = this.clientSideParameters as Record<string, string|number|boolean>;
+      return isBooleanLikeSet(params.show_percentage_values)
+        ? translate('CoreHome_ShowAbsoluteValues')
+        : translate('CoreHome_ShowPercentageValues');
     },
     includeAggregateRowsText() {
       const params = this.clientSideParameters as Record<string, string|number|boolean>;
@@ -468,7 +501,8 @@ export default defineComponent({
         || isBooleanLikeSet(params.include_aggregate_rows)
         || isBooleanLikeSet(params.show_dimensions)
         || isBooleanLikeSet(params.pivotBy)
-        || isBooleanLikeSet(params.enable_filter_excludelowpop);
+        || isBooleanLikeSet(params.enable_filter_excludelowpop)
+        || isBooleanLikeSet(params.show_percentage_values);
     },
     isTableView() {
       return this.viewDataTable === 'table'

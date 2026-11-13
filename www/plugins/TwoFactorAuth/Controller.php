@@ -9,12 +9,14 @@
 
 namespace Piwik\Plugins\TwoFactorAuth;
 
+use Piwik\Access;
 use Piwik\Common;
 use Piwik\Container\StaticContainer;
 use Piwik\IP;
 use Piwik\Nonce;
 use Piwik\Piwik;
 use Piwik\Plugins\Login\PasswordVerifier;
+use Piwik\Plugins\Login\WhatsNewProvider;
 use Piwik\Plugins\TwoFactorAuth\Dao\RecoveryCodeDao;
 use Piwik\Session\SessionFingerprint;
 use Piwik\Session\SessionNamespace;
@@ -59,20 +61,48 @@ class Controller extends \Piwik\Plugin\Controller
      */
     private $validator;
 
-    public function __construct(SystemSettings $systemSettings, RecoveryCodeDao $recoveryCodeDao, PasswordVerifier $passwordVerify, TwoFactorAuthentication $twoFa, Validator $validator)
-    {
+    /**
+     * @var WhatsNewProvider
+     */
+    private $whatsNewProvider;
+
+    public function __construct(
+        SystemSettings $systemSettings,
+        RecoveryCodeDao $recoveryCodeDao,
+        PasswordVerifier $passwordVerify,
+        TwoFactorAuthentication $twoFa,
+        Validator $validator,
+        WhatsNewProvider $whatsNewProvider
+    ) {
         $this->settings = $systemSettings;
         $this->recoveryCodeDao = $recoveryCodeDao;
         $this->passwordVerify = $passwordVerify;
         $this->twoFa = $twoFa;
         $this->validator = $validator;
+        $this->whatsNewProvider = $whatsNewProvider;
 
         parent::__construct();
+    }
+
+    /**
+     * The "What's New" entries shown by the shared login layout. Reuses Login's provider, since
+     * these screens already extend Login's layout.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function getWhatsNewChanges(): array
+    {
+        return $this->whatsNewProvider->getChanges();
     }
 
     public function loginTwoFactorAuth()
     {
         $this->validator->checkCanUseTwoFa();
+
+        if (!$this->validator->isCurrentUserMatchingSessionUser()) {
+            return $this->renderFreshLoginAfterResettingPendingTwoFactorSession();
+        }
+
         $this->validator->check2FaEnabled();
         $this->validator->checkNotVerified2FAYet();
 
@@ -94,7 +124,7 @@ class Controller extends \Piwik\Plugin\Controller
 
                 if ($this->twoFa->validateAuthCode(Piwik::getCurrentUserLogin(), $authCode)) {
                     $sessionFingerprint = new SessionFingerprint();
-                    $sessionFingerprint->setTwoFactorAuthenticationVerified();
+                    $sessionFingerprint->setTwoFactorAuthenticationVerified(Piwik::getCurrentUserLogin());
                     Url::redirectToUrl(Url::getCurrentUrl());
                 } else {
                     $messageNoAccess = Piwik::translate('TwoFactorAuth_InvalidAuthCode');
@@ -114,9 +144,21 @@ class Controller extends \Piwik\Plugin\Controller
         $view->AccessErrorString = $messageNoAccess;
         $view->addForm($form);
         $this->setBasicVariablesView($view);
+        $view->whatsNewChanges = $this->getWhatsNewChanges();
         $view->nonce = Nonce::getNonce(self::LOGIN_2FA_NONCE);
 
         return $view->render();
+    }
+
+    private function renderFreshLoginAfterResettingPendingTwoFactorSession()
+    {
+        \Piwik\Plugins\Login\Controller::clearSession();
+        Access::getInstance()->setSessionExpired(true);
+
+        return StaticContainer::get(\Piwik\Plugins\Login\Controller::class)->login(
+            null,
+            Piwik::translate('General_YourSessionHasExpired')
+        );
     }
 
     public function userSettings()
@@ -126,7 +168,7 @@ class Controller extends \Piwik\Plugin\Controller
         return $this->renderTemplate('userSettings', array(
             'isEnabled' => TwoFactorAuthentication::isUserUsingTwoFactorAuthentication(Piwik::getCurrentUserLogin()),
             'isForced' => $this->twoFa->isUserRequiredToHaveTwoFactorEnabled(),
-            'disableNonce' => Nonce::getNonce(self::DISABLE_2FA_NONCE)
+            'disableNonce' => Nonce::getNonce(self::DISABLE_2FA_NONCE),
         ));
     }
 
@@ -152,12 +194,12 @@ class Controller extends \Piwik\Plugin\Controller
             $container = StaticContainer::getContainer();
             $email = $container->make(TwoFactorAuthDisabledEmail::class, array(
                 'login' => Piwik::getCurrentUserLogin(),
-                'emailAddress' => Piwik::getCurrentUserEmail()
+                'emailAddress' => Piwik::getCurrentUserEmail(),
             ));
             $email->safeSend();
 
             $this->redirectToIndex('UsersManager', 'userSecurity', null, null, null, array(
-                'disableNonce' => false
+                'disableNonce' => false,
             ));
         }
     }
@@ -169,7 +211,11 @@ class Controller extends \Piwik\Plugin\Controller
 
     public function onLoginSetupTwoFactorAuth()
     {
-        // called when 2fa is required, but user has not yet set up 2fa
+        // login-only setup screen: available only while 2fa is enforced and the user has not enrolled yet
+        $this->validator->checkCanUseTwoFa();
+        $this->validator->checkCurrentUserMatchesSessionUser();
+        $this->validator->check2FaIsRequired();
+        $this->validator->check2FaNotEnabled();
 
         return $this->setupTwoFactorAuth($standalone = true);
     }
@@ -187,6 +233,7 @@ class Controller extends \Piwik\Plugin\Controller
         if ($standalone) {
             $view = new View('@TwoFactorAuth/setupTwoFactorAuthStandalone');
             $this->setBasicVariablesView($view);
+            $view->whatsNewChanges = $this->getWhatsNewChanges();
             $view->submitAction = 'onLoginSetupTwoFactorAuth';
         } else {
             $view = new View('@TwoFactorAuth/setupTwoFactorAuth');
@@ -222,7 +269,7 @@ class Controller extends \Piwik\Plugin\Controller
             if ($this->twoFa->validateAuthCodeDuringSetup(trim($authCode), $secret)) {
                 $this->twoFa->saveSecret($login, $secret);
                 $fingerprint = new SessionFingerprint();
-                $fingerprint->setTwoFactorAuthenticationVerified();
+                $fingerprint->setTwoFactorAuthenticationVerified($login);
                 unset($session->secret);
                 $this->passwordVerify->forgetVerifiedPassword();
 
@@ -231,7 +278,7 @@ class Controller extends \Piwik\Plugin\Controller
                 $container = StaticContainer::getContainer();
                 $email = $container->make(TwoFactorAuthEnabledEmail::class, array(
                     'login' => Piwik::getCurrentUserLogin(),
-                    'emailAddress' => Piwik::getCurrentUserEmail()
+                    'emailAddress' => Piwik::getCurrentUserEmail(),
                 ));
                 $email->safeSend();
 
@@ -305,7 +352,7 @@ class Controller extends \Piwik\Plugin\Controller
 
             $email = $container->make(RecoveryCodesRegeneratedEmail::class, array(
                 'login' => Piwik::getCurrentUserLogin(),
-                'emailAddress' => Piwik::getCurrentUserEmail()
+                'emailAddress' => Piwik::getCurrentUserEmail(),
             ));
             $email->safeSend();
             // no need to redirect as password was verified nonce
@@ -325,7 +372,7 @@ class Controller extends \Piwik\Plugin\Controller
         if (!$regenerateSuccess && !$regenerateError) {
             $email = $container->make(RecoveryCodesShowedEmail::class, array(
                 'login' => Piwik::getCurrentUserLogin(),
-                'emailAddress' => Piwik::getCurrentUserEmail()
+                'emailAddress' => Piwik::getCurrentUserEmail(),
             ));
             $email->safeSend();
         }
@@ -334,12 +381,14 @@ class Controller extends \Piwik\Plugin\Controller
             'codes' => $recoveryCodes,
             'regenerateNonce' => Nonce::getNonce(self::REGENERATE_CODES_2FA_NONCE),
             'regenerateError' => $regenerateError,
-            'regenerateSuccess' => $regenerateSuccess
+            'regenerateSuccess' => $regenerateSuccess,
         ));
     }
 
-    private function getTwoFaBarCodeSetupUrl($secret)
-    {
+    private function getTwoFaBarCodeSetupUrl(
+        #[\SensitiveParameter]
+        $secret
+    ) {
         $title = $this->settings->twoFactorAuthTitle->getValue();
         $descr = Piwik::getCurrentUserLogin();
 

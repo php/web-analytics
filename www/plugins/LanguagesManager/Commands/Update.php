@@ -13,8 +13,6 @@ use Piwik\Cache;
 use Piwik\Plugin\Manager;
 use Piwik\Plugins\LanguagesManager\API;
 
-/**
- */
 class Update extends TranslationBase
 {
     protected function configure()
@@ -111,7 +109,7 @@ class Update extends TranslationBase
                     [
                         '--code' => $code,
                         '--file' => $filename,
-                        '--plugin' => $plugin
+                        '--plugin' => $plugin,
                     ],
                     !$output->isVeryVerbose()
                 );
@@ -200,7 +198,7 @@ class Update extends TranslationBase
             [
                 '--token'    => $input->getOption('token'),
                 '--slug'     => $input->getOption('slug'),
-                '--plugin'   => $plugin
+                '--plugin'   => $plugin,
             ]
         );
     }

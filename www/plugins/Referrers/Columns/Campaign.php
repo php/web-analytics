@@ -17,21 +17,12 @@ use Piwik\Tracker\Visitor;
 
 class Campaign extends Base
 {
-    /**
-     * Obtained from the `[Tracker] create_new_visit_when_campaign_changes` INI config option.
-     * If true, will create new visits when campaign name changes.
-     *
-     * @var bool
-     */
     protected $nameSingular = 'Referrers_ColumnCampaign';
 
     /**
      * If we should create a new visit when the campaign changes, check if the campaign info changed and if so
      * force the tracker to create a new visit.i
      *
-     * @param Request $request
-     * @param Visitor $visitor
-     * @param Action|null $action
      * @return bool
      */
     public function shouldForceNewVisit(Request $request, Visitor $visitor, ?Action $action = null)

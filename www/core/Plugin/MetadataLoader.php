@@ -21,7 +21,7 @@ require_once PIWIK_INCLUDE_PATH . '/core/Version.php';
 
 /**
  * Loads plugin metadata found in the following files:
- * - piwik.json
+ * - plugin.json
  */
 class MetadataLoader
 {
@@ -35,8 +35,6 @@ class MetadataLoader
     private $pluginName;
 
     /**
-     * Constructor.
-     *
      * @param string $pluginName Name of the plugin to load metadata.
      */
     public function __construct($pluginName)
@@ -88,7 +86,7 @@ class MetadataLoader
             'license'          => 'GPL v3+',
             'version'          => Version::VERSION,
             'theme'            => false,
-            'require'          => []
+            'require'          => [],
         ];
     }
 
@@ -147,7 +145,7 @@ class MetadataLoader
         $licenseFiles = array(
             'LICENSE',
             'LICENSE.md',
-            'LICENSE.txt'
+            'LICENSE.txt',
         );
         foreach ($licenseFiles as $licenseFile) {
             $pathToLicense = $prefixPath . $licenseFile;

@@ -453,7 +453,7 @@ class Filesystem
         }
 
         if (!file_exists($pathToFile)) {
-            return;
+            return null;
         }
 
         $filesize  = filesize($pathToFile);
@@ -568,9 +568,7 @@ class Filesystem
     }
 
     /**
-     * Check if the filesystem is case sensitive by writing a temporary file
-     *
-     * @return bool
+     * Check if the filesystem is case insensitive by writing a temporary file
      */
     public static function isFileSystemCaseInsensitive(): bool
     {
@@ -623,7 +621,7 @@ class Filesystem
         }
         $filesToCreate = array(
             $path . '/index.htm',
-            $path . '/index.php'
+            $path . '/index.php',
         );
         foreach ($filesToCreate as $file) {
             if (!is_file($file)) {

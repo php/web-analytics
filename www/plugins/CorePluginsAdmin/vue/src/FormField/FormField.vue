@@ -8,6 +8,7 @@
 <template>
   <div
     class="form-group row matomo-form-field"
+    :class="{ 'form-group--error': formField.errorMessage }"
   >
     <h3
       v-if="formField.introduction"
@@ -28,14 +29,22 @@
         v-bind="{
           formField,
           ...formField,
+          id: fieldId,
           modelValue: processedModelValue,
           modelModifiers,
           availableOptions,
           ...extraChildComponentParams,
         }"
         @update:modelValue="onChange($event)"
+        @check:isValid="onCheckIsValid($event)"
       >
       </component>
+      <div
+        v-if="formField.errorMessage"
+        class="form-group__error-message"
+      >
+        {{ formField.errorMessage }}
+      </div>
     </div>
     <div
       class="col s12"
@@ -70,6 +79,16 @@
           <span>{{ defaultValuePrettyTruncated }}</span>
         </span>
       </div>
+      <Notification
+        v-if="isPrivacyPolicyControlled"
+        :noclear="true"
+        context="info"
+      >
+        {{ privacyPolicyNote }}
+        <a v-if="!isPrivacyPolicyConfigControlled" :href="privacyPolicyLink">
+          {{ translate('PrivacyManager_ViewPrivacyComplianceOverview') }}
+        </a>
+      </Notification>
     </div>
   </div>
 </template>
@@ -83,7 +102,12 @@ import {
   Component,
   markRaw,
 } from 'vue';
-import { useExternalPluginComponent } from 'CoreHome';
+import {
+  useExternalPluginComponent,
+  MatomoUrl,
+  Notification,
+  translate,
+} from 'CoreHome';
 import FieldCheckbox from './FieldCheckbox.vue';
 import FieldCheckboxArray from './FieldCheckboxArray.vue';
 import FieldExpandableSelect, {
@@ -104,8 +128,31 @@ import FieldTextArray from './FieldTextArray.vue';
 import FieldTextarea from './FieldTextarea.vue';
 import FieldTextareaArray from './FieldTextareaArray.vue';
 import { processCheckboxAndRadioAvailableValues } from './utilities';
+import FieldPassword from './FieldPassword.vue';
+import {
+  CompliancePolicyControl,
+  CompliancePolicyControls,
+  isFieldLockedByPolicies,
+} from './compliancePolicy';
 
-const TEXT_CONTROLS = ['password', 'url', 'search', 'email'];
+// note shown when the policy requirement is the only compliant value, so the field is read-only
+const POLICY_LOCKED_NOTES: Record<string, string> = {
+  config: 'PrivacyManager_PolicyControlledSettingLockedConfig',
+  instance: 'PrivacyManager_PolicyControlledSettingLockedInstance',
+  site: 'PrivacyManager_PolicyControlledSettingLockedWebsite',
+};
+
+// note shown when the requirement is only a bound, so stricter values remain selectable
+const POLICY_CONSTRAINED_NOTES: Record<string, string> = {
+  config: 'PrivacyManager_PolicyControlledSettingConstrainedConfig',
+  instance: 'PrivacyManager_PolicyControlledSettingConstrainedInstance',
+  site: 'PrivacyManager_PolicyControlledSettingConstrainedWebsite',
+};
+
+// most to least far reaching, so that the note names the enforcement that actually applies
+const POLICY_SCOPE_PRECEDENCE = ['config', 'instance', 'site'];
+
+const TEXT_CONTROLS = ['url', 'search', 'email'];
 const CONTROLS_SUPPORTING_ARRAY = ['textarea', 'checkbox', 'text'];
 const CONTROL_TO_COMPONENT_MAP: Record<string, string> = {
   checkbox: 'FieldCheckbox',
@@ -116,6 +163,7 @@ const CONTROL_TO_COMPONENT_MAP: Record<string, string> = {
   multiselect: 'FieldSelect',
   multituple: 'FieldMultituple',
   number: 'FieldNumber',
+  password: 'FieldPassword',
   radio: 'FieldRadio',
   select: 'FieldSelect',
   site: 'FieldSite',
@@ -150,6 +198,7 @@ interface FormField {
   component: Component | ComponentReference;
   inlineHelp?: string;
   inlineHelpBind?: unknown;
+  errorMessage?: string;
 }
 
 interface OptionLike {
@@ -166,8 +215,9 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['update:modelValue'],
+  emits: ['update:modelValue', 'check:isValid'],
   components: {
+    Notification,
     FieldCheckbox,
     FieldCheckboxArray,
     FieldExpandableSelect,
@@ -183,6 +233,7 @@ export default defineComponent({
     FieldTextArray,
     FieldTextarea,
     FieldTextareaArray,
+    FieldPassword,
   },
   setup(props) {
     const inlineHelpNode = ref<HTMLElement|null>(null);
@@ -256,7 +307,7 @@ export default defineComponent({
 
       let control = CONTROL_TO_COMPONENT_MAP[uiControl];
       if (TEXT_CONTROLS.indexOf(uiControl) !== -1) {
-        control = 'FieldText'; // we use same template for text and password both
+        control = 'FieldText'; // we use same field for url, email etc.
       }
 
       if (this.formField.type === 'array' && CONTROLS_SUPPORTING_ARRAY.indexOf(uiControl) !== -1) {
@@ -382,10 +433,66 @@ export default defineComponent({
       const inlineHelpSlot = this.$slots['inline-help']();
       return !!inlineHelpSlot?.[0]?.children?.length;
     },
+    fieldId() {
+      return this.formField.id ? this.formField.id : this.formField.name;
+    },
+    getExtraMetadataIdSite() {
+      return this.formField.extraMetadata?.idSite;
+    },
+    isPrivacyPolicyControlled() {
+      return this.privacyPolicyControls.length > 0;
+    },
+    privacyPolicyControlled(): CompliancePolicyControls {
+      return (this.formField.extraMetadata?.compliancePolicyControlled
+        ?? {}) as CompliancePolicyControls;
+    },
+    privacyPolicyControls(): CompliancePolicyControl[] {
+      return Object.values(this.privacyPolicyControlled);
+    },
+    isPrivacyPolicyConfigControlled() {
+      return this.privacyPolicyScope === 'config';
+    },
+    privacyPolicyScope(): string|undefined {
+      // the same precedence CompliancePolicy::getEnforcementScope() applies: a value in the
+      // config file cannot be changed from the dashboard, and instance-wide covers every site
+      return POLICY_SCOPE_PRECEDENCE.find(
+        (scope) => this.privacyPolicyControls.some((control) => control.scope === scope),
+      );
+    },
+    privacyPolicyNote() {
+      const control = this.privacyPolicyControls[0];
+
+      if (!control) {
+        return '';
+      }
+
+      // a requirement that leaves no alternative locks the field, one that is only a bound
+      // still lets the user pick any of the values that remain compliant
+      const notes = isFieldLockedByPolicies(this.privacyPolicyControlled)
+        ? POLICY_LOCKED_NOTES
+        : POLICY_CONSTRAINED_NOTES;
+
+      return translate(notes[this.privacyPolicyScope ?? ''] ?? notes.instance, control.policyTitle);
+    },
+    privacyPolicyLink() {
+      const idSite = this.getExtraMetadataIdSite;
+
+      return `?${MatomoUrl.stringify({
+        ...MatomoUrl.urlParsed.value,
+        module: 'PrivacyManager',
+        action: 'compliance',
+        idSite: idSite ?? 'all',
+        // a setting without an idSite is configured for every website
+        complianceScope: idSite ? 'site' : 'all',
+      })}`;
+    },
   },
   methods: {
     onChange(newValue: unknown) {
       this.$emit('update:modelValue', newValue);
+    },
+    onCheckIsValid(isValid: boolean) {
+      this.$emit('check:isValid', isValid);
     },
   },
 });

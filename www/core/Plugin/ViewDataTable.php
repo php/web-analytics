@@ -149,7 +149,7 @@ abstract class ViewDataTable implements ViewInterface
     /**
      * DataTable loaded from the API for this ViewDataTable.
      *
-     * @var DataTable
+     * @var DataTable|null
      */
     protected $dataTable = null;
 
@@ -436,7 +436,7 @@ abstract class ViewDataTable implements ViewInterface
      * To prevent calling an API multiple times, the DataTable can be set directly.
      * It won't be loaded from the API in this case.
      *
-     * @param DataTable $dataTable The DataTable to use.
+     * @param DataTable|DataTable\Map $dataTable The DataTable to use.
      * @return void
      */
     public function setDataTable($dataTable)
@@ -572,7 +572,6 @@ abstract class ViewDataTable implements ViewInterface
      * Display a meaningful error message when any invalid parameter is being set.
      *
      * @param $overrideParams
-     * @throws
      */
     public function throwWhenSettingNonOverridableParameter($overrideParams)
     {

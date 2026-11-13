@@ -30,7 +30,7 @@ class DbHelper
     }
 
     /**
-     * Returns `true` if a table in the database, `false` if otherwise.
+     * Returns `true` if a table exists in the database, `false` if otherwise.
      *
      * @param string $tableName The name of the table to check for. Must be prefixed.
      *                          Avoid using user input, as the variable will be used in a query unescaped.
@@ -143,6 +143,12 @@ class DbHelper
     public static function createTables()
     {
         Schema::getInstance()->createTables();
+
+        // The tables were just (re)created without their dimension columns (those are added by the
+        // subsequent DB update). Invalidate the cache that would otherwise make Columns\Updater
+        // believe the dimension columns are already installed because the dimension files on disk
+        // are unchanged. See Columns\Updater::clearCache().
+        \Piwik\Columns\Updater::clearCache();
     }
 
     /**
@@ -166,6 +172,7 @@ class DbHelper
      */
     public static function checkDatabaseVersion()
     {
+        Schema::getInstance()->unsetSchema();
         Db::get()->checkServerVersion();
     }
 
@@ -198,7 +205,7 @@ class DbHelper
      */
     public static function tableHasIndex($table, $indexName)
     {
-        $result = Db::get()->fetchOne('SHOW INDEX FROM ' . $table . ' WHERE Key_name = ?', [$indexName]);
+        $result = Db::get()->fetchOne('SHOW INDEX FROM `' . $table . '` WHERE Key_name = ?', [$indexName]);
         return !empty($result);
     }
 
@@ -207,7 +214,6 @@ class DbHelper
      *
      * Returns utf8mb4 if supported, with fallback to utf8
      *
-     * @return string
      * @throws Tracker\Db\DbException
      */
     public static function getDefaultCharset(): string
@@ -236,14 +242,32 @@ class DbHelper
     /**
      * Returns the default collation for a charset.
      *
-     * @param string $charset
-     *
-     * @return string
      * @throws Exception
      */
     public static function getDefaultCollationForCharset(string $charset): string
     {
         return Schema::getInstance()->getDefaultCollationForCharset($charset);
+    }
+
+    /**
+     * @internal
+     */
+    public static function isValidCharset(string $charset): bool
+    {
+        return self::isValidDatabaseEncodingName($charset);
+    }
+
+    /**
+     * @internal
+     */
+    public static function isValidCollation(string $collation): bool
+    {
+        return self::isValidDatabaseEncodingName($collation);
+    }
+
+    private static function isValidDatabaseEncodingName(string $name): bool
+    {
+        return preg_match('/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/D', $name) === 1;
     }
 
     /**
@@ -304,7 +328,6 @@ class DbHelper
      *
      * @param string $sql  query to add hint to
      * @param float $limit  time limit in seconds
-     * @return string
      */
     public static function addMaxExecutionTimeHintToQuery(string $sql, float $limit): string
     {
@@ -367,22 +390,96 @@ class DbHelper
      */
     public static function addJoinPrefixHintToQuery(string $sql, string $prefix): string
     {
-        if (strpos(trim($sql), '/*+ JOIN_PREFIX(') === false) {
-            $select = 'SELECT';
-            if (0 === strpos(trim($sql), $select)) {
-                $sql = trim($sql);
-                $sql = 'SELECT /*+ JOIN_PREFIX(' . $prefix . ') */' . substr($sql, strlen($select));
+        return self::addOptimizerHintToQuery($sql, 'JOIN_PREFIX(' . $prefix . ')');
+    }
+
+    /**
+     * Add an optimizer hint to the query.
+     *
+     * Creating and using a "add_x_HintToQuery" functions is preferred
+     * over using this function directly, as some optimizer hints depend
+     * on the database used.
+     *
+     * If an optimizer hint is already present (check is done by name only)
+     * in the query the new value will be silently discarded.
+     *
+     * @param string $sql   SQL query string
+     * @param string $hint  Hint to add
+     *
+     * @return string       Modified query string with hint added
+     */
+    public static function addOptimizerHintToQuery(string $sql, string $hint): string
+    {
+        $sql = trim($sql);
+
+        // only apply hints to SELECT queries
+        if (0 !== stripos($sql, 'SELECT')) {
+            return $sql;
+        }
+
+        $pattern =
+            '@^SELECT\s+' .
+            // ignore non-hint comments ("/* ... */")
+            '(?:|/\*[^+]*?\*/\s*)' .
+            // capture hint comments ("/*+ ... */")
+            '(/\*\+\s*(.*?)\s*\*/)' .
+            '@is';
+
+        preg_match($pattern, $sql, $matches);
+
+        if (empty($matches)) {
+            return 'SELECT /*+ ' . $hint . ' */' . substr($sql, strlen('SELECT'));
+        }
+
+        $originalComment = $matches[1];
+        $hints = $matches[2];
+
+        $newHintNameEnd = stripos($hint, '(') ?: strlen($hint);
+        $newHintName = substr($hint, 0, $newHintNameEnd);
+
+        // only add new hints
+        if (preg_match('/(?:^|\s)' . preg_quote($newHintName) . '(?:\\(|\s|$)/i', $hints)) {
+            return $sql;
+        }
+
+        $hints = trim($hint . ' ' . $hints);
+
+        return substr_replace(
+            $sql,
+            '/*+ ' . $hints . ' */',
+            strpos($sql, $originalComment),
+            strlen($originalComment)
+        );
+    }
+
+    /**
+     * Extracts the "ORDER BY" clause from a query.
+     *
+     * Will return null if no clause found or the extraction failed,
+     * e.g. parentheses in the extracted clause are not balanced.
+     */
+    public static function extractOrderByFromQuery(string $sql): ?string
+    {
+        $pattern = '/.*ORDER\s+BY\s+(.*?)(?:\s+LIMIT|\s*;|\s*$)/is';
+
+        if (preg_match($pattern, $sql, $matches)) {
+            $orderBy = $matches[1];
+            $openParentheses = substr_count($orderBy, '(');
+            $closeParentheses = substr_count($orderBy, ')');
+
+            if ($openParentheses === $closeParentheses) {
+                return trim($orderBy);
             }
         }
 
-        return $sql;
+        return null;
     }
 
     /**
      * Returns true if the string is a valid database name for MySQL. MySQL allows + in the database names.
      * Database names that start with a-Z or 0-9 and contain a-Z, 0-9, underscore(_), dash(-), plus(+), and dot(.) will be accepted.
-     * File names beginning with anything but a-Z or 0-9 will be rejected (including .htaccess for example).
-     * File names containing anything other than above mentioned will also be rejected (file names with spaces won't be accepted).
+     * Database names beginning with anything but a-Z or 0-9 will be rejected.
+     * Database names containing anything other than above mentioned will also be rejected (names with spaces won't be accepted).
      *
      * @param string $dbname
      * @return bool

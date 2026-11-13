@@ -13,7 +13,6 @@ use Exception;
 use HTML_QuickForm2_DataSource_Array;
 use HTML_QuickForm2_Factory;
 use HTML_QuickForm2_Rule;
-use Piwik\Config;
 use Piwik\Db;
 use Piwik\Db\Adapter;
 use Piwik\DbHelper;
@@ -91,13 +90,8 @@ class FormDatabaseSetup extends QuickForm2
 
         $this->addElement('submit', 'submit', array('value' => Piwik::translate('General_Next') . ' »', 'class' => 'btn'));
 
-        $defaultDatabaseType = Config::getInstance()->database['type'];
-        $this->addElement( 'hidden', 'type')->setLabel('Database engine');
-
-
         $defaults = array(
             'host'          => '127.0.0.1',
-            'type'          => $defaultDatabaseType,
             'tables_prefix' => 'matomo_',
             'schema'        => 'Mysql',
             'port'          => '3306',
@@ -136,8 +130,7 @@ class FormDatabaseSetup extends QuickForm2
     /**
      * Creates database object based on form data.
      *
-     * @throws Exception|Zend_Db_Adapter_Exception
-     * @return array The database connection info. Can be passed into Piwik::createDatabaseObject.
+     * @return array The database connection info. Can be passed into Db::createDatabaseObject.
      */
     public function createDatabaseObject()
     {
@@ -169,7 +162,7 @@ class FormDatabaseSetup extends QuickForm2
             'adapter'       => $adapter,
             'port'          => Db\Schema::getDefaultPortForSchema($schema),
             'schema'        => $schema,
-            'type'          => $this->getSubmitValue('type'),
+            'type'          => 'InnoDB',
             'enable_ssl'    => false
         );
 

@@ -59,6 +59,11 @@ class Record
     private $countOfRecordNameIsRecursive = false;
 
     /**
+     * @var bool
+     */
+    private $countOfRecordNameIsForLeafs = false;
+
+    /**
      * @var array|null
      */
     private $columnToRenameAfterAggregation = null;
@@ -73,6 +78,26 @@ class Record
      */
     private $multiplePeriodTransform = null;
 
+    /**
+     * @var callable|null
+     */
+    private $aggregatedRecordTransform = null;
+
+    /**
+     * @var string|null
+     */
+    private $builtFromFlatRecord = null;
+
+    /**
+     * @var callable|null
+     */
+    private $flatToHierarchyPathCallback = null;
+
+    /**
+     * @var callable|null
+     */
+    private $legacyHierarchyToFlatReducerCallback = null;
+
     public static function make($type, $name)
     {
         $record = new Record();
@@ -81,20 +106,12 @@ class Record
         return $record;
     }
 
-    /**
-     * @param string|null $plugin
-     * @return Record
-     */
     public function setPlugin(?string $plugin): Record
     {
         $this->plugin = $plugin;
         return $this;
     }
 
-    /**
-     * @param string $name
-     * @return Record
-     */
     public function setName(string $name): Record
     {
         if (!preg_match('/^[a-zA-Z0-9_-]+$/', $name)) {
@@ -115,37 +132,23 @@ class Record
         return $this;
     }
 
-    /**
-     * @param int|null $maxRowsInTable
-     * @return Record
-     */
     public function setMaxRowsInTable(?int $maxRowsInTable): Record
     {
         $this->maxRowsInTable = $maxRowsInTable;
         return $this;
     }
 
-    /**
-     * @param int|null $maxRowsInSubtable
-     * @return Record
-     */
     public function setMaxRowsInSubtable(?int $maxRowsInSubtable): Record
     {
         $this->maxRowsInSubtable = $maxRowsInSubtable;
         return $this;
     }
 
-    /**
-     * @return string|null
-     */
     public function getPlugin(): ?string
     {
         return $this->plugin;
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return $this->name;
@@ -159,35 +162,22 @@ class Record
         return $this->columnToSortByBeforeTruncation;
     }
 
-    /**
-     * @return int|null
-     */
     public function getMaxRowsInTable(): ?int
     {
         return $this->maxRowsInTable;
     }
 
-    /**
-     * @return int|null
-     */
     public function getMaxRowsInSubtable(): ?int
     {
         return $this->maxRowsInSubtable;
     }
 
-    /**
-     * @param string $type
-     * @return Record
-     */
     public function setType(string $type): Record
     {
         $this->type = $type;
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getType(): string
     {
         return $this->type;
@@ -200,25 +190,30 @@ class Record
         return $this;
     }
 
-    /**
-     * @return string|null
-     */
+    public function setIsCountOfBlobRecordLeafRows(string $dependentRecordName): Record
+    {
+        $this->countOfRecordName           = $dependentRecordName;
+        $this->countOfRecordNameIsForLeafs = true;
+        return $this;
+    }
+
     public function getCountOfRecordName(): ?string
     {
         return $this->countOfRecordName;
     }
 
-    /**
-     * @return bool
-     */
     public function getCountOfRecordNameIsRecursive(): bool
     {
         return $this->countOfRecordNameIsRecursive;
     }
 
+    public function getCountOfRecordNameIsForLeafs(): bool
+    {
+        return $this->countOfRecordNameIsForLeafs;
+    }
+
     /**
      * @param array|null $columnToRenameAfterAggregation
-     * @return Record
      */
     public function setColumnToRenameAfterAggregation(?array $columnToRenameAfterAggregation): Record
     {
@@ -236,7 +231,6 @@ class Record
 
     /**
      * @param array|null $blobColumnAggregationOps
-     * @return Record
      */
     public function setBlobColumnAggregationOps(?array $blobColumnAggregationOps): Record
     {
@@ -252,21 +246,108 @@ class Record
         return $this->blobColumnAggregationOps;
     }
 
-    /**
-     * @param ?callable $multiplePeriodTransform
-     * @return Record
-     */
     public function setMultiplePeriodTransform(?callable $multiplePeriodTransform): Record
     {
         $this->multiplePeriodTransform = $multiplePeriodTransform;
         return $this;
     }
 
-    /**
-     * @return callable
-     */
     public function getMultiplePeriodTransform(): ?callable
     {
         return $this->multiplePeriodTransform;
+    }
+
+    /**
+     * Sets a transform applied to this blob record's aggregated table during non-day archiving,
+     * after the day blobs have been aggregated together (additive columns summed, columns marked
+     * 'skip' in the aggregation ops left untouched) and before the table is truncated and stored.
+     *
+     * Use this for columns that cannot be summed across child periods and must be recomputed from
+     * the aggregated additive columns — for example a table-relative ratio, index or score. Mark
+     * such a column 'skip' via {@see setBlobColumnAggregationOps()} so it is not summed, then
+     * recompute it here. Because the transform runs before truncation, a column it (re)computes can
+     * be used as {@see setColumnToSortByBeforeTruncation()}.
+     *
+     * Only used for non-day periods; the day archive builds the record from logs via the
+     * RecordBuilder's aggregate() and should apply any equivalent computation there.
+     *
+     * Applies on both the standard blob path and the built-from-flat path ({@see setBuiltFromFlatRecord()}):
+     * each record's transform runs on that record's own aggregated table, so a flat base record and the
+     * hierarchy rebuilt from it are each transformed (the hierarchy after it is built) before being stored.
+     *
+     * @param callable|null $transform Signature:
+     *                                 function (\Piwik\DataTable $table, ArchiveProcessor $archiveProcessor, Record $record): void
+     *                                 The callback mutates $table in place.
+     */
+    public function setAggregatedRecordTransform(?callable $transform): Record
+    {
+        if (null !== $transform && $this->type !== self::TYPE_BLOB) {
+            throw new \InvalidArgumentException('setAggregatedRecordTransform() can only be used with blob records.');
+        }
+
+        $this->aggregatedRecordTransform = $transform;
+        return $this;
+    }
+
+    public function getAggregatedRecordTransform(): ?callable
+    {
+        return $this->aggregatedRecordTransform;
+    }
+
+    /**
+     * Marks this blob record as being derived from a flat blob record during non-day aggregation.
+     *
+     * Use this when day archives store a flat representation and non-day archives should rebuild
+     * hierarchy from it. The flat record must be present in getRecordMetadata().
+     *
+     * @param string $flatRecordName Name of the flat blob record to aggregate first.
+     * @param callable $flatToHierarchyPathCallback Callback used when rebuilding hierarchy.
+     *                                              Signature: function (Row $flatRow, ArchiveProcessor $archiveProcessor, Record $hierarchicalRecord): ?array
+     *                                              Return value is the path of labels to map the flat row into the hierarchy.
+     * @param callable|null $legacyHierarchyToFlatReducerCallback Optional callback that can merge legacy hierarchical
+     *                                                            aggregates into the flat table when some periods do not
+     *                                                            have the flat record yet.
+     *                                                            Signature: function (DataTable $legacyHierarchy, DataTable $flatTable, ArchiveProcessor $archiveProcessor, Record $hierarchicalRecord): void
+     *                                                            The callback is invoked once per legacy source period hierarchy table.
+     */
+    public function setBuiltFromFlatRecord(
+        string $flatRecordName,
+        callable $flatToHierarchyPathCallback,
+        ?callable $legacyHierarchyToFlatReducerCallback = null
+    ): Record {
+        if ($this->type !== self::TYPE_BLOB) {
+            throw new \InvalidArgumentException('setBuiltFromFlatRecord() can only be used with blob records.');
+        }
+
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $flatRecordName)) {
+            throw new \InvalidArgumentException('Invalid flat record name: ' . $flatRecordName);
+        }
+
+        $this->builtFromFlatRecord = $flatRecordName;
+        $this->flatToHierarchyPathCallback = $flatToHierarchyPathCallback;
+        $this->legacyHierarchyToFlatReducerCallback = $legacyHierarchyToFlatReducerCallback;
+
+        return $this;
+    }
+
+    public function getBuiltFromFlatRecord(): ?string
+    {
+        return $this->builtFromFlatRecord;
+    }
+
+    /**
+     * @see setBuiltFromFlatRecord()
+     */
+    public function getFlatToHierarchyPathCallback(): ?callable
+    {
+        return $this->flatToHierarchyPathCallback;
+    }
+
+    /**
+     * @see setBuiltFromFlatRecord()
+     */
+    public function getLegacyHierarchyToFlatReducerCallback(): ?callable
+    {
+        return $this->legacyHierarchyToFlatReducerCallback;
     }
 }

@@ -11,9 +11,6 @@ namespace Piwik\Plugins\PagePerformance\JqplotDataGenerator;
 
 use Piwik\ProxyHttp;
 
-/**
- *
- */
 class Chart extends \Piwik\Plugins\CoreVisualizations\JqplotDataGenerator\Chart
 {
     // the data kept here conforms to the jqplot data layout
@@ -96,9 +93,9 @@ class Chart extends \Piwik\Plugins\CoreVisualizations\JqplotDataGenerator\Chart
         $data = [
             'params' => [
                 'axes'   => &$this->axes,
-                'series' => &$this->series
+                'series' => &$this->series,
             ],
-            'data'   => &$this->data
+            'data'   => &$this->data,
         ];
 
         return $data;

@@ -48,8 +48,6 @@ class VisitTotalActions extends VisitDimension
     }
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
      * @return int
      */
@@ -65,7 +63,7 @@ class VisitTotalActions extends VisitDimension
             Action::TYPE_DOWNLOAD,
             Action::TYPE_OUTLINK,
             Action::TYPE_SITE_SEARCH,
-            Action::TYPE_EVENT
+            Action::TYPE_EVENT,
         );
 
         // if visit starts with something else (e.g. ecommerce order), don't record as an action
@@ -77,10 +75,8 @@ class VisitTotalActions extends VisitDimension
     }
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
-     * @return int
+     * @return string|false
      */
     public function onExistingVisit(Request $request, Visitor $visitor, $action)
     {

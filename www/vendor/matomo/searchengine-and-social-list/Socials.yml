@@ -23,6 +23,11 @@ Classmates.com:
 Cyworld:
   - global.cyworld.com
 
+Discord:
+  - discord.com
+  - discord.gg
+  - discordapp.com
+
 Douyin:
   - douyin.com
 
@@ -278,6 +283,7 @@ reddit:
   - reddit.com
   - np.reddit.com
   - pay.reddit.com
+  - com.reddit.frontpage
 
 Renren:
   - renren.com
@@ -287,6 +293,7 @@ Skyrock:
 
 Snapchat:
   - snapchat.com
+  - com.snapchat.android
 
 Sonico.com:
   - sonico.com
@@ -314,6 +321,8 @@ Telegram:
 Threads:
   - threads.net
   - l.threads.net
+  - threads.com
+  - l.threads.com
 
 TikTok:
   - tiktok.com
@@ -361,6 +370,12 @@ vkrugudruzei.ru:
 
 WAYN:
   - wayn.com
+
+WeChat:
+  - wechat.com
+  - mp.weixin.qq.com
+  - open.weixin.qq.com
+  - channels.weixin.qq.com
 
 Weibo:
   - weibo.com

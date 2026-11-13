@@ -1,6 +1,7 @@
 {
     "CoreUpdater": {
         "CheckingForPluginUpdates": "Kontrola aktualizací zásuvných modulů",
+        "ClickHereToViewSqlQueries": "Kliknutím sem zobrazíte a zkopírujete seznam dotazů SQL a konzolových příkazů, které budou provedeny",
         "CloudHosting": "Hostování v Cloudu",
         "CriticalErrorDuringTheUpgradeProcess": "Při aktualizaci nastala kritická chyba:",
         "DatabaseUpgradeRequired": "Vyžadováno povýšení databáze",
@@ -42,7 +43,7 @@
         "PiwikWillBeUpgradedFromVersionXToVersionY": "Databáze Matoma bude aktualizována z verze %1$s na novou verzi %2$s.",
         "PostUpdateMessage": "Matomo bude vždy zdarma ke stažení a použití, ale potřebuje pro svůj růst a zlepšení vaši neustálou podporu .",
         "PostUpdateSupport": "Pokud potřebujete pomoc s použitím aplikace Matomo, můžete ji obdržet od jejích tvůrců:",
-        "ReadyToGo": "Připraven pokračovat?",
+        "ReadyToGo": "Jste připraveni pokračovat?",
         "ReceiveEmailBecauseIsSuperUser": "Tento e-mail dostáváte, protože jste super uživatel Matoma na: %s",
         "ServicesSupport": "Služby a podpora",
         "ThankYouUpdatePiwik": "Děkujeme, že používáte Matomo vždy v nejaktuálnější verzi!",

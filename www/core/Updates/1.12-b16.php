@@ -13,8 +13,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_1_12_b16 extends Updates
 {
     /**
@@ -30,7 +28,7 @@ class Updates_1_12_b16 extends Updates
     public function getMigrations(Updater $updater)
     {
         return array(
-            $this->migration->db->addColumn('report', 'idsegment', 'INT(11)', 'description')
+            $this->migration->db->addColumn('report', 'idsegment', 'INT(11)', 'description'),
         );
     }
 

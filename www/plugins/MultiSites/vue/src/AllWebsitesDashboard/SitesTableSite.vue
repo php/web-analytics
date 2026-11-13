@@ -17,7 +17,7 @@
             rel="noreferrer noopener"
             target="_blank"
             :href="site.main_url"
-            :title="translate('General_GoTo', site.main_url)"
+            :title="translate('General_GoTo', htmlEntities(site.main_url))"
         >
           <span class="icon icon-outlink" /></a>
         <a
@@ -35,6 +35,9 @@
 
     <td><span class="value">{{ formatNumber(site.nb_visits) }}</span></td>
     <td><span class="value">{{ formatNumber(site.nb_pageviews) }}</span></td>
+    <td v-if="showAiChatbotsRequests">
+      <span class="value">{{ formatNumber(site.ai_chatbots_requests) }}</span>
+    </td>
     <td><span class="value">{{ formatNumber(site.hits) }}</span></td>
     <td v-if="displayRevenue">
       <span class="value">{{ formatCurrency(site.revenue, site.currencySymbol || '') }}</span>
@@ -58,7 +61,10 @@
           rel="noreferrer noopener"
           target="_blank"
           :href="dashboardUrl"
-          :title="translate('General_GoTo', translate('Dashboard_DashboardOf', siteLabel))"
+          :title="translate(
+            'General_GoTo',
+            translate('Dashboard_DashboardOf', htmlEntities(siteLabel)),
+          )"
           v-if="!site.isGroup"
       >
         <img
@@ -99,6 +105,10 @@ export default defineComponent({
     },
     sparklineMetric: String,
     displaySparkline: Boolean,
+    showAiChatbotsRequests: {
+      type: Boolean,
+      required: true,
+    },
   },
   computed: {
     dashboardUrl() {
@@ -114,14 +124,14 @@ export default defineComponent({
     },
     evolutionIconSrc() {
       if (this.evolutionTrend === 1) {
-        return 'plugins/MultiSites/images/arrow_up.png';
+        return 'plugins/MultiSites/images/arrow_up.svg';
       }
 
       if (this.evolutionTrend === -1) {
-        return 'plugins/MultiSites/images/arrow_down.png';
+        return 'plugins/MultiSites/images/arrow_down.svg';
       }
 
-      return 'plugins/MultiSites/images/stop.png';
+      return 'plugins/MultiSites/images/stop.svg';
     },
     evolutionSparklineSrc() {
       let sparklineDate = Matomo.currentDateString as string;
@@ -146,6 +156,10 @@ export default defineComponent({
         evolutionBy: this.sparklineMetric,
         colors: JSON.stringify(Matomo.getSparklineColors()),
         viewDataTable: 'sparkline',
+        // The render size is twice the display size (the img is shown at 100x25) so the
+        // PNG renders at 2x pixel density.
+        width: 200,
+        height: 50,
       });
 
       return `?${sparklineParams}${this.tokenParam}`;
@@ -176,6 +190,11 @@ export default defineComponent({
       const token_auth = MatomoUrl.urlParsed.value.token_auth as string;
 
       return token_auth ? `&token_auth=${token_auth}` : '';
+    },
+  },
+  methods: {
+    htmlEntities(value: string) {
+      return Matomo.helper.htmlEntities(value);
     },
   },
 });

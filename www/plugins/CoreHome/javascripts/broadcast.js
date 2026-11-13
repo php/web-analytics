@@ -359,7 +359,7 @@ var broadcast = {
     loadAjaxContent: function (urlAjax) {
         if(broadcast.getParamValue('module', urlAjax) == 'API') {
             broadcast.lastUrlRequested = null;
-            $('#content').html("Loading content from the API and displaying it within Piwik is not allowed.");
+            $('#content').html("Loading content from the API and displaying it within Matomo is not allowed.");
             piwikHelper.hideAjaxLoading();
             return false;
         }
@@ -525,7 +525,9 @@ var broadcast = {
             }
             if (/\[.*?]$/.test(key)) {
               key = key.replace(/\[.*?]$/, '');
-              result[key] = result[key] || [];
+              if (!Object.prototype.hasOwnProperty.call(result, key)) {
+                result[key] = [];
+              }
               result[key].push(value);
             } else {
               result[key] = value;

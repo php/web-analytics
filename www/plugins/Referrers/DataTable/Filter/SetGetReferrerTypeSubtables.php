@@ -41,8 +41,6 @@ class SetGetReferrerTypeSubtables extends DataTable\BaseFilter
     private $expanded;
 
     /**
-     * Constructor.
-     *
      * @param DataTable $table The table to eventually filter.
      * @param int $idSite
      * @param string $period
@@ -79,7 +77,7 @@ class SetGetReferrerTypeSubtables extends DataTable\BaseFilter
                         'segment' => $this->segment,
                         'idSubtable' => $typeReferrer,
                         'disable_generic_filters' => true,
-                        'disable_queued_filters' => !$this->expanded
+                        'disable_queued_filters' => !$this->expanded,
                     ], []);
 
                     $row->setSubtable($subtable);

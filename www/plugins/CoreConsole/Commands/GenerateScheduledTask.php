@@ -11,8 +11,6 @@ namespace Piwik\Plugins\CoreConsole\Commands;
 
 use Piwik\Plugin\Manager;
 
-/**
- */
 class GenerateScheduledTask extends GeneratePluginBase
 {
     protected function configure()
@@ -36,7 +34,7 @@ class GenerateScheduledTask extends GeneratePluginBase
         $this->writeSuccessMessage(array(
              sprintf('Tasks.php for %s generated.', $pluginName),
              'You can now start specifying your scheduled tasks',
-             'Enjoy!'
+             'Enjoy!',
         ));
 
         return self::SUCCESS;

@@ -59,21 +59,19 @@ class TagManager extends \Piwik\Plugin
             'PluginManager.pluginDeactivated' => 'onPluginActivateOrInstall',
             'PluginManager.pluginUninstalled' => 'onPluginActivateOrInstall',
             'TagManager.regenerateContainerReleases' => 'regenerateReleasedContainers',
-            'Updater.componentUpdated' => 'regenerateReleasedContainers',
             'Controller.CoreHome.checkForUpdates.end' => 'regenerateReleasedContainers',
             'CustomJsTracker.trackerJsChanged' => 'regenerateReleasedContainers', // in case a Matomo tracker is bundled
             'SitesManager.deleteSite.end' => 'onSiteDeleted',
             'SitesManager.addSite.end' => 'onSiteAdded',
             'System.addSystemSummaryItems' => 'addSystemSummaryItems',
-            'Template.endTrackingCodePage' => 'addTagManagerCode',
+            'Template.afterJsTracker' => 'addTagManagerCode',
             'Template.siteWithoutDataTab.MatomoTagManager.content' => 'setTagManagerCode',
             'Template.endTrackingHelpPage' => 'addTagManagerTrackingCodeHelp',
-            'Template.endTrackingCodePageTableOfContents' => 'endTrackingCodePageTableOfContents',
+            'Template.afterJsTrackerMenu' => 'addTagManagerMenuLink',
             'Tracker.PageUrl.getQueryParametersToExclude' => 'getQueryParametersToExclude',
             'API.addGlossaryItems' => 'addGlossaryItems',
             'Template.bodyClass' => 'addBodyClass',
             'Access.Capability.addCapabilities' => 'addCapabilities',
-            'TwoFactorAuth.requiresTwoFactorAuthentication' => 'requiresTwoFactorAuthentication',
             'Db.getTablesInstalled' => 'getTablesInstalled',
             'Template.siteWithoutDataTab.ReactJs.content' => 'embedReactTagManagerTrackingCode',
             'SitesManager.getMessagesToWarnOnSiteRemoval' => 'getMessagesToWarnOnSiteRemoval'
@@ -93,13 +91,6 @@ class TagManager extends \Piwik\Plugin
         $allTablesInstalled[] = Common::prefixTable('tagmanager_tag');
         $allTablesInstalled[] = Common::prefixTable('tagmanager_trigger');
         $allTablesInstalled[] = Common::prefixTable('tagmanager_variable');
-    }
-
-    public function requiresTwoFactorAuthentication(&$requiresAuth, $module, $action, $parameters)
-    {
-        if ($module == 'TagManager' && $action === 'debug') {
-            $requiresAuth = false;
-        }
     }
 
     public function addBodyClass(&$out, $type)
@@ -261,7 +252,7 @@ class TagManager extends \Piwik\Plugin
         $parametersToExclude[] = 'mtmSetDebugFlag';
     }
 
-    public function endTrackingCodePageTableOfContents(&$out)
+    public function addTagManagerMenuLink(&$out)
     {
         // Check whether to show the MTM code. If not, simply return early
         if ($this->isAccessRestrictedForUser()) {
@@ -460,7 +451,7 @@ class TagManager extends \Piwik\Plugin
         $result[] = 'TagManager_PublishLiveEnvironmentCapabilityRequired';
         $result[] = 'TagManager_CapabilityPublishLiveContainer';
         $result[] = 'TagManager_VersionAlreadyPublishedToAllEnvironments';
-        $result[] = 'TagManager_UseCustomTemplateCapabilityRequired';
+        $result[] = 'TagManager_UseCustomTemplateCapabilityPermissionRequiredDescription';
         $result[] = 'TagManager_CapabilityUseCustomTemplates';
         $result[] = 'TagManager_ViewX';
         $result[] = 'TagManager_DeleteX';
@@ -468,19 +459,23 @@ class TagManager extends \Piwik\Plugin
         $result[] = 'TagManager_EditX';
         $result[] = 'TagManager_Context';
         $result[] = 'TagManager_ManageContainersIntro';
-        $result[] = 'TagManager_ContainerNameHelp';
+        $result[] = 'TagManager_ContainerNameHelpText';
         $result[] = 'TagManager_ContainerContextHelp';
-        $result[] = 'TagManager_ContainerDescriptionHelp';
+        $result[] = 'TagManager_ContainerDescriptionHelpText';
         $result[] = 'TagManager_TagStartDateHelp';
         $result[] = 'TagManager_TagEndDateHelp';
         $result[] = 'TagManager_CurrentTimeInLocalTimezone';
         $result[] = 'TagManager_TagUsageBenefits';
-        $result[] = 'TagManager_TagNameHelpV2';
+        $result[] = 'TagManager_NameHelpText';
+        $result[] = 'TagManager_DescriptionHelpText';
+        $result[] = 'TagManager_TagLowercase';
+        $result[] = 'TagManager_TriggerLowercase';
+        $result[] = 'TagManager_VariableLowercase';
         $result[] = 'TagManager_NoTagsFound';
         $result[] = 'TagManager_DeleteTagConfirm';
         $result[] = 'TagManager_DeleteVersionConfirm';
         $result[] = 'TagManager_VersionUsageBenefits';
-        $result[] = 'TagManager_VersionNameHelp';
+        $result[] = 'TagManager_VersionNameHelpText';
         $result[] = 'TagManager_NoVersionsFound';
         $result[] = 'TagManager_NoReleasesFound';
         $result[] = 'TagManager_NoReleasesFoundForContainer';
@@ -520,7 +515,7 @@ class TagManager extends \Piwik\Plugin
         $result[] = 'TagManager_UpdatingData';
         $result[] = 'TagManager_DeleteContainerConfirm';
         $result[] = 'TagManager_VersionEnvironmentHelp';
-        $result[] = 'TagManager_VersionDescriptionHelp';
+        $result[] = 'TagManager_VersionDescriptionHelpText';
         $result[] = 'TagManager_Container';
         $result[] = 'TagManager_Containers';
         $result[] = 'TagManager_Type';
@@ -569,11 +564,9 @@ class TagManager extends \Piwik\Plugin
         $result[] = 'TagManager_DeleteVariableConfirm';
         $result[] = 'TagManager_NoVariablesFound';
         $result[] = 'TagManager_VariableUsageBenefits';
-        $result[] = 'TagManager_VariableNameHelp';
         $result[] = 'TagManager_DeleteTriggerConfirm';
         $result[] = 'TagManager_NoTriggersFound';
         $result[] = 'TagManager_TriggerUsageBenefits';
-        $result[] = 'TagManager_TriggerNameHelp';
         $result[] = 'TagManager_ContainerX';
         $result[] = 'TagManager_ConfirmImportContainerVersion';
         $result[] = 'TagManager_Filter';
@@ -639,9 +632,6 @@ class TagManager extends \Piwik\Plugin
         $result[] = 'TagManager_MatomoTagManager';
         $result[] = 'TagManager_TagManagerTrackingInfo';
         $result[] = 'TagManager_InvalidDebugUrlError';
-        $result[] = 'TagManager_TagDescriptionHelp';
-        $result[] = 'TagManager_TriggerDescriptionHelp';
-        $result[] = 'TagManager_VariableDescriptionHelp';
         $result[] = 'TagManager_InstallCodeDataLayerNote';
         $result[] = 'TagManager_TagsNameDescription';
         $result[] = 'TagManager_TagsDescriptionDescription';
@@ -871,13 +861,13 @@ class TagManager extends \Piwik\Plugin
         $result[] = 'TagManager_TagDescriptionPlaceholder';
         $result[] = 'TagManager_TriggerDescriptionPlaceholder';
         $result[] = 'TagManager_VariableDescriptionPlaceholder';
-        $result[] = 'TagManager_VersionDescriptionPlaceholder';
-        $result[] = 'TagManager_ContainerDescriptionPlaceholder';
+        $result[] = 'TagManager_VersionDescriptionPlaceholderV2';
+        $result[] = 'TagManager_ContainerDescriptionPlaceholderV2';
         $result[] = 'TagManager_TagNamePlaceholder';
         $result[] = 'TagManager_TriggerNamePlaceholder';
         $result[] = 'TagManager_VariableNamePlaceholder';
-        $result[] = 'TagManager_VersionNamePlaceholder';
-        $result[] = 'TagManager_ContainerNamePlaceholder';
+        $result[] = 'TagManager_VersionNamePlaceholderV2';
+        $result[] = 'TagManager_ContainerNamePlaceholderV2';
         $result[] = 'TagManager_PlaceholderZero';
         $result[] = 'TagManager_PriorityPlaceholder';
         $result[] = 'TagManager_VersionDescriptionOptional';
@@ -962,6 +952,8 @@ class TagManager extends \Piwik\Plugin
     {
         $stylesheets[] = "plugins/TagManager/stylesheets/manageList.less";
         $stylesheets[] = "plugins/TagManager/stylesheets/manageEdit.less";
+        $stylesheets[] = "plugins/TagManager/stylesheets/containerMenu.less";
+        $stylesheets[] = "plugins/TagManager/stylesheets/previewDebugNotification.less";
         $stylesheets[] = "plugins/TagManager/vue/src/Tag/TagEdit.less";
         $stylesheets[] = "plugins/TagManager/vue/src/VariableSelectType/VariableSelectType.less";
         $stylesheets[] = "plugins/TagManager/vue/src/Field/FieldVariableTemplate.less";

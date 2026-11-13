@@ -1,0 +1,519 @@
+/*!
+ * Matomo - free/libre analytics platform
+ *
+ * @link    https://matomo.org
+ * @license https://www.gnu.org/licenses/gpl-3.0.html GPL v3 or later
+ */
+
+import AjaxHelper from './AjaxHelper';
+
+type AjaxMode = 'success' | 'apiErrorEachChunk' | 'abort' | 'sessionTimeout';
+type JQueryXhr = JQuery.jqXHR;
+
+describe('CoreHome/AjaxHelper', () => {
+  const unsupportedBulkResponseObjectError = 'AjaxHelper returnResponseObject is not supported for bulk requests.';
+  const originalAjax = window.$.ajax;
+  const originalRequire = window.require;
+  const originalRedirect = window.piwikHelper.redirect;
+  const originalRefreshAfter = window.piwikHelper.refreshAfter;
+
+  let notificationCallCount = 0;
+  let consoleLogSpy: jest.SpyInstance;
+
+  function makeBulkRequests(count: number): QueryParameters[] {
+    return Array.from({ length: count }, (_, index) => ({
+      method: 'API.getMatomoVersion',
+      format: 'json',
+      index,
+    }));
+  }
+
+  function installAjaxMock(mode: AjaxMode, chunkSizes: number[]): void {
+    (window.$ as JQueryStatic & { ajax: typeof window.$.ajax }).ajax = ((ajaxOptions: any) => {
+      const urls = Array.isArray(ajaxOptions?.data?.urls) ? ajaxOptions.data.urls : [];
+      const chunkOffset = chunkSizes.reduce((sum, chunkSize) => sum + chunkSize, 0);
+      chunkSizes.push(urls.length);
+      const chunkNumber = chunkSizes.length - 1;
+
+      const data = urls.map((url: string, index: number) => {
+        if (mode === 'apiErrorEachChunk' && index === 0) {
+          return {
+            result: 'error',
+            message: `chunk-${chunkOffset + index}`,
+          };
+        }
+
+        return {
+          url,
+          index: chunkOffset + index,
+        };
+      });
+
+      const xhr = {
+        readyState: 4,
+        status: 200,
+        statusText: 'success',
+        responseJSON: data,
+        abort: jest.fn(),
+        getResponseHeader(headerName: string) {
+          if (mode === 'sessionTimeout' && headerName === 'X-Matomo-Session-Timed-Out') {
+            return '1';
+          }
+          if (headerName === 'X-Test-Header') {
+            return `chunk-${chunkNumber}`;
+          }
+          return null;
+        },
+        then(callback: (response: unknown, status: string, request: JQueryXhr) => void) {
+          if (mode !== 'abort' && mode !== 'sessionTimeout') {
+            callback(data, 'success', this as unknown as JQueryXhr);
+          }
+          return this;
+        },
+        fail(callback: (request: JQueryXhr, status: string, errorThrown: unknown) => void) {
+          if (mode === 'abort') {
+            this.status = 0;
+            this.statusText = 'abort';
+            callback(this as unknown as JQueryXhr, 'abort', new Error('aborted'));
+          }
+          if (mode === 'sessionTimeout') {
+            this.status = 401;
+            this.statusText = 'error';
+            callback(this as unknown as JQueryXhr, 'error', new Error('session timed out'));
+          }
+          return this;
+        },
+      };
+
+      return xhr as unknown as JQueryXhr;
+    }) as typeof window.$.ajax;
+  }
+
+  function installUrlCapturingAjaxMock(onRequest: (url: string) => void): void {
+    (window.$ as JQueryStatic & { ajax: typeof window.$.ajax }).ajax = ((ajaxOptions: any) => {
+      onRequest(ajaxOptions.url);
+
+      const xhr = {
+        readyState: 4,
+        status: 200,
+        statusText: 'success',
+        responseJSON: [],
+        abort: jest.fn(),
+        getResponseHeader() {
+          return null;
+        },
+        then(callback: (response: unknown) => void) {
+          callback([]);
+          return this;
+        },
+        fail() {
+          return this;
+        },
+      };
+
+      return xhr as unknown as JQueryXhr;
+    }) as typeof window.$.ajax;
+  }
+
+  beforeEach(() => {
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    notificationCallCount = 0;
+    document.body.innerHTML = '<div id="ajaxError"></div>';
+
+    (window as Window & { require: (name: string) => any }).require = jest.fn().mockImplementation((moduleName: string) => {
+      if (moduleName !== 'piwik/UI') {
+        throw new Error(`unexpected module ${moduleName}`);
+      }
+
+      return {
+        Notification: class Notification {
+          show() {
+            notificationCallCount += 1;
+          }
+
+          scrollToNotification() {
+          }
+        },
+      };
+    });
+
+    window.piwikHelper.redirect = jest.fn();
+    window.piwikHelper.refreshAfter = jest.fn();
+    window.piwik.idSite = 1;
+    window.piwik.period = 'day';
+    window.piwik.currentDateString = 'yesterday';
+    window.piwik.token_auth = 'testtoken';
+    window.piwik.shouldPropagateTokenAuth = false;
+    window.piwik.apiBulkRequestLimit = 2;
+    window.piwik.ajaxRequestFinished = undefined;
+  });
+
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+    (window.$ as JQueryStatic & { ajax: typeof window.$.ajax }).ajax = originalAjax;
+    (window as Window & { require: (name: string) => any }).require = originalRequire;
+    window.piwikHelper.redirect = originalRedirect;
+    window.piwikHelper.refreshAfter = originalRefreshAfter;
+  });
+
+  it('should chunk bulk requests when request count is higher than configured limit', async () => {
+    const chunkSizes: number[] = [];
+    installAjaxMock('success', chunkSizes);
+
+    const result = await AjaxHelper.fetch<Array<{ index: number }>>(makeBulkRequests(5));
+
+    expect(chunkSizes).toEqual([2, 2, 1]);
+    expect(result.length).toBe(5);
+    expect(result[0].index).toBe(0);
+    expect(result[result.length - 1].index).toBe(4);
+  });
+
+  it('should not chunk bulk requests when bulk limit is disabled', async () => {
+    window.piwik.apiBulkRequestLimit = -1;
+    const chunkSizes: number[] = [];
+    installAjaxMock('success', chunkSizes);
+
+    const result = await AjaxHelper.fetch<Array<{ index: number }>>(makeBulkRequests(5));
+
+    expect(chunkSizes).toEqual([5]);
+    expect(result.length).toBe(5);
+    expect(result[0].index).toBe(0);
+    expect(result[result.length - 1].index).toBe(4);
+  });
+
+  it('should chunk bulk requests when using the helper instance API', async () => {
+    const chunkSizes: number[] = [];
+    installAjaxMock('success', chunkSizes);
+
+    const helper = new AjaxHelper<Array<{ index: number }>>();
+    helper.setBulkRequests(...makeBulkRequests(5));
+    const result = await helper.send();
+
+    expect(chunkSizes).toEqual([2, 2, 1]);
+    expect((result as Array<{ index: number }>).length).toBe(5);
+    expect((result as Array<{ index: number }>)[0].index).toBe(0);
+    expect((result as Array<{ index: number }>)[4].index).toBe(4);
+  });
+
+  it('should call complete callback once for chunked helper instance requests', async () => {
+    const chunkSizes: number[] = [];
+    installAjaxMock('success', chunkSizes);
+    let completeCallbackCallCount = 0;
+    let completeCallbackStatus = '';
+    let completeCallbackHeaderValue: string|null = null;
+
+    const helper = new AjaxHelper<Array<{ index: number }>>();
+    helper.setBulkRequests(...makeBulkRequests(5));
+    helper.setCompleteCallback((xhr: JQueryXhr, status: string) => {
+      completeCallbackCallCount += 1;
+      completeCallbackStatus = status;
+      completeCallbackHeaderValue = xhr.getResponseHeader('X-Test-Header');
+    });
+
+    await helper.send();
+
+    expect(chunkSizes).toEqual([2, 2, 1]);
+    expect(completeCallbackCallCount).toBe(1);
+    expect(completeCallbackStatus).toBe('success');
+    expect(completeCallbackHeaderValue).toBe('chunk-2');
+  });
+
+  it('should preserve useCallbackInCaseOfError for chunked helper instance requests', async () => {
+    const chunkSizes: number[] = [];
+    installAjaxMock('apiErrorEachChunk', chunkSizes);
+    let callbackCallCount = 0;
+    let callbackResultLength = 0;
+
+    const helper = new AjaxHelper<Array<{ result?: string; message?: string }>>();
+    helper.setBulkRequests(...makeBulkRequests(5));
+    helper.useCallbackInCaseOfError();
+    helper.setCallback((result: Array<{ result?: string; message?: string }>) => {
+      callbackCallCount += 1;
+      callbackResultLength = Array.isArray(result) ? result.length : 0;
+    });
+
+    const result = await helper.send();
+
+    expect(chunkSizes).toEqual([2, 2, 1]);
+    expect((result as Array<{ result?: string; message?: string }>).length).toBe(5);
+    expect(callbackCallCount).toBe(1);
+    expect(callbackResultLength).toBe(5);
+  });
+
+  it('should process all chunks and show one notification before rejecting for API errors', async () => {
+    const chunkSizes: number[] = [];
+    installAjaxMock('apiErrorEachChunk', chunkSizes);
+
+    let error: Error|null = null;
+    try {
+      await AjaxHelper.fetch(makeBulkRequests(5));
+    } catch (caught) {
+      error = caught as Error;
+    }
+
+    expect(chunkSizes).toEqual([2, 2, 1]);
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain('chunk-0');
+    expect(error!.message).toContain('chunk-2');
+    expect(error!.message).toContain('chunk-4');
+    expect(notificationCallCount).toBe(1);
+  });
+
+  it('should call redirectOnSuccess only once for chunked fetch requests', async () => {
+    const chunkSizes: number[] = [];
+    installAjaxMock('success', chunkSizes);
+
+    await AjaxHelper.fetch(makeBulkRequests(5), {
+      redirectOnSuccess: { update: 1 },
+    });
+
+    expect(chunkSizes).toEqual([2, 2, 1]);
+    expect(window.piwikHelper.redirect).toHaveBeenCalledTimes(1);
+    expect(window.piwikHelper.redirect).toHaveBeenCalledWith({ update: 1 });
+  });
+
+  it('should reject returnResponseObject for chunked bulk requests', async () => {
+    expect(() => {
+      AjaxHelper.fetch(makeBulkRequests(5), { returnResponseObject: true });
+    }).toThrow(unsupportedBulkResponseObjectError);
+  });
+
+  it('should reject returnResponseObject for chunked helper instance requests', async () => {
+    const helper = new AjaxHelper();
+    helper.resolveWithHelper = true;
+    helper.setBulkRequests(...makeBulkRequests(5));
+
+    expect(() => {
+      helper.send();
+    }).toThrow(unsupportedBulkResponseObjectError);
+  });
+
+  it('should reject returnResponseObject for non-chunked helper instance requests', async () => {
+    window.piwik.apiBulkRequestLimit = 10;
+    const helper = new AjaxHelper();
+    helper.resolveWithHelper = true;
+    helper.setBulkRequests(...makeBulkRequests(5));
+
+    expect(() => {
+      helper.send();
+    }).toThrow(unsupportedBulkResponseObjectError);
+  });
+
+  it('should reject chunked fetch requests when aborted', async () => {
+    const chunkSizes: number[] = [];
+    installAjaxMock('abort', chunkSizes);
+
+    await expect(AjaxHelper.fetch(makeBulkRequests(5))).rejects.toThrow('Chunked bulk request was aborted.');
+    expect(chunkSizes).toEqual([2]);
+  });
+
+  it('should refresh and reject chunked fetch requests when the session times out', async () => {
+    const chunkSizes: number[] = [];
+    installAjaxMock('sessionTimeout', chunkSizes);
+
+    await expect(AjaxHelper.fetch(makeBulkRequests(5))).rejects.toThrow('Chunked bulk request timed out due to session expiration.');
+    expect(chunkSizes).toEqual([2]);
+    expect(window.piwikHelper.refreshAfter).toHaveBeenCalledTimes(1);
+    expect(window.piwikHelper.refreshAfter).toHaveBeenCalledWith(0);
+  });
+
+  it('omits a request parameter with an unsupported name', async () => {
+    let requestedUrl = '';
+
+    installUrlCapturingAjaxMock((url) => {
+      requestedUrl = url;
+    });
+
+    await AjaxHelper.fetch({
+      method: 'API.getMatomoVersion',
+      keep: '1',
+      [`drop${String.fromCharCode(0)}x`]: '2',
+    });
+
+    expect(requestedUrl).toContain('keep=1');
+    expect(requestedUrl).not.toContain('drop');
+  });
+
+  it('should not replace an explicitly empty segment with the URL segment', async () => {
+    let requestedUrl = '';
+
+    installUrlCapturingAjaxMock((url) => {
+      requestedUrl = url;
+    });
+
+    history.replaceState({}, '', '?module=CoreHome&action=index&idSite=1&period=day&segment=urlSegmentValue');
+
+    await AjaxHelper.fetch({
+      method: 'API.getSuggestedValuesForSegment',
+      segment: '',
+    });
+
+    expect(requestedUrl).not.toContain('segment=urlSegmentValue');
+    expect(requestedUrl).toContain('segment=');
+  });
+
+  it('should omit the segment parameter when explicitly set to null', async () => {
+    let requestedUrl = '';
+
+    installUrlCapturingAjaxMock((url) => {
+      requestedUrl = url;
+    });
+
+    history.replaceState({}, '', '?module=CoreHome&action=index&idSite=1&period=day&segment=urlSegmentValue');
+
+    await AjaxHelper.fetch({
+      method: 'API.getSuggestedValuesForSegment',
+      segment: null,
+    });
+
+    expect(requestedUrl).not.toContain('segment=urlSegmentValue');
+    expect(requestedUrl).not.toContain('segment=');
+  });
+
+  it('should treat an undefined segment like a missing segment parameter', async () => {
+    let requestedUrl = '';
+
+    installUrlCapturingAjaxMock((url) => {
+      requestedUrl = url;
+    });
+
+    history.replaceState({}, '', '?module=CoreHome&action=index&idSite=1&period=day&segment=urlSegmentValue');
+
+    await AjaxHelper.fetch({
+      method: 'API.getSuggestedValuesForSegment',
+      segment: undefined,
+    });
+
+    expect(requestedUrl).toContain('segment=urlSegmentValue');
+  });
+
+  it('escapes query-string characters in an unencoded segment value', async () => {
+    let requestedUrl = '';
+
+    installUrlCapturingAjaxMock((url) => {
+      requestedUrl = url;
+    });
+
+    const helper = new AjaxHelper();
+    helper.addParams({
+      module: 'API',
+      method: 'SomeReport.get',
+      // a not pre-encoded segment value containing characters with query-string meaning
+      segment: 'x&method=Other.method&foo=bar?baz#',
+    }, 'get');
+
+    await helper.send();
+
+    // the whole value stays inside the segment parameter (query-string characters escaped)
+    expect(requestedUrl).toContain('segment=x%26method=Other.method%26foo=bar%3Fbaz%23');
+    // so it does not turn into separate query parameters
+    expect(requestedUrl).not.toContain('&method=Other.method');
+    expect(requestedUrl).not.toContain('#');
+    // and the other request parameters are still present
+    expect(requestedUrl).toContain('&method=SomeReport.get');
+  });
+
+  it('keeps segment operators and inner separators intact while escaping query-string characters', async () => {
+    let requestedUrl = '';
+
+    installUrlCapturingAjaxMock((url) => {
+      requestedUrl = url;
+    });
+
+    const helper = new AjaxHelper();
+    helper.addParams({
+      module: 'API',
+      method: 'SomeReport.get',
+      // a realistic, not pre-encoded segment matching on a URL that itself carries a query string
+      segment: 'pageUrl==http://example.com/?a=1&b=2',
+    }, 'get');
+
+    await helper.send();
+
+    // '==' and the inner '=' must survive untouched, only '?' and '&' are escaped
+    expect(requestedUrl).toContain('segment=pageUrl==http://example.com/%3Fa=1%26b=2');
+    // the URL query string of the matched page must not leak out as a separate parameter
+    expect(requestedUrl).not.toContain('&b=2');
+  });
+
+  it('does not double-encode an already encoded segment value', async () => {
+    let requestedUrl = '';
+
+    installUrlCapturingAjaxMock((url) => {
+      requestedUrl = url;
+    });
+
+    const helper = new AjaxHelper();
+    helper.addParams({
+      module: 'API',
+      method: 'SomeReport.get',
+      segment: 'pageUrl%3D%3Dhttps%253A%252F%252Fexample.com',
+    }, 'get');
+
+    await helper.send();
+
+    expect(requestedUrl).toContain('segment=pageUrl%3D%3Dhttps%253A%252F%252Fexample.com');
+  });
+
+  describe('date/period validation', () => {
+    const validCases: Array<[string, QueryParameters]> = [
+      ['day + ISO date', { period: 'day', date: '2024-01-15' }],
+      ['day + today', { period: 'day', date: 'today' }],
+      ['day + yesterday', { period: 'day', date: 'yesterday' }],
+      ['week + ISO date', { period: 'week', date: '2024-01-15' }],
+      ['month + ISO date', { period: 'month', date: '2024-01-15' }],
+      ['year + ISO date', { period: 'year', date: '2024-01-15' }],
+      ['range + explicit range', { period: 'range', date: '2024-01-01,2024-01-31' }],
+      ['range + last7', { period: 'range', date: 'last7' }],
+      ['range + previous30', { period: 'range', date: 'previous30' }],
+      // multiple-period requests with a non-range period are valid on the backend
+      ['day + lastN', { period: 'day', date: 'last30' }],
+      ['day + comma range', { period: 'day', date: '2024-01-01,2024-01-31' }],
+      ['month + comma range', { period: 'month', date: '2024-01-01,2024-03-31' }],
+      ['week + previousN', { period: 'week', date: 'previous4' }],
+      // keyword preset dates emitted by PresetDateRangeResolver must not be mistaken for ranges
+      ['week + lastweek', { period: 'week', date: 'lastweek' }],
+      ['month + lastmonth', { period: 'month', date: 'lastmonth' }],
+      ['year + lastyear', { period: 'year', date: 'lastyear' }],
+      // unrecognized periods are left to the backend to validate
+      ['unrecognized period', { period: 'bogusperiod', date: '2024-01-01' }],
+      // the character-set guard still allows dates with no period present
+      ['no period + ISO date', { date: '2024-01-15' }],
+      ['no period + range', { date: '2024-01-01,2024-01-31' }],
+    ];
+
+    const invalidCases: Array<[string, QueryParameters]> = [
+      ['day + string', { period: 'day', date: 'not-a-date' }],
+      ['day + comma range with invalid part', { period: 'day', date: '2024-01-01,gibberish' }],
+      // the character-set guard catches odd characters even without a recognized period
+      ['no period + slash date', { date: '2024/01/15' }],
+      ['unrecognized period + illegal chars', { period: 'bogusperiod', date: '<script>' }],
+    ];
+
+    it.each(validCases)('does not throw for a valid date/period (%s)', async (_label, params) => {
+      installUrlCapturingAjaxMock(() => { /* url not asserted in validation tests */ });
+
+      await expect(AjaxHelper.fetch({ method: 'X.get', ...params })).resolves.toBeDefined();
+    });
+
+    it.each(invalidCases)('throws for an invalid date/period (%s)', async (_label, params) => {
+      installUrlCapturingAjaxMock(() => { /* url not asserted in validation tests */ });
+
+      await expect(AjaxHelper.fetch({ method: 'X.get', ...params }))
+        .rejects.toThrow(/Invalid date/);
+    });
+
+    it('rejects (rather than throwing synchronously) when a chunked bulk request is invalid', async () => {
+      const chunkSizes: number[] = [];
+      installAjaxMock('success', chunkSizes);
+
+      const helper = new AjaxHelper();
+      helper.setBulkRequests(...makeBulkRequests(5));
+      helper.addParams({ period: 'day', date: 'not-a-date' }, 'get');
+
+      await expect(helper.send()).rejects.toThrow(/Invalid date/);
+      // the request must reject before any chunk is sent, so no queue slot is consumed
+      expect(chunkSizes).toEqual([]);
+    });
+  });
+});

@@ -14,8 +14,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_1_4_rc1 extends Updates
 {
     /**
@@ -32,7 +30,7 @@ class Updates_1_4_rc1 extends Updates
     {
         return array(
             $this->migration->db->sql('UPDATE `' . Common::prefixTable('pdf') . '` SET format = "pdf"', '42S22'),
-            $this->migration->db->addColumn('pdf', 'format', 'VARCHAR(10)')
+            $this->migration->db->addColumn('pdf', 'format', 'VARCHAR(10)'),
         );
     }
 

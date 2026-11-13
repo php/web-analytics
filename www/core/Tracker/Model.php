@@ -20,12 +20,11 @@ class Model
     public const CACHE_KEY_INDEX_IDSITE_IDVISITOR_TIME = 'log_visit_has_index_idsite_idvisitor_time';
 
     /**
-     * Write an visit action record to the database
+     * Write a visit action record to the database
      *
      * @param array $visitAction
      *
      * @return int
-     * @throws Db\DbException
      */
     public function createAction($visitAction)
     {
@@ -120,23 +119,22 @@ class Model
 
 
     /**
-     * Loads the Ecommerce items from the request and records them in the DB
+     * Returns the ecommerce items currently stored in the cart/order for the given visit.
      *
      * @param array $goal
      * @param int   $defaultIdOrder
-     * @throws Exception
      * @return array
      */
     public function getAllItemsCurrentlyInTheCart($goal, $defaultIdOrder)
     {
         $sql = "SELECT idaction_sku, idaction_name, idaction_category, idaction_category2, idaction_category3, idaction_category4, idaction_category5, price, quantity, deleted, idorder AS idorder_original_value
-				FROM " . Common::prefixTable('log_conversion_item') . "
+				FROM `" . Common::prefixTable('log_conversion_item') . "`
 				WHERE idvisit = ? AND (idorder = ? OR idorder = ?)";
 
         $bind = [
             $goal['idvisit'],
             isset($goal['idorder']) ? $goal['idorder'] : $defaultIdOrder,
-            $defaultIdOrder
+            $defaultIdOrder,
         ];
 
         $itemsInDb = $this->getDb()->fetchAll($sql, $bind);
@@ -248,7 +246,7 @@ class Model
     {
         // it is possible for multiple actions to exist in the DB (due to rare concurrency issues), so the ORDER BY and
         // LIMIT are important
-        $sql = "SELECT idaction, type, name FROM " . Common::prefixTable('log_action')
+        $sql = "SELECT idaction, type, name FROM `" . Common::prefixTable('log_action') . "`"
             . "  WHERE " . $this->getSqlConditionToMatchSingleAction() . " "
             . "ORDER BY idaction ASC LIMIT 1";
 
@@ -282,7 +280,7 @@ class Model
      */
     public function getIdsAction($actionsNameAndType)
     {
-        $sql = "SELECT `idaction`, `type`, `name` FROM " . Common::prefixTable('log_action') . " WHERE";
+        $sql = "SELECT `idaction`, `type`, `name` FROM `" . Common::prefixTable('log_action') . "` WHERE";
         $bind = [];
 
         $i = 0;
@@ -464,6 +462,30 @@ class Model
         return $wasInserted;
     }
 
+    public function updateIdVisitorInLogTable(string $logTable, string $idVisitor, array $conditions): bool
+    {
+        if (empty($idVisitor) || empty($conditions)) {
+            return false;
+        }
+
+        $table = Common::prefixTable($logTable);
+
+        $sqlQuery = "UPDATE `$table` SET `idvisitor` = ? WHERE ";
+        $sqlConditions = [];
+        $sqlBind = [$idVisitor];
+
+        foreach ($conditions as $name => $value) {
+            $sqlConditions[] = $name . " = ?";
+            $sqlBind[] = $value;
+        }
+
+        $sqlQuery .= implode(' AND ', $sqlConditions);
+
+        $db = $this->getDb();
+        $result = $db->query($sqlQuery, $sqlBind);
+        return $db->rowCount($result) != 0;
+    }
+
     /**
      * Attempt to find an existing visit record in the database
      *
@@ -493,7 +515,7 @@ class Model
         $selectFields = implode(', ', $fieldsToRead);
 
         $select = "SELECT $selectFields ";
-        $from   = "FROM " . Common::prefixTable('log_visit');
+        $from = "FROM `" . Common::prefixTable('log_visit') . "`";
 
         // Two use cases:
         // 1) there is no visitor ID so we try to match only on config_id (heuristics)
@@ -507,7 +529,7 @@ class Model
         $configIdbindSql = [
             $timeLookBack,
             $timeLookAhead,
-            $idSite
+            $idSite,
         ];
 
         $visitorIdWhere = 'idsite = ? AND visit_last_action_time <= ?';
@@ -548,7 +570,7 @@ class Model
     public function hasVisit($idSite, $idVisit)
     {
         // will use INDEX index_idsite_idvisitor_time (idsite, idvisitor, visit_last_action_time)
-        $sql = 'SELECT idsite FROM ' . Common::prefixTable('log_visit') . ' WHERE idvisit = ? LIMIT 1';
+        $sql = 'SELECT idsite FROM `' . Common::prefixTable('log_visit') . '` WHERE idvisit = ? LIMIT 1';
         $bindSql = [$idVisit];
 
         $val = $this->getDb()->fetchOne($sql, $bindSql);
@@ -634,7 +656,7 @@ class Model
      */
     public function isSiteEmpty($siteId)
     {
-        $sql = sprintf('SELECT idsite FROM %s WHERE idsite = ? limit 1', Common::prefixTable('log_visit'));
+        $sql = sprintf('SELECT idsite FROM `%s` WHERE idsite = ? limit 1', Common::prefixTable('log_visit'));
 
         $result = \Piwik\Db::fetchOne($sql, [$siteId]);
 
@@ -677,7 +699,7 @@ class Model
      */
     private function deleteDuplicateAction($newActionId)
     {
-        $sql = "DELETE FROM " . Common::prefixTable('log_action') . " WHERE idaction = ?";
+        $sql = "DELETE FROM `" . Common::prefixTable('log_action') . "` WHERE idaction = ?";
 
         $db = $this->getDb();
         $db->query($sql, [$newActionId]);

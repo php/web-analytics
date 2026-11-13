@@ -9,6 +9,7 @@
 
 namespace Piwik\Plugins\Actions\Columns;
 
+use Piwik\Piwik;
 use Piwik\Plugin\Dimension\VisitDimension;
 use Piwik\Tracker\Action;
 use Piwik\Tracker\Request;
@@ -20,12 +21,14 @@ class VisitTotalSearches extends VisitDimension
     protected $columnType = 'SMALLINT(5) UNSIGNED NULL';
     protected $segmentName = 'searches';
     protected $nameSingular = 'General_NbSearches';
-    protected $acceptValues = 'To select all visits who used internal Site Search, use: &segment=searches>0';
     protected $type = self::TYPE_NUMBER;
 
+    public function getAcceptValues()
+    {
+        return Piwik::translate('Actions_SearchesSegmentHelp', '&segment=searches>0');
+    }
+
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
      * @return int
      */
@@ -39,10 +42,8 @@ class VisitTotalSearches extends VisitDimension
     }
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
-     * @return int
+     * @return string|false
      */
     public function onExistingVisit(Request $request, Visitor $visitor, $action)
     {

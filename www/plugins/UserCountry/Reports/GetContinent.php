@@ -24,11 +24,7 @@ class GetContinent extends Base
         $this->dimension      = new Continent();
         $this->name           = Piwik::translate('UserCountry_Continent');
         $this->documentation  = Piwik::translate('UserCountry_getContinentDocumentation');
-        $this->metrics        = array('nb_visits', 'nb_uniq_visitors', 'nb_actions');
-        $this->hasGoalMetrics = true;
         $this->order = 6;
-
-        $this->subcategoryId = 'UserCountry_SubmenuLocations';
     }
 
     public function configureWidgets(WidgetsList $widgetsList, ReportWidgetFactory $factory)
@@ -43,6 +39,8 @@ class GetContinent extends Base
 
     public function configureView(ViewDataTable $view)
     {
+        $view->config->show_flatten_table = false;
+        $view->config->show_flatten_table_export = false;
         $view->config->show_exclude_low_population = false;
         $view->config->show_search = false;
         $view->config->show_offset_information = false;

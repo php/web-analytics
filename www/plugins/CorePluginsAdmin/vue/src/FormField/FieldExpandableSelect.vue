@@ -29,8 +29,7 @@
         <li
           v-for="(options, index) in availableOptions"
           class="collection-item"
-          v-show="options.values.filter(x =>
-           x.value.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1).length"
+          v-show="visibleChildren(options).length"
           :key="index"
         >
           <h4
@@ -50,8 +49,7 @@
           <ul v-show="showCategory === options.group || searchTerm" class="collection secondLevel">
             <li
               class="expandableListItem collection-item valign-wrapper"
-              v-for="children in options.values.filter(x =>
-              x.value.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)"
+              v-for="children in visibleChildren(options)"
               :key="children.key"
               @click="onValueClicked(children)"
             >
@@ -71,7 +69,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
-import { FocusAnywhereButHere, FocusIf } from 'CoreHome';
+import { Matomo, FocusAnywhereButHere, FocusIf } from 'CoreHome';
 import AbortableModifiers from './AbortableModifiers';
 
 interface SelectValueInfo {
@@ -138,6 +136,10 @@ export default defineComponent({
     modelModifiers: Object,
     availableOptions: Array,
     title: String,
+    searchOnGroup: {
+      type: Boolean,
+      default: false,
+    },
   },
   directives: {
     FocusAnywhereButHere,
@@ -153,6 +155,12 @@ export default defineComponent({
     };
   },
   computed: {
+    searchTermLowercase() {
+      return this.searchTerm.toLowerCase();
+    },
+    searchTermNormalized() {
+      return this.normalize(this.searchTerm);
+    },
     modelValueText() {
       if (this.title) {
         return this.title;
@@ -174,6 +182,20 @@ export default defineComponent({
     },
   },
   methods: {
+    normalize(value: string) {
+      return Matomo.helper.normalize(value);
+    },
+    isSearchMatch(value: unknown) {
+      const stringValue = `${value ?? ''}`;
+      return this.normalize(stringValue).indexOf(this.searchTermNormalized) !== -1
+        || stringValue.toLowerCase().indexOf(this.searchTermLowercase) !== -1;
+    },
+    visibleChildren(options: OptionGroup) {
+      if (this.searchOnGroup && this.isSearchMatch(options.group)) {
+        return options.values;
+      }
+      return options.values.filter((x) => this.isSearchMatch(x.value));
+    },
     onBlur() {
       this.showSelect = false;
     },

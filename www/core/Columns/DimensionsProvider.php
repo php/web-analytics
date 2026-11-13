@@ -15,8 +15,8 @@ use Piwik\Cache as PiwikCache;
 class DimensionsProvider
 {
     /**
-     * @param $dimensionId
-     * @return Dimension
+     * @param string $dimensionId
+     * @return ?Dimension
      */
     public function factory($dimensionId)
     {

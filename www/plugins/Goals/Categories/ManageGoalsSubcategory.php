@@ -17,11 +17,11 @@ class ManageGoalsSubcategory extends Subcategory
 {
     protected $categoryId = 'Goals_Goals';
     protected $id = 'Goals_ManageGoals';
-    protected $order = 9999;
+    protected $order = 800;
 
     public function getHelp()
     {
         return '<p>' . Piwik::translate('Goals_ManageGoalsSubcategoryHelp1') . '</p>'
-            . '<p><a href="' . Url::addCampaignParametersToMatomoLink('https://matomo.org/docs/tracking-goals-web-analytics/') . '" rel="noreferrer noopener" target="_blank">' . Piwik::translate('Goals_ManageGoalsSubcategoryHelp2') . '</a></p>';
+            . '<p>' . Url::getExternalLinkTag('https://matomo.org/docs/tracking-goals-web-analytics/') . Piwik::translate('Goals_ManageGoalsSubcategoryHelp2') . '</a></p>';
     }
 }

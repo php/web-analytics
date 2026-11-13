@@ -66,7 +66,7 @@ use Piwik\Site;
 class DataComparisonFilter
 {
     /**
-     * @var array
+     * @var \Piwik\Request
      */
     private $request;
 
@@ -144,8 +144,9 @@ class DataComparisonFilter
         $this->segmentName = $this->getSegmentNameFromReport($report);
 
         $this->compareSegments = self::getCompareSegments();
-        if (count($this->compareSegments) > $this->segmentCompareLimit + 1) {
-            throw new BadRequestException(Piwik::translate('General_MaximumNumberOfSegmentsComparedIs', [$this->segmentCompareLimit]));
+        $segmentCompareLimitPlusMain = $this->segmentCompareLimit + 1;
+        if (count($this->compareSegments) > $segmentCompareLimitPlusMain) {
+            throw new BadRequestException(Piwik::translate('General_MaximumNumberOfSegmentsComparedIs', [$segmentCompareLimitPlusMain]));
         }
 
         $this->compareDates = self::getCompareDates($request);
@@ -155,8 +156,9 @@ class DataComparisonFilter
             throw new BadRequestException(Piwik::translate('General_CompareDatesParamMustMatchComparePeriods', ['compareDates', 'comparePeriods']));
         }
 
-        if (count($this->compareDates) > $this->periodCompareLimit + 1) {
-            throw new BadRequestException(Piwik::translate('General_MaximumNumberOfPeriodsComparedIs', [$this->periodCompareLimit]));
+        $periodCompareLimitPlusMain = $this->periodCompareLimit + 1;
+        if (count($this->compareDates) > $periodCompareLimitPlusMain) {
+            throw new BadRequestException(Piwik::translate('General_MaximumNumberOfPeriodsComparedIs', [$periodCompareLimitPlusMain]));
         }
 
         if (
@@ -191,9 +193,6 @@ class DataComparisonFilter
             || !empty(Common::getRequestVar('compareDates', [], $type = 'array', $request));
     }
 
-    /**
-     * @param DataTable\DataTableInterface $table
-     */
     public function compare(DataTable\DataTableInterface $table)
     {
         if (
@@ -602,7 +601,6 @@ class DataComparisonFilter
      *
      * @see \Piwik\Plugins\CoreVisualizations\Visualizations\Sparklines::render()
      *
-     * @return bool
      * @throws \Exception
      */
     private function shouldIncludeTrendValues(): bool

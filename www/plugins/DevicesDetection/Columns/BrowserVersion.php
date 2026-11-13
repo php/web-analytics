@@ -9,6 +9,7 @@
 
 namespace Piwik\Plugins\DevicesDetection\Columns;
 
+use Piwik\Plugins\DevicesDetection\DevicesDetection;
 use Piwik\Tracker\Request;
 use Piwik\Tracker\Visitor;
 use Piwik\Tracker\Action;
@@ -24,8 +25,6 @@ class BrowserVersion extends Base
     protected $type = self::TYPE_TEXT;
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
      * @return mixed
      */
@@ -36,7 +35,11 @@ class BrowserVersion extends Base
         $aBrowserInfo = $parser->getClient();
 
         if (!empty($aBrowserInfo['version'])) {
-            return substr($aBrowserInfo['version'], 0, 20);
+            $version = substr($aBrowserInfo['version'], 0, 20);
+            if (DevicesDetection::shouldOnlyStoreMajorVersions($request->getIdSiteIfExists())) {
+                return explode('.', $version, 2)[0];
+            }
+            return $version;
         }
 
         return '';

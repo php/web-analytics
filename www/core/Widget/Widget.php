@@ -22,8 +22,8 @@ use Piwik\View;
 class Widget
 {
     /**
-     * @param WidgetConfig $config
      * @api
+     * @return void
      */
     public static function configure(WidgetConfig $config)
     {

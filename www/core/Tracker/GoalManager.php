@@ -23,8 +23,6 @@ use Piwik\Plugins\CustomVariables\CustomVariables;
 use Piwik\Plugins\Events\Actions\ActionEvent;
 use Piwik\Tracker\Visit\VisitProperties;
 
-/**
- */
 class GoalManager
 {
     // log_visit.visit_goal_buyer
@@ -39,6 +37,18 @@ class GoalManager
     public const IDGOAL_ORDER = 0;
 
     public const REVENUE_PRECISION = 2;
+
+    /**
+     * Upper sanity limit for a single tracked ecommerce money value (item price, order
+     * revenue, tax, shipping, discount, subtotal). Values whose absolute value exceeds
+     * this are rejected at tracking time.
+     *
+     * No legitimate single transaction is this large, and such values corrupt revenue
+     * reports. Rejecting them also removes the archiving overflow vector: quantity is
+     * bounded by its INT UNSIGNED column (<= ~4.29e9), so quantity * price can no longer
+     * exceed the MySQL DOUBLE range and abort archiving with error 1690.
+     */
+    public const MAX_ALLOWED_REVENUE = 1000000000000;
 
     public const MAXIMUM_PRODUCT_CATEGORIES = 5;
 
@@ -125,8 +135,6 @@ class GoalManager
      *
      * @param int $idSite
      * @param Action $action
-     * @param VisitProperties $visitor
-     * @param Request $request
      * @throws Exception
      * @return array[] Goals matched
      */
@@ -153,10 +161,7 @@ class GoalManager
      * is returned. Otherwise null is returned.
      *
      * @param array $goal
-     * @param Action $action
-     * @param VisitProperties $visitor
-     * @param Request $request
-     * @return bool|null if a goal is matched, a string of the Action URL is returned, or if no goal was matched it returns null
+     * @return string|null The Action URL that triggered the goal, or null if no goal was matched
      */
     public function detectGoalMatch($goal, Action $action, VisitProperties $visitor, Request $request)
     {
@@ -269,11 +274,6 @@ class GoalManager
 
     /**
      * Records one or several goals matched in this request.
-     *
-     * @param Visitor $visitor
-     * @param array $visitorInformation
-     * @param array $visitCustomVariables
-     * @param Action $action
      */
     public function recordGoals(VisitProperties $visitProperties, Request $request)
     {
@@ -325,6 +325,15 @@ class GoalManager
      */
     protected function getRevenue($revenue)
     {
+        // Reject out-of-range values (see self::MAX_ALLOWED_REVENUE); treat as no revenue.
+        if (abs((float) $revenue) > self::MAX_ALLOWED_REVENUE) {
+            StaticContainer::get(LoggerInterface::class)->debug(
+                "Ecommerce value ({$revenue}) exceeds the allowed maximum of " . self::MAX_ALLOWED_REVENUE . " and was rejected (treated as no revenue)."
+            );
+
+            return 0;
+        }
+
         if (round($revenue) != $revenue) {
             $revenue = round($revenue, self::REVENUE_PRECISION);
         }
@@ -339,9 +348,7 @@ class GoalManager
      * Will deal with 2 types of conversions: Ecommerce Order and Ecommerce Cart update (Add to cart, Update Cart etc).
      *
      * @param array $conversion
-     * @param Visitor $visitor
-     * @param Action $action
-     * @param array $visitInformation
+     * @param Action|null $action
      */
     protected function recordEcommerceGoal(VisitProperties $visitProperties, Request $request, $conversion, $action)
     {
@@ -466,7 +473,7 @@ class GoalManager
                 $itemToUpdate = array_merge(
                     $itemInDb,
                     array('deleted'                => 1,
-                          'idorder_original_value' => $itemInDbOriginal['idorder_original_value']
+                          'idorder_original_value' => $itemInDbOriginal['idorder_original_value'],
                     )
                 );
 
@@ -558,7 +565,7 @@ class GoalManager
                 self::INTERNAL_ITEM_CATEGORY4 => $category4,
                 self::INTERNAL_ITEM_CATEGORY5 => $category5,
                 self::INTERNAL_ITEM_PRICE     => $price,
-                self::INTERNAL_ITEM_QUANTITY  => $quantity
+                self::INTERNAL_ITEM_QUANTITY  => $quantity,
             );
         }
 
@@ -695,7 +702,7 @@ class GoalManager
             'idsite'             => $goal['idsite'],
             'idvisitor'          => $goal['idvisitor'],
             'server_time'        => $goal['server_time'],
-            'idvisit'            => $goal['idvisit']
+            'idvisit'            => $goal['idvisit'],
         );
         return $newRow;
     }
@@ -712,10 +719,8 @@ class GoalManager
     /**
      * Records a standard non-Ecommerce goal in the DB (URL/Title matching),
      * linking the conversion to the action that triggered it
-     * @param $goal
-     * @param Visitor $visitor
-     * @param Action $action
-     * @param $visitorInformation
+     * @param array $goal
+     * @param Action|null $action
      */
     protected function recordStandardGoals(VisitProperties $visitProperties, Request $request, $goal, $action)
     {
@@ -762,13 +767,12 @@ class GoalManager
     }
 
     /**
-     * Helper function used by other record* methods which will INSERT or UPDATE the conversion in the DB
+     * Helper function used by other record* methods which will INSERT the conversion in the DB
      *
      * @param array $conversion
      * @param array $visitInformation
-     * @param Request $request
      * @param Action|null $action
-     * @param int|null $convertedGoal
+     * @param array|null $convertedGoal
      * @return bool
      */
     protected function insertNewConversion($conversion, $visitInformation, Request $request, $action, $convertedGoal = null)
@@ -812,10 +816,15 @@ class GoalManager
         $wasInserted = $this->getModel()->createConversion($conversion);
         if (
             !$wasInserted
-            && !empty($idorder)
         ) {
-            $idSite = $request->getIdSite();
-            throw new InvalidRequestParameterException("Invalid non-unique idsite/idorder combination ($idSite, $idorder), conversion was not inserted.");
+            if (!empty($idorder)) {
+                $idSite = $request->getIdSite();
+                throw new InvalidRequestParameterException("Invalid non-unique idsite/idorder combination ($idSite, $idorder), conversion was not inserted.");
+            } elseif ($conversion['buster'] > 0) {
+                // Note: The buster is set to 0 for goals that can only be triggered once per visit.
+                // It's expected behaviour that creating additional conversion fail, so we don't log failures in that case.
+                StaticContainer::get(LoggerInterface::class)->warning("Failed to insert goal due to duplicate idvisit/idgoal/buster combination ({$conversion['idvisit']}, {$conversion['idgoal']}, {$conversion['buster']})");
+            }
         }
 
         return $wasInserted;
@@ -869,7 +878,7 @@ class GoalManager
      * @param string $hook
      * @param Visitor $visitor
      * @param Action|null $action
-     * @param array|null $valuesToUpdate If null, $this->visitorInfo will be updated
+     * @param array|null $valuesToUpdate
      *
      * @return array|null The updated $valuesToUpdate or null if no $valuesToUpdate given
      */

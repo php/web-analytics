@@ -11,12 +11,18 @@
     class="matomo-widget"
     :class="{'isFirstWidgetInPage': actualWidget.isFirstInPage}"
     :id="actualWidget.uniqueId"
-    v-tooltips="{ content: tooltipContent }"
+    v-tooltips="{ content: widgetTooltipContent }"
   >
     <WidgetLoader
-      v-if="!actualWidget.isContainer && actualWidget.parameters"
+      v-if="!actualWidget.isContainer && actualWidget.parameters && !actualWidget.clientComponent"
       :widget-params="actualWidget.parameters"
       :widget-name="actualWidget.name"
+      :suppress-notifications="suppressNotifications"
+    />
+    <ClientWidgetRenderer
+      v-if="!actualWidget.isContainer && actualWidget.clientComponent"
+      :widget="actualWidget"
+      :widgetized="widgetized"
     />
     <div v-if="actualWidget.isContainer
       && actualWidget.layout !== 'ByDimension'
@@ -39,6 +45,7 @@ import { DeepReadonly, defineComponent } from 'vue';
 import WidgetLoader from '../WidgetLoader/WidgetLoader.vue';
 import WidgetContainer from '../WidgetContainer/WidgetContainer.vue';
 import WidgetByDimensionContainer from '../WidgetByDimensionContainer/WidgetByDimensionContainer.vue';
+import ClientWidgetRenderer from './ClientWidgetRenderer.vue';
 import WidgetsStoreInstance, { getWidgetChildren } from './Widgets.store';
 import {
   Widget as WidgetData,
@@ -47,6 +54,7 @@ import {
 import AjaxHelper from '../AjaxHelper/AjaxHelper';
 import ReportMetadataStoreInstance from '../ReportMetadata/ReportMetadata.store';
 import Tooltips from '../Tooltips/Tooltips';
+import tooltipContent from '../Tooltips/tooltipContent';
 
 function findContainer(
   widgetsByCategory: typeof WidgetsStoreInstance.widgets.value,
@@ -92,11 +100,13 @@ export default defineComponent({
     widgetized: Boolean,
     containerid: String,
     preventRecursion: Boolean,
+    suppressNotifications: Boolean,
   },
   components: {
     WidgetLoader,
     WidgetContainer,
     WidgetByDimensionContainer,
+    ClientWidgetRenderer,
   },
   directives: {
     Tooltips,
@@ -107,19 +117,18 @@ export default defineComponent({
     };
   },
   setup() {
-    function tooltipContent(this: HTMLElement) {
+    function widgetTooltipContent(this: HTMLElement) {
       const $this = window.$(this) as JQuery;
       if ($this.hasClass('matomo-form-field')) {
         // do not show it for form fields
         return '';
       }
 
-      const title = window.$(this).attr('title') || '';
-      return window.vueSanitize(title.replace(/\n/g, '<br />'));
+      return tooltipContent.call(this);
     }
 
     return {
-      tooltipContent,
+      widgetTooltipContent,
     };
   },
   created() {
@@ -151,7 +160,11 @@ export default defineComponent({
           }
         }
 
-        return widget;
+        if (widget.uniqueId) {
+          result.parameters = { ...result.parameters, uniqueId: widget.uniqueId };
+        }
+
+        return result;
       }
 
       if (this.containerid) {

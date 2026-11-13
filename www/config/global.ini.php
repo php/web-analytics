@@ -215,6 +215,10 @@ enabled = 0
 ; Note that for quick debugging, instead of using below setting, you can add `&disable_merged_assets=1` to the Matomo URL
 disable_merged_assets = 0
 
+; if set to 1, the sourcemaps for built vue files will be allowed to be served.
+; this is useful for debugging vue files in the browser
+allow_vue_sourcemaps = 0
+
 [General]
 ; the following settings control whether Unique Visitors `nb_uniq_visitors` and Unique users `nb_users` will be processed for different period types.
 ; year and range periods are disabled by default, to ensure optimal performance for high traffic Matomo instances
@@ -351,6 +355,9 @@ datatable_row_limits = "5,10,25,50,100,250,500,-1"
 ; if set to -1, a click on 'Export as' will export all rows independently of the current '# Rows to display'.
 API_datatable_default_limit = 100
 
+; Maximum number of URLs allowed in API.getBulkRequest for authenticated users (-1 disables the limit)
+API_bulk_request_limit = -1
+
 ; When period=range, below the datatables, when user clicks on "export", the data will be aggregate of the range.
 ; Here you can specify the comma separated list of formats for which the data will be exported aggregated by day
 ; (ie. there will be a new "date" column). For example set to: "rss,tsv,csv"
@@ -427,11 +434,6 @@ enable_sql_optimize_queries = 1
 ; you can prevent this action from happening by setting this parameter to value bigger than 1
 purge_date_range_archives_after_X_days = 1
 
-; MySQL minimum required version
-; note: timezone support added in 4.1.3
-minimum_mysql_version = 4.1
-
-
 ; Minimum advised memory limit in Mb in php.ini file (see memory_limit value)
 ; Set to "-1" to always use the configured memory_limit value in php.ini file.
 minimum_memory_limit = 128
@@ -478,6 +480,8 @@ csp_enabled = 1
 
 ; If set, and csp_enabled is on, Matomo will send a report-uri in the Content-Security-Policy-Report-Only header
 ; instead of a Content-Security-Policy header.
+; Responses that carry data rather than application UI (API output, exports, generated reports) are not
+; covered: their policy is always enforced.
 csp_report_only = 0
 
 ; If set to 1 Matomo will prefer using SERVER_NAME variable over HTTP_HOST.
@@ -561,6 +565,20 @@ enable_framed_allow_write_admin_token_auth = 0
 ; Recommended for best security.
 only_allow_secure_auth_tokens = 0
 
+; Number of days after which a personal auth token is recommended to be rotated and an email notification will be sent to the user.
+; If set to 0 days, notifications won't be sent.
+; Recommended to keep enabled for best security.
+auth_token_rotation_notification_days = 180
+
+; Number of days that will be added to 'today' to preset an expiration date when a new auth token is being created
+; For example, if a user starts creating an auth token on 1 May 2025, the expiry date will be preset to 1 November 2025.
+auth_token_default_expiration_days = 180
+
+; Number of days before the expiration date of a personal auth token, where an email notification is sent to the user.
+; If set to 0 days, notifications won't be sent.
+; Recommended to keep enabled for best security.
+auth_token_expiration_notification_days = 30
+
 ; language cookie name for session
 language_cookie_name = matomo_lang
 
@@ -608,6 +626,9 @@ datatable_archiving_maximum_rows_subtable_custom_dimensions = 1000
 
 ; maximum number of rows for any of the Actions tables (pages, downloads, outlinks)
 datatable_archiving_maximum_rows_actions = 500
+; maximum number of rows used when archiving flat page/title actions before rebuilding hierarchy
+; if set to 0, legacy hierarchical-only Actions archiving is used
+datatable_archiving_maximum_rows_actions_flat = 0
 ; maximum number of rows for pages in categories (sub pages, when clicking on the + for a page category)
 ; note: should not exceed the display limit in Piwik\Actions\Controller::ACTIONS_REPORT_ROWS_DISPLAY
 ; because each subdirectory doesn't have paging at the bottom, so all data should be displayed if possible.
@@ -622,6 +643,16 @@ datatable_archiving_maximum_rows_subtable_events = 500
 
 ; maximum number of rows for the Products reports
 datatable_archiving_maximum_rows_products = 10000
+
+; maximum number of AI Assistants listed in Bot Tracking reports
+datatable_archiving_maximum_rows_bots = 250
+; maximum number of page/document rows listed per AI Assistant in Bot Tracking reports
+datatable_archiving_maximum_rows_subtable_bots = 250
+; maximum number of content URLs (pages/documents) listed in the AI Chatbots Content Requests reports
+datatable_archiving_maximum_rows_ai_chatbot_content = 50000
+; maximum number of page URLs listed in the Human-Favoured / AI-Favoured Pages reports
+; (these span the full human page-URL set, matching the content reports cap)
+datatable_archiving_maximum_rows_ai_chatbot_favoured_pages = 50000
 
 ; maximum number of rows for other tables (Providers, User settings configurations)
 datatable_archiving_maximum_rows_standard = 500
@@ -646,6 +677,11 @@ live_widget_visitor_count_last_minutes = 3
 ; by default visitor profile will show aggregated information for the last up to 100 visits of a visitor
 ; this limit can be adjusted by changing this value
 live_visitor_profile_max_visits_to_aggregate = 100
+
+; maximum number of AI chatbots listed in the real-time AI Chatbots reports
+live_ai_chatbots_maximum_rows = 100
+; maximum number of page URLs listed in the real-time AI Chatbots top page URL reports
+live_ai_chatbots_top_page_urls_maximum_rows = 100
 
 ; If configured, will abort a MySQL query after the configured amount of seconds and show an error in the UI to for
 ; example lower the date range or tweak the segment (if one is applied). Set it to -1 if the query time should not be
@@ -691,6 +727,18 @@ multi_server_environment = 0
 ;
 ; de facto standard (X-Forwarded-Host)
 ;proxy_host_headers[] = HTTP_X_FORWARDED_HOST
+
+; List of proxy headers for scheme (http/https) detection.
+; If unset, Matomo will ignore proxy scheme headers by default.
+;
+; de facto standard (X-Forwarded-Proto)
+;proxy_scheme_headers[] = HTTP_X_FORWARDED_PROTO
+;
+; alternative header (X-Forwarded-Scheme)
+;proxy_scheme_headers[] = HTTP_X_FORWARDED_SCHEME
+;
+; alternative header (X-Url-Scheme)
+;proxy_scheme_headers[] = HTTP_X_URL_SCHEME
 
 ; List of proxy IP addresses (or IP address ranges) to skip (if present in the above headers).
 ; Generally, only required if there's more than one proxy between the visitor and the backend web server.
@@ -839,6 +887,13 @@ enable_update_communication = 1
 ; If you may need to download GeoIP updates or other stuff using other protocols like ftp you may need to extend this list.
 allowed_outgoing_protocols = 'http,https'
 
+; HTTP requests fetching a user-configured URL (e.g. a site's URL for site content detection) refuse to
+; contact private, loopback or otherwise reserved IP addresses, so they cannot be pointed at other servers
+; in this Matomo's network. If this Matomo tracks intranet sites hosted on such addresses, allowlist their
+; ranges here. Accepts single IPs, CIDR notation and wildcards, both IPv4 and IPv6.
+; allowed_private_egress_ranges[] = "10.0.0.0/8"
+; allowed_private_egress_ranges[] = "192.168.1.*"
+
 ; This option forces matomo marketplace and matomo api requests to use HTTP, as default we use HTTPS to improve security
 ; If you have a problem loading the marketplace, please enable this config option
 force_matomo_http_request = 0
@@ -902,6 +957,11 @@ enable_referrer_definition_syncs = 1
 ; the link url could be used by third parties monitoring network requests to identify that the Matomo app is being used,
 ; so it can be disabled here if necessary.
 disable_tracking_matomo_app_links = 0
+
+; Compression level used in ArchiveWriter when creating blob archives
+; Valid values are 0 for no compression up to 9 for maximum compression. If -1 is used, the default compression of the zlib library (level 6) is used.
+; Change with caution as using a higher compression may decrease archiving performance.
+archive_blob_compression_level = -1
 
 [Tracker]
 
@@ -976,8 +1036,12 @@ window_look_back_for_visitor = 0
 default_time_one_page_visit = 0
 
 ; Comma separated list of URL query string variable names that will be removed from your tracked URLs
-; By default, Matomo will remove the most common parameters which are known to change often (eg. session ID parameters)
-url_query_parameter_to_exclude_from_url = "gclid,fbclid,msclkid,twclid,wbraid,gbraid,yclid,fb_xd_fragment,fb_comment_id,phpsessid,jsessionid,sessionid,aspsessionid,doing_wp_cron,sid,pk_vid"
+; By default, Matomo will remove the most common parameters which are known to change often (eg. session ID parameters
+; and advertising/attribution tracking parameters)
+; An entry can either be a parameter name (eg. gclid) or a regular expression including its delimiters, as used below.
+; As this list is split on commas, a regular expression must not contain a
+; comma. Matching is case insensitive, so entries should always be written in lower case.
+url_query_parameter_to_exclude_from_url = "gclid,fbclid,msclkid,twclid,wbraid,gbraid,yclid,fb_xd_fragment,fb_comment_id,phpsessid,jsessionid,sessionid,aspsessionid,doing_wp_cron,sid,pk_vid,li_fat_id,token_auth,token,gad_source,gad_campaignid,/^hsa_(acc|ad|cam|grp|kw|la|mt|net|ol|src|tgt|ver)$/"
 
 ; If set to 1, Matomo will use the default provider if no other provider is configured.
 ; In addition the default provider will be used as a fallback when the configure provider does not return any results.
@@ -1131,6 +1195,10 @@ delete_reports_keep_year_reports     = 1
 delete_reports_keep_range_reports    = 0
 delete_reports_keep_segment_reports  = 0
 
+[ArchivingMetrics]
+; retention_days - delete archiving metrics older than this many days. Set to 0 to disable cleanup.
+retention_days = 180
+
 [mail]
 defaultHostnameIfEmpty = defaultHostnameIfEmpty.example.org ; default Email @hostname, if current host can't be read from system variables
 transport = ; smtp (using the configuration below) or empty (using built-in mail() function)
@@ -1280,6 +1348,9 @@ Plugins[] = PagePerformance
 Plugins[] = CustomDimensions
 Plugins[] = JsTrackerInstallCheck
 Plugins[] = FeatureFlags
+Plugins[] = AIAgents
+Plugins[] = BotTracking
+Plugins[] = AIProviders
 
 [PluginsInstalled]
 PluginsInstalled[] = Diagnostics
@@ -1319,10 +1390,24 @@ time_dom_completion_cap_duration_ms = 0
 ; Cap for On load time: avg/high 10ms (recommended value: 1000)
 time_on_load_cap_duration_ms = 0
 
+[Live]
+; When enabled, the visits log asks the joined log tables for a match with a subquery instead of
+; grouping away the rows they duplicate. Grouping by log_visit.idvisit while ordering by
+; log_visit.visit_last_action_time makes MySQL sort every matching visit before it can apply the
+; LIMIT, so the query costs as much as the whole date range even when a single page of visits is
+; requested. Both forms return the same visits in the same order, a visit matching several actions
+; still counting once, see https://github.com/matomo-org/matomo/issues/13861
+; The subquery form only stops early when an index serves the order by, which is the case when the
+; visits log is asked for a single site. Asking for several sites at once sorts the matching visits
+; either way.
+use_semi_join_query = 0
+
 [APISettings]
 ; Any key/value pair can be added in this section, they will be available via the REST call
 ; index.php?module=API&method=API.getSettings
+; Access to this API is unrestricted, so do not include any sensitive information here.
 ; This can be used to expose values from Matomo, to control for example a Mobile app tracking
+
 SDK_batch_size = 10
 SDK_interval_value = 30
 
@@ -1337,6 +1422,12 @@ CommonPIIParams[] = addressline1
 CommonPIIParams[] = addressline2
 CommonPIIParams[] = adres
 CommonPIIParams[] = adresse
+CommonPIIParams[] = adresse1
+CommonPIIParams[] = adresse2
+CommonPIIParams[] = adresse3
+CommonPIIParams[] = adresse_email
+CommonPIIParams[] = adresseemail
+CommonPIIParams[] = adressepostale
 CommonPIIParams[] = age
 CommonPIIParams[] = alter
 CommonPIIParams[] = auth
@@ -1347,6 +1438,10 @@ CommonPIIParams[] = billingaddress1
 CommonPIIParams[] = billingaddress2
 CommonPIIParams[] = calle
 CommonPIIParams[] = cardnumber
+CommonPIIParams[] = carte
+CommonPIIParams[] = cartebancaire
+CommonPIIParams[] = carteidentite
+CommonPIIParams[] = cb
 CommonPIIParams[] = cc
 CommonPIIParams[] = ccc
 CommonPIIParams[] = cccsc
@@ -1361,36 +1456,51 @@ CommonPIIParams[] = cctype
 CommonPIIParams[] = cell
 CommonPIIParams[] = cellphone
 CommonPIIParams[] = city
+CommonPIIParams[] = civilite
+CommonPIIParams[] = civilité
+CommonPIIParams[] = cle
 CommonPIIParams[] = clientid
 CommonPIIParams[] = clientsecret
+CommonPIIParams[] = clé
+CommonPIIParams[] = codepostal
 CommonPIIParams[] = company
 CommonPIIParams[] = consumerkey
 CommonPIIParams[] = consumersecret
 CommonPIIParams[] = contrasenya
 CommonPIIParams[] = contraseña
+CommonPIIParams[] = courriel
+CommonPIIParams[] = cp
 CommonPIIParams[] = creditcard
 CommonPIIParams[] = creditcardnumber
 CommonPIIParams[] = cvc
 CommonPIIParams[] = cvv
+CommonPIIParams[] = datedenaissance
+CommonPIIParams[] = dateexpiration
+CommonPIIParams[] = datenaissance
 CommonPIIParams[] = dateofbirth
 CommonPIIParams[] = debitcard
+CommonPIIParams[] = departement
 CommonPIIParams[] = dirección
 CommonPIIParams[] = dob
 CommonPIIParams[] = domain
+CommonPIIParams[] = département
 CommonPIIParams[] = ebost
 CommonPIIParams[] = email
 CommonPIIParams[] = emailaddress
 CommonPIIParams[] = emailadresse
+CommonPIIParams[] = entreprise
 CommonPIIParams[] = epos
 CommonPIIParams[] = epost
 CommonPIIParams[] = eposta
 CommonPIIParams[] = exp
+CommonPIIParams[] = expiration
 CommonPIIParams[] = familyname
 CommonPIIParams[] = firma
 CommonPIIParams[] = firstname
 CommonPIIParams[] = formlogin
 CommonPIIParams[] = fullname
 CommonPIIParams[] = gender
+CommonPIIParams[] = genre
 CommonPIIParams[] = geschlecht
 CommonPIIParams[] = gst
 CommonPIIParams[] = gstnumber
@@ -1401,7 +1511,9 @@ CommonPIIParams[] = iban
 CommonPIIParams[] = ibanaccountnum
 CommonPIIParams[] = ibanaccountnumber
 CommonPIIParams[] = id
+CommonPIIParams[] = identifiant
 CommonPIIParams[] = identifier
+CommonPIIParams[] = identitenationale
 CommonPIIParams[] = indirizzo
 CommonPIIParams[] = kartakredytowa
 CommonPIIParams[] = kennwort
@@ -1416,43 +1528,83 @@ CommonPIIParams[] = kreditkort
 CommonPIIParams[] = lastname
 CommonPIIParams[] = login
 CommonPIIParams[] = mail
+CommonPIIParams[] = mdp
 CommonPIIParams[] = mobiili
 CommonPIIParams[] = mobile
 CommonPIIParams[] = mobilne
+CommonPIIParams[] = mot_de_passe
+CommonPIIParams[] = motdepasse
 CommonPIIParams[] = nachname
 CommonPIIParams[] = name
+CommonPIIParams[] = nationalite
 CommonPIIParams[] = nickname
+CommonPIIParams[] = nom
+CommonPIIParams[] = nomcomplet
+CommonPIIParams[] = nomdefamille
+CommonPIIParams[] = nomfamille
+CommonPIIParams[] = nss
+CommonPIIParams[] = numero_fiscal
+CommonPIIParams[] = numerocarte
+CommonPIIParams[] = numerocarteidentite
+CommonPIIParams[] = numerocompte
+CommonPIIParams[] = numerodecarte
+CommonPIIParams[] = numerofiscal
+CommonPIIParams[] = numeroidentite
+CommonPIIParams[] = numeromobile
+CommonPIIParams[] = numeropasseport
+CommonPIIParams[] = numerosecuritesociale
+CommonPIIParams[] = numerotelephone
+CommonPIIParams[] = numerotva
+CommonPIIParams[] = numfiscal
+CommonPIIParams[] = numsecu
+CommonPIIParams[] = numtva
 CommonPIIParams[] = off
 CommonPIIParams[] = osoite
 CommonPIIParams[] = parole
 CommonPIIParams[] = pass
+CommonPIIParams[] = passeport
 CommonPIIParams[] = passord
 CommonPIIParams[] = password
 CommonPIIParams[] = passwort
 CommonPIIParams[] = pasword
 CommonPIIParams[] = paswort
 CommonPIIParams[] = paword
+CommonPIIParams[] = pays
 CommonPIIParams[] = phone
 CommonPIIParams[] = pin
 CommonPIIParams[] = plz
+CommonPIIParams[] = portable
 CommonPIIParams[] = postalcode
 CommonPIIParams[] = postcode
 CommonPIIParams[] = postleitzahl
+CommonPIIParams[] = prenom
 CommonPIIParams[] = privatekey
+CommonPIIParams[] = prénom
 CommonPIIParams[] = publickey
 CommonPIIParams[] = pw
 CommonPIIParams[] = pwd
 CommonPIIParams[] = pword
 CommonPIIParams[] = pwrd
+CommonPIIParams[] = questionsecrete
+CommonPIIParams[] = region
+CommonPIIParams[] = reponsesecrete
+CommonPIIParams[] = rib
 CommonPIIParams[] = rue
 CommonPIIParams[] = secret
+CommonPIIParams[] = secretclé
 CommonPIIParams[] = secretq
 CommonPIIParams[] = secretquestion
+CommonPIIParams[] = securitesociale
+CommonPIIParams[] = sexe
 CommonPIIParams[] = shippingaddress
 CommonPIIParams[] = shippingaddress1
 CommonPIIParams[] = shippingaddress2
+CommonPIIParams[] = signature
+CommonPIIParams[] = siren
+CommonPIIParams[] = siret
 CommonPIIParams[] = socialsec
 CommonPIIParams[] = socialsecuritynumber
+CommonPIIParams[] = societe
 CommonPIIParams[] = socsec
 CommonPIIParams[] = sokak
 CommonPIIParams[] = ssn
@@ -1469,16 +1621,21 @@ CommonPIIParams[] = telefonnr
 CommonPIIParams[] = telefonnummer
 CommonPIIParams[] = telefono
 CommonPIIParams[] = telephone
+CommonPIIParams[] = titre
 CommonPIIParams[] = token
 CommonPIIParams[] = token_auth
 CommonPIIParams[] = tokenauth
+CommonPIIParams[] = tva
 CommonPIIParams[] = téléphone
 CommonPIIParams[] = ulica
 CommonPIIParams[] = user
 CommonPIIParams[] = username
+CommonPIIParams[] = utilisateur
 CommonPIIParams[] = vat
 CommonPIIParams[] = vatnumber
 CommonPIIParams[] = via
+CommonPIIParams[] = ville
+CommonPIIParams[] = voie
 CommonPIIParams[] = vorname
 CommonPIIParams[] = wachtwoord
 CommonPIIParams[] = wagwoord
@@ -1486,5 +1643,13 @@ CommonPIIParams[] = webhooksecret
 CommonPIIParams[] = website
 CommonPIIParams[] = zip
 CommonPIIParams[] = zipcode
+
+[Goals]
+; Maximum number of same-origin pages fetched when analysing a website for goal recommendations
+recommendation_max_crawl_pages = 50
+
+; Maximum number of AI-assisted goal recommendation scans allowed per site and day.
+; Set to 0 for no limit. Useful for managed environments to cap AI provider usage.
+recommendation_ai_daily_scan_limit = 0
 
 ; NOTE: do not directly edit this file! See notice at the top

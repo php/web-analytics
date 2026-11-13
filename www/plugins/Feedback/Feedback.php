@@ -15,9 +15,6 @@ use Piwik\Piwik;
 use Piwik\Common;
 use Piwik\Plugins\Feedback\FeedbackReminder;
 
-/**
- *
- */
 class Feedback extends \Piwik\Plugin
 {
     public const NEVER_REMIND_ME_AGAIN = "-1";
@@ -31,7 +28,7 @@ class Feedback extends \Piwik\Plugin
             'AssetManager.getStylesheetFiles'        => 'getStylesheetFiles',
             'AssetManager.getJavaScriptFiles'        => 'getJsFiles',
             'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
-            'Controller.CoreHome.index.end'          => 'renderViewsAndAddToPage'
+            'Controller.CoreHome.index.end'          => 'renderViewsAndAddToPage',
         );
     }
 

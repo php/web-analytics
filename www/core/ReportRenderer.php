@@ -14,6 +14,7 @@ use Piwik\API\Request;
 use Piwik\Container\StaticContainer;
 use Piwik\DataTable\Row;
 use Piwik\DataTable\Simple;
+use Piwik\Http\SecurityHeaders;
 use Piwik\Plugins\ImageGraph\API;
 
 /**
@@ -113,6 +114,8 @@ abstract class ReportRenderer extends BaseFactory
 
     /**
      * Get rendered report
+     *
+     * @return string
      */
     abstract public function getRenderedReport();
 
@@ -129,7 +132,7 @@ abstract class ReportRenderer extends BaseFactory
 
     /**
      * Render the provided report.
-     * Multiple calls to this method before calling outputRendering appends each report content.
+     * Multiple calls to this method before calling getRenderedReport appends each report content.
      *
      * @param array $processedReport @see API::getProcessedReport()
      */
@@ -170,6 +173,10 @@ abstract class ReportRenderer extends BaseFactory
      */
     protected static function getOutputPath($filename)
     {
+        // Keep the generated file inside the assets directory: strip any directory components so the
+        // filename can never point outside $baseAssetsDir when it is concatenated below.
+        $filename = basename($filename);
+
         $baseAssetsDir = StaticContainer::get('path.tmp') . '/assets/';
         $outputFilename = $baseAssetsDir . $filename;
 
@@ -199,9 +206,27 @@ abstract class ReportRenderer extends BaseFactory
         return $outputFilename;
     }
 
+    /**
+     * Streaming a report writes response headers and body directly, so it is reserved for the
+     * top-level request. A report generated as a nested API sub-request must be returned to the
+     * calling request instead.
+     *
+     * @throws Exception
+     */
+    public static function checkStreamingToBrowserIsAllowed(): void
+    {
+        if (Request::isCurrentApiRequestNestedInAnotherApiRequest()) {
+            throw new Exception('A report can only be sent to the browser by the top-level request.');
+        }
+    }
+
     protected static function sendToBrowser($filename, $extension, $contentType, $content)
     {
+        self::checkStreamingToBrowserIsAllowed();
+
         $filename = ReportRenderer::makeFilenameWithExtension($filename, $extension);
+
+        SecurityHeaders::sendForDataResponse();
 
         ProxyHttp::overrideCacheControlHeaders();
         Common::sendHeader('Content-Description: File Transfer');
@@ -214,8 +239,25 @@ abstract class ReportRenderer extends BaseFactory
 
     protected static function inlineToBrowser($contentType, $content)
     {
+        self::checkStreamingToBrowserIsAllowed();
+
+        SecurityHeaders::sendForDataResponse();
+
         Common::sendHeader('Content-Type: ' . $contentType);
         echo $content;
+    }
+
+    /**
+     * Whether the report aggregates its rows by a dimension.
+     *
+     * A report without a dimension has a single row of metrics rather than one row per
+     * dimension value.
+     *
+     * @param array $reportMetadata
+     */
+    protected static function isAggregateReport($reportMetadata): bool
+    {
+        return !empty($reportMetadata['dimension']);
     }
 
     /**
@@ -230,7 +272,7 @@ abstract class ReportRenderer extends BaseFactory
     protected static function processTableFormat($reportMetadata, $report, $reportColumns)
     {
         $finalReport = $report;
-        if (empty($reportMetadata['dimension'])) {
+        if (!self::isAggregateReport($reportMetadata)) {
             $simpleReportMetrics = $report->getFirstRow();
             if ($simpleReportMetrics) {
                 $finalReport = new Simple();
@@ -262,13 +304,22 @@ abstract class ReportRenderer extends BaseFactory
             $imageGraphUrl = $reportMetadata['imageGraphEvolutionUrl'];
         }
 
-        $requestGraph = $imageGraphUrl .
-            '&outputType=' . API::GRAPH_OUTPUT_PHP .
-            '&format=original&serialize=0' .
-            '&filter_truncate=' .
-            '&width=' . $width .
-            '&height=' . $height .
-            ($segment != null ? '&segment=' . urlencode($segment['definition']) : '');
+        $queryString = Url::getQueryStringFromUrl($imageGraphUrl);
+        if (!is_string($queryString) || $queryString === '') {
+            $queryString = $imageGraphUrl;
+        }
+
+        $requestGraph = UrlHelper::getArrayFromQueryString($queryString);
+        $requestGraph['outputType'] = API::GRAPH_OUTPUT_PHP;
+        $requestGraph['format'] = 'original';
+        $requestGraph['serialize'] = 0;
+        $requestGraph['filter_truncate'] = '';
+        $requestGraph['width'] = $width;
+        $requestGraph['height'] = $height;
+
+        if ($segment != null) {
+            $requestGraph['segment'] = urlencode($segment['definition']);
+        }
 
         $request = new Request($requestGraph);
 

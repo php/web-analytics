@@ -20,6 +20,8 @@ use Piwik\NumberFormatter;
 use Piwik\Piwik;
 use Piwik\Plugin\Manager;
 use Piwik\Plugins\CoreVisualizations\Visualizations\Sparklines;
+use Piwik\Plugins\FeatureFlags\FeatureFlagManager;
+use Piwik\Plugins\Goals\FeatureFlags\GoalRecommendations;
 use Piwik\Plugins\Live\Live;
 use Piwik\Plugins\Referrers\API as APIReferrers;
 use Piwik\Site;
@@ -28,9 +30,6 @@ use Piwik\View;
 use Piwik\ViewDataTable\Factory as ViewDataTableFactory;
 use Piwik\Plugins\CoreVisualizations\Visualizations\JqplotGraph\Evolution;
 
-/**
- *
- */
 class Controller extends \Piwik\Plugin\Controller
 {
     /**
@@ -66,13 +65,23 @@ class Controller extends \Piwik\Plugin\Controller
         return $conversionRate;
     }
 
-    public function __construct(Translator $translator)
+    /**
+     * @var FeatureFlagManager
+     */
+    private $featureFlagManager;
+
+    public function __construct(Translator $translator, FeatureFlagManager $featureFlagManager)
     {
         parent::__construct();
 
         $this->translator = $translator;
+        $this->featureFlagManager = $featureFlagManager;
 
-        $this->goals = Request::processRequest('Goals.getGoals', ['idSite' => $this->idSite, 'filter_limit' => '-1', 'orderByName' => true], $default = []);
+        if (!empty($this->idSite)) {
+            $this->goals = Request::processRequest('Goals.getGoals', ['idSite' => $this->idSite, 'filter_limit' => '-1', 'orderByName' => true], $default = []);
+        } else {
+            $this->goals = [];
+        }
     }
 
     public function manage()
@@ -216,8 +225,8 @@ class Controller extends \Piwik\Plugin\Controller
         if ($idGoal == Piwik::LABEL_ID_GOAL_IS_ECOMMERCE_ORDER) {
             $nameToLabel['nb_conversions'] = 'General_EcommerceOrders';
         } elseif ($idGoal == Piwik::LABEL_ID_GOAL_IS_ECOMMERCE_CART) {
-            $nameToLabel['nb_conversions'] = $this->translator->translate('General_VisitsWith', $this->translator->translate('Goals_AbandonedCart'));
-            $nameToLabel['conversion_rate'] = $nameToLabel['nb_conversions'];
+            $nameToLabel['nb_conversions'] = 'General_AbandonedCarts';
+            $nameToLabel['conversion_rate'] = $this->translator->translate('Goals_ConversionRate', $this->translator->translate('Goals_AbandonedCart'));
             $nameToLabel['revenue'] = $this->translator->translate('Goals_LeftInCart', $this->translator->translate('General_ColumnRevenue'));
             $nameToLabel['items'] = $this->translator->translate('Goals_LeftInCart', $this->translator->translate('Goals_Products'));
         }
@@ -346,23 +355,26 @@ class Controller extends \Piwik\Plugin\Controller
                 $idGoalToProcess = AddColumnsProcessedMetricsGoal::GOALS_FULL_TABLE;
             }
 
-            $requestString = "method=$apiMethod
-                               &format=original
-                               &format_metrics=0
-                               &filter_update_columns_when_show_all_goals=1
-                               &idGoal=$idGoalToProcess
-                               &filter_sort_order=desc
-                               &filter_sort_column=$columnNbConversions
-                               &showColumns=label,$columnNbConversions,$columnConversionRate" .
-                               // select a couple more in case some are not valid (ie. conversions==0 or they are "Keyword not defined")
-                               "&filter_limit=" . (self::COUNT_TOP_ROWS_TO_DISPLAY + 2);
+            $requestParams = [
+                'method'                                 => $apiMethod,
+                'format'                                 => 'original',
+                'format_metrics'                         => 0,
+                'filter_update_columns_when_show_all_goals' => 1,
+                'idGoal'                                 => $idGoalToProcess,
+                'filter_sort_order'                      => 'desc',
+                'filter_sort_column'                     => $columnNbConversions,
+                'showColumns'                            => "label,$columnNbConversions,$columnConversionRate",
+                // select a couple more in case some are not valid (ie. conversions==0 or they are "Keyword not defined")
+                'filter_limit'                           => self::COUNT_TOP_ROWS_TO_DISPLAY + 2,
+            ];
 
             if ($apiMethod == 'Actions.getEntryPageUrls') {
-                $requestString .= '&flat=1';
+                $requestParams['flat'] = 1;
             }
 
-            $request = new Request($requestString);
+            $request = new Request($requestParams);
 
+            /** @var DataTable $datatable */
             $datatable = $request->process();
             $formatter = new Formatter();
             $topDimension = array();
@@ -395,7 +407,12 @@ class Controller extends \Piwik\Plugin\Controller
     protected function getMetricsForGoal($idGoal, $dataRow = null)
     {
         if (!$dataRow) {
-            $request = new Request("method=Goals.get&format=original&idGoal=$idGoal");
+            $request = new Request([
+                'method' => 'Goals.get',
+                'format' => 'original',
+                'idGoal' => $idGoal,
+            ]);
+            /** @var DataTable $datatable */
             $datatable = $request->process();
             $dataRow = $datatable->getFirstRow();
         }
@@ -457,9 +474,11 @@ class Controller extends \Piwik\Plugin\Controller
     private function setGoalOptions(View $view)
     {
         $view->userCanEditGoals = Piwik::isUserHasWriteAccess($this->idSite);
+        $view->goalRecommendationsEnabled = $this->featureFlagManager->isFeatureActive(GoalRecommendations::class);
+        $view->currencySymbol = Site::getCurrencySymbolFor($this->idSite);
         $view->goalTriggerTypeOptions = array(
             'visitors' => Piwik::translate('Goals_WhenVisitors'),
-            'manually' => Piwik::translate('Goals_Manually')
+            'manually' => Piwik::translate('Goals_Manually'),
         );
         $view->goalMatchAttributeOptions = array(
             array('key' => 'url', 'value' => Piwik::translate('Goals_VisitUrl')),
@@ -471,17 +490,17 @@ class Controller extends \Piwik\Plugin\Controller
         );
         $view->allowMultipleOptions = array(
             array('key' => '0', 'value' => Piwik::translate('Goals_DefaultGoalConvertedOncePerVisit')),
-            array('key' => '1', 'value' => Piwik::translate('Goals_AllowGoalConvertedMoreThanOncePerVisit'))
+            array('key' => '1', 'value' => Piwik::translate('Goals_AllowGoalConvertedMoreThanOncePerVisit')),
         );
         $view->eventTypeOptions = array(
             array('key' => 'event_category', 'value' => Piwik::translate('Events_EventCategory')),
             array('key' => 'event_action', 'value' => Piwik::translate('Events_EventAction')),
-            array('key' => 'event_name', 'value' => Piwik::translate('Events_EventName'))
+            array('key' => 'event_name', 'value' => Piwik::translate('Events_EventName')),
         );
         $view->patternTypeOptions = array(
             array('key' => 'contains', 'value' => Piwik::translate('Goals_Contains', '')),
             array('key' => 'exact', 'value' => Piwik::translate('Goals_IsExactly', '')),
-            array('key' => 'regex', 'value' => Piwik::translate('Goals_MatchesExpression', ''))
+            array('key' => 'regex', 'value' => Piwik::translate('Goals_MatchesExpression', '')),
         );
         $view->numericComparisonTypeOptions = [
             ['key' => 'greater_than', 'value' => Piwik::translate('General_OperationGreaterThan')],

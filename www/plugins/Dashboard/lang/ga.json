@@ -1,6 +1,6 @@
 {
     "Dashboard": {
-        "AddAWidget": "Cuir giuirléid leis",
+        "AddAWidget": "Cuir giuirléid leis an deais seo",
         "AddPreviewedWidget": "Cliceáil chun giuirléid a chur leis an deais",
         "ChangeDashboardLayout": "Athraigh leagan amach an deais",
         "CopyDashboardToUser": "Cóipeáil an painéal chuig an úsáideoir",
@@ -14,8 +14,9 @@
         "DefaultDashboard": "Deais réamhshocraithe - Ag baint úsáide as roghnú giuirléidí réamhshocraithe agus leagan amach na gcolún",
         "DeleteWidgetConfirm": "An bhfuil tú cinnte gur mhaith leat an ghiuirléid seo a scriosadh ón deais?",
         "EmptyDashboard": "Deais folamh - Roghnaigh na giuirléidí is fearr leat",
+        "ExportThisDashboard": "Easpórtáil Painéal Rialaithe",
         "LoadingWidget": "Giuirléid á lódáil, fan go fóill…",
-        "ManageDashboard": "Bainistigh deais",
+        "ManageDashboard": "Bainistigh Painéal Rialaithe",
         "Maximise": "Uasmhéadaigh",
         "Minimise": "Íoslaghdaigh",
         "NotUndo": "Ní bheidh tú in ann an oibríocht seo a chealú.",
@@ -32,6 +33,7 @@
         "SetAsDefaultWidgetsConfirm": "An bhfuil tú cinnte gur mian leat rogha na ngiuirléidí reatha agus leagan amach an deais a shocrú mar an teimpléad deais réamhshocraithe?",
         "SetAsDefaultWidgetsConfirmHelp": "Úsáidfear an rogha giuirléidí seo agus leagan amach na gcolún ar an deais nuair a chruthaíonn aon úsáideoir deais nua, nó nuair a úsáidtear an ghné \"%s\".",
         "TopLinkTooltip": "Féach ar thuairiscí Web Analytics le haghaidh %s.",
+        "TopMenuTitle": "Anailísíocht",
         "WidgetNotFound": "Giuirléid gan aimsiú",
         "WidgetPreview": "Réamhamharc giuirléid"
     }

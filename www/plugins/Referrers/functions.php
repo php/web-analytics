@@ -31,7 +31,7 @@ function getPathFromUrl($url)
 /**
  * Return translated referrer type
  *
- * @param string $label
+ * @param string|int $label
  * @return string Referrer type
  */
 function getReferrerTypeLabel($label)
@@ -48,6 +48,10 @@ function getReferrerTypeLabel($label)
         case 'social':
         case Common::REFERRER_TYPE_SOCIAL_NETWORK:
             $indexTranslation = 'Referrers_Socials';
+            break;
+        case 'ai':
+        case Common::REFERRER_TYPE_AI_ASSISTANT:
+            $indexTranslation = 'Referrers_AIAssistants';
             break;
         case 'website':
         case Common::REFERRER_TYPE_WEBSITE:
@@ -67,15 +71,15 @@ function getReferrerTypeLabel($label)
 
 /**
  * Works in both directions
- * @param string $name
- * @throws \Exception
- * @return string
+ * @param string|int $name
+ * @return string|int
  */
 function getReferrerTypeFromShortName($name)
 {
     $map = array(
         Common::REFERRER_TYPE_SEARCH_ENGINE  => 'search',
         Common::REFERRER_TYPE_SOCIAL_NETWORK => 'social',
+        Common::REFERRER_TYPE_AI_ASSISTANT => 'ai',
         Common::REFERRER_TYPE_WEBSITE        => 'website',
         Common::REFERRER_TYPE_DIRECT_ENTRY   => 'direct',
         Common::REFERRER_TYPE_CAMPAIGN       => 'campaign',

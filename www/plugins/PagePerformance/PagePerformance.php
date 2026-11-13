@@ -13,8 +13,6 @@ use Piwik\DataTable;
 use Piwik\Plugin\ViewDataTable;
 use Piwik\Plugins\CoreVisualizations\Visualizations\HtmlTable;
 
-/**
- */
 class PagePerformance extends \Piwik\Plugin
 {
     public static $availableForMethods = [
@@ -47,7 +45,7 @@ class PagePerformance extends \Piwik\Plugin
             'Metrics.getDefaultMetricTranslations'   => 'addMetricTranslations',
             'Metrics.getDefaultMetricSemanticTypes' => 'addMetricSemanticTypes',
             'Metrics.isLowerValueBetter'             => 'isLowerValueBetter',
-            'API.Request.dispatch.end'               => 'enrichApi'
+            'API.Request.dispatch.end'               => 'enrichApi',
         ];
     }
 

@@ -15,6 +15,7 @@ use Piwik\Exception\MissingFilePermissionException;
 use Piwik\Plugins\Overlay\Overlay;
 use Piwik\Session\SaveHandler\DbTable;
 use Piwik\Log\LoggerInterface;
+use Piwik\Session\SessionFingerprint;
 use Zend_Session;
 
 /**
@@ -23,6 +24,12 @@ use Zend_Session;
 class Session extends Zend_Session
 {
     public const SESSION_NAME = 'MATOMO_SESSID';
+
+    /**
+     * Classes that may be restored from stored session data. Anything else is a class the
+     * session was never meant to hold.
+     */
+    public const SESSION_DATA_ALLOWED_CLASSES = [Notification::class];
 
     public static $sessionName = self::SESSION_NAME;
 
@@ -99,6 +106,7 @@ class Session extends Zend_Session
             // - user  - we can't verify that user-defined session handler functions have already been set via session_set_save_handler()
             // - mm    - this handler is not recommended, unsupported, not available for Windows, and has a potential concurrency issue
 
+            // SessionSerializeHandlerCheck reports it when the server does not let us set this
             if (@ini_get('session.serialize_handler') !== 'php_serialize') {
                 @ini_set('session.serialize_handler', 'php_serialize');
             }
@@ -179,8 +187,28 @@ class Session extends Zend_Session
 
         $isOptOutRequest = $module == 'CoreAdminHome' && ($action == 'optOut' || $action == 'optOutJS');
         $shouldUseNone = !empty($general['enable_framed_pages']) || $isOptOutRequest || Overlay::isOverlayRequest($module, $action, $method, $referer);
+        /** @var bool $shouldUseNoneForcefully */
+        $shouldUseNoneForcefully = false;
+        /**
+         * Triggered to determine whether the session cookie SameSite value should be forced to None.
+         *
+         * Plugins can set `$shouldUseNoneForcefully` to true when the session cookie needs to be
+         * sent in a third-party context that is not covered by Matomo's built-in iframe, opt-out,
+         * or Overlay detection. The final cookie value is still only set to `None` when the request
+         * is served over HTTPS.
+         *
+         * @param bool &$shouldUseNoneForcefully Set this to true to force the session cookie SameSite value to None.
+         *
+         * @internal
+         *
+         * @example
+         * Piwik::addAction('Session.shouldSendSameSiteCookieAsNoneForcefully', function (&$shouldUseNoneForcefully) {
+         *     $shouldUseNoneForcefully = true;
+         * });
+         */
+        Piwik::postEvent('Session.shouldSendSameSiteCookieAsNoneForcefully', [&$shouldUseNoneForcefully]);
 
-        if ($shouldUseNone && ProxyHttp::isHttps()) {
+        if (($shouldUseNone || $shouldUseNoneForcefully) && ProxyHttp::isHttps()) {
             return 'None';
         }
 
@@ -226,7 +254,7 @@ class Session extends Zend_Session
         return $headerStr;
     }
 
-    public static function getDbTableConfig()
+    public static function getDbTableConfig(): array
     {
         return array(
             'name'           => Common::prefixTable(DbTable::TABLE_NAME),
@@ -235,5 +263,14 @@ class Session extends Zend_Session
             'dataColumn'     => 'data',
             'lifetimeColumn' => 'lifetime',
         );
+    }
+
+    public static function destroyAllSessions(): void
+    {
+        $config = self::getDbTableConfig();
+        $saveHandler = new DbTable($config);
+        $saveHandler->destroyAll();
+        $fingerprint = new SessionFingerprint();
+        $fingerprint->clear();
     }
 }

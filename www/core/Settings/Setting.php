@@ -44,7 +44,7 @@ class Setting
     protected $pluginName;
 
     /**
-     * @var FieldConfig
+     * @var FieldConfig|null
      */
     protected $config;
 
@@ -64,8 +64,6 @@ class Setting
     protected $type;
 
     /**
-     * Constructor.
-     *
      * @param string $name    The setting's persisted name. Only alphanumeric characters are allowed, eg,
      *                        `'refreshInterval'`.
      * @param mixed $defaultValue  Default value for this setting if no value was specified.
@@ -134,7 +132,6 @@ class Setting
 
     /**
      * @internal
-     * @param Storage $storage
      */
     public function setStorage(Storage $storage)
     {
@@ -341,7 +338,7 @@ class Setting
             FieldConfig::TYPE_FLOAT,
             FieldConfig::TYPE_STRING,
             FieldConfig::TYPE_BOOL,
-            FieldConfig::TYPE_ARRAY
+            FieldConfig::TYPE_ARRAY,
         );
 
         if (!in_array($this->type, $types)) {

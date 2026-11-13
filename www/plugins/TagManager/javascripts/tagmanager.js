@@ -96,7 +96,7 @@
                     var parts = key.split('.');
                     var i;
                     for (i = 0; i < parts.length; i++) {
-                        if (parts[i] in obj) {
+                        if (utils.isObject(obj) && parts[i] in obj) {
                             obj = obj[parts[i]];
                         } else {
                             // value does not exist
@@ -1835,8 +1835,9 @@
                 windowAlias.dataLayer = windowAlias.dataLayer || [];
 
                 const syncDataLayer = function(array, callback) {
+                    const originalPush = array.push;
                     array.push = function(e) {
-                        Array.prototype.push.call(array, e);
+                        originalPush.call(array, e);
                         callback(array);
                     };
                 }

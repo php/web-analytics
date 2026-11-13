@@ -263,48 +263,65 @@ class ClientHints
                 continue;
             }
 
+            // any kind of html tag is unexpected as part of those headers, so discard values that contain some.
+            if (\is_string($value) && \strip_tags($value) !== $value) {
+                continue;
+            }
+
             switch (\str_replace('_', '-', \strtolower((string) $name))) {
                 case 'http-sec-ch-ua-arch':
                 case 'sec-ch-ua-arch':
                 case 'arch':
                 case 'architecture':
-                    $architecture = \trim($value, '"');
+                    if (\is_string($value)) {
+                        $architecture = \trim($value, '"');
+                    }
 
                     break;
                 case 'http-sec-ch-ua-bitness':
                 case 'sec-ch-ua-bitness':
                 case 'bitness':
-                    $bitness = \trim($value, '"');
+                    if (\is_string($value)) {
+                        $bitness = \trim($value, '"');
+                    }
 
                     break;
                 case 'http-sec-ch-ua-mobile':
                 case 'sec-ch-ua-mobile':
                 case 'mobile':
-                    $mobile = true === $value || '1' === $value || '?1' === $value;
+                    $mobile = \in_array($value, [true, '1', '?1'], true);
 
                     break;
                 case 'http-sec-ch-ua-model':
                 case 'sec-ch-ua-model':
                 case 'model':
-                    $model = \trim($value, '"');
+                    if (\is_string($value)) {
+                        $model = \trim($value, '"');
+                    }
 
                     break;
                 case 'http-sec-ch-ua-full-version':
                 case 'sec-ch-ua-full-version':
                 case 'uafullversion':
-                    $uaFullVersion = \trim($value, '"');
+                    if (\is_string($value)) {
+                        $uaFullVersion = \trim($value, '"');
+                    }
 
                     break;
                 case 'http-sec-ch-ua-platform':
                 case 'sec-ch-ua-platform':
                 case 'platform':
-                    $platform = \trim($value, '"');
+                    if (\is_string($value)) {
+                        $platform = \trim($value, '"');
+                    }
 
                     break;
                 case 'http-sec-ch-ua-platform-version':
                 case 'sec-ch-ua-platform-version':
                 case 'platformversion':
-                    $platformVersion = \trim($value, '"');
+                    if (\is_string($value)) {
+                        $platformVersion = \trim($value, '"');
+                    }
 
                     break;
                 case 'brands':
@@ -324,6 +341,10 @@ class ClientHints
                     // use this only if no other header already set the list
                 case 'http-sec-ch-ua-full-version-list':
                 case 'sec-ch-ua-full-version-list':
+                    if (!\is_string($value)) {
+                        break;
+                    }
+
                     $reg  = '/^"([^"]+)"; ?v="([^"]+)"(?:, )?/';
                     $list = [];
 
@@ -339,7 +360,7 @@ class ClientHints
                     break;
                 case 'http-x-requested-with':
                 case 'x-requested-with':
-                    if ('xmlhttprequest' !== \strtolower($value)) {
+                    if (\is_string($value) && 'xmlhttprequest' !== \strtolower($value)) {
                         $app = $value;
                     }
 
@@ -348,8 +369,12 @@ class ClientHints
                 case 'http-sec-ch-ua-form-factors':
                 case 'sec-ch-ua-form-factors':
                     if (\is_array($value)) {
-                        $formFactors = \array_map('\strtolower', $value);
-                    } elseif (\preg_match_all('~"([a-z]+)"~i', \strtolower($value), $matches)) {
+                        $stringValues = \array_filter($value, '\is_string');
+
+                        if (\count($stringValues) === \count($value)) {
+                            $formFactors = \array_map('\strtolower', $value);
+                        }
+                    } elseif (\is_string($value) && \preg_match_all('~"([a-z]+)"~i', \strtolower($value), $matches)) {
                         $formFactors = $matches[1];
                     }
 

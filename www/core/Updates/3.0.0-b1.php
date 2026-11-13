@@ -40,14 +40,13 @@ class Updates_3_0_0_b1 extends Updates
 
     /**
      * Here you can define one or multiple SQL statements that should be executed during the update.
-     * @param Updater $updater
      * @return Migration[]
      */
     public function getMigrations(Updater $updater)
     {
         $db = Db::get();
-        $allGoals = $db->fetchAll(sprintf("SELECT DISTINCT idgoal FROM %s", Common::prefixTable('goal')));
-        $allDashboards = $db->fetchAll(sprintf("SELECT * FROM %s", Common::prefixTable('user_dashboard')));
+        $allGoals = $db->fetchAll(sprintf("SELECT DISTINCT idgoal FROM `%s`", Common::prefixTable('goal')));
+        $allDashboards = $db->fetchAll(sprintf("SELECT * FROM `%s`", Common::prefixTable('user_dashboard')));
 
         $migrations = $this->getDashboardMigrations($allDashboards, $allGoals);
         $migrations = $this->getPluginSettingsMigrations($migrations);
@@ -90,7 +89,7 @@ class Updates_3_0_0_b1 extends Updates
     private function getBigIntPreventOverflowMigrations($queries)
     {
         $queries[] = $this->migration->db->changeColumnTypes('log_visit', array(
-            'idvisit' => 'BIGINT(10) UNSIGNED NOT NULL AUTO_INCREMENT'
+            'idvisit' => 'BIGINT(10) UNSIGNED NOT NULL AUTO_INCREMENT',
         ));
 
         $queries[] = $this->migration->db->changeColumnTypes('log_conversion_item', array(
@@ -197,7 +196,7 @@ class Updates_3_0_0_b1 extends Updates
             'plugin_name' => $pluginName,
             'setting_name' => $settingName,
             'setting_value' => $settingValue,
-            'user_login' => $login
+            'user_login' => $login,
         ));
     }
 
@@ -412,7 +411,7 @@ class Updates_3_0_0_b1 extends Updates
                 'params' =>
                     array (
                         'forceView' => '1',
-                        'viewDataTable' => 'sparklines'
+                        'viewDataTable' => 'sparklines',
                     ),
             ),array (
                 'module' => 'VisitFrequency',
@@ -452,7 +451,7 @@ class Updates_3_0_0_b1 extends Updates
                 'uniqueId' => 'widgetGoalsOverview',
                 'params' =>
                     array (
-                        'containerId' => 'GoalsOverview'
+                        'containerId' => 'GoalsOverview',
                     ),
             ),array (
                 'module' => 'Goals',
@@ -489,7 +488,7 @@ class Updates_3_0_0_b1 extends Updates
         }
 
         $table = Common::prefixTable('user_dashboard');
-        $sql = sprintf('UPDATE %s SET layout = ? WHERE iddashboard = ?', $table);
+        $sql = sprintf('UPDATE `%s` SET layout = ? WHERE iddashboard = ?', $table);
 
         foreach ($allDashboards as $dashboard) {
             $dashboardLayout = json_decode($dashboard['layout']);

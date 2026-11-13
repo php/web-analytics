@@ -13,6 +13,7 @@ use Piwik\Piwik;
 use Piwik\Plugin\ViewDataTable;
 use Piwik\Plugins\Resolution\Columns\Resolution;
 use Piwik\Plugin\ReportsProvider;
+use Piwik\Plugins\Resolution\Settings\ScreenResolutionDetectionDisabled;
 
 class GetResolution extends Base
 {
@@ -37,5 +38,11 @@ class GetResolution extends Base
         return array(
             ReportsProvider::factory('Resolution', 'getConfiguration'),
         );
+    }
+
+    public function isEnabled()
+    {
+        // Metadata visibility is global-only here, so check the instance-wide setting state.
+        return !ScreenResolutionDetectionDisabled::getInstance()->getValue();
     }
 }

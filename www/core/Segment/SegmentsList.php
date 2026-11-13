@@ -36,9 +36,6 @@ class SegmentsList
 
     private $segmentsByNameCache = array();
 
-    /**
-     * @param Segment $segment
-     */
     public function addSegment(Segment $segment)
     {
         $this->segments[]          = $segment;
@@ -102,7 +99,8 @@ class SegmentsList
     public static function get()
     {
         $cache = Cache::getTransientCache();
-        $cacheKey = CacheId::siteAware('SegmentsList');
+        $idSites = CacheId::getIdSiteListFromParams();
+        $cacheKey = CacheId::siteAware('SegmentsList', $idSites);
 
         if ($cache->contains($cacheKey)) {
             return $cache->fetch($cacheKey);
@@ -127,7 +125,7 @@ class SegmentsList
          *
          * @param SegmentsList $list An instance of the SegmentsList. You can add segments to the list this way.
          */
-        Piwik::postEvent('Segment.addSegments', array($list));
+        Piwik::postEvent('Segment.addSegments', [$list]);
 
         foreach (Dimension::getAllDimensions() as $dimension) {
             $dimension->configureSegments($list, new DimensionSegmentFactory($dimension));
@@ -144,8 +142,9 @@ class SegmentsList
          *     }
          *
          * @param SegmentsList $list An instance of the SegmentsList.
+         * @param array $idSites
          */
-        Piwik::postEvent('Segment.filterSegments', array($list));
+        Piwik::postEvent('Segment.filterSegments', [&$list, $idSites]);
 
         $cache->save($cacheKey, $list);
 

@@ -96,21 +96,20 @@ class WidgetsProvider
     public function factory($module, $action)
     {
         if (empty($module) || empty($action)) {
-            return;
+            return null;
         }
 
         try {
             if (!$this->pluginManager->isPluginActivated($module)) {
-                return;
+                return null;
             }
 
             $plugin = $this->pluginManager->getLoadedPlugin($module);
         } catch (\Exception $e) {
             // we are not allowed to use possible widgets, plugin is not active
-            return;
+            return null;
         }
 
-        /** @var Widget[] $widgetContainer */
         $widgets = $plugin->findMultipleComponents('Widgets', 'Piwik\\Widget\\Widget');
 
         foreach ($widgets as $widgetClass) {
@@ -120,6 +119,8 @@ class WidgetsProvider
                 return StaticContainer::get($widgetClass);
             }
         }
+
+        return null;
     }
 
     private function getWidgetConfigForClassName($widgetClass)

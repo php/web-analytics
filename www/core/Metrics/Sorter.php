@@ -133,9 +133,8 @@ class Sorter
     /**
      * Detect the column to be used for sorting
      *
-     * @param DataTable $table
      * @param string|int $columnToSort  column name or column id
-     * @return int
+     * @return string|int
      */
     public function getPrimaryColumnToSort(DataTable $table, $columnToSort)
     {
@@ -159,7 +158,6 @@ class Sorter
     /**
      * Detect the secondary sort column to be used for sorting
      *
-     * @param Row $row
      * @param int|string $primaryColumnToSort
      * @return ?string
      */
@@ -194,8 +192,7 @@ class Sorter
     }
 
     /**
-     * @param DataTable $table
-     * @param string|int $columnToSort  A column name or column id. Make sure that column actually exists in the row.
+     * @param string|int|null $columnToSort  A column name or column id. Make sure that column actually exists in the row.
      *                                  You might want to get a valid column via {@link getPrimaryColumnToSort()} or
      *                                  {@link getSecondaryColumnToSort()}
      * @return int

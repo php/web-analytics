@@ -148,7 +148,7 @@ class Notification
      * The notification's priority. The higher the priority, the higher the order. See `PRIORITY_*`
      * constants in {@link Notification} to see possible priority values.
      *
-     * @var int
+     * @var ?int
      */
     public $priority;
 
@@ -161,8 +161,6 @@ class Notification
     public $raw = false;
 
     /**
-     * Constructor.
-     *
      * @param  string $message   The notification message.
      * @throws \Exception        If the message is empty.
      */

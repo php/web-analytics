@@ -13,6 +13,8 @@ use Piwik\Common;
 use Piwik\Exception\UnexpectedWebsiteFoundException;
 use Piwik\Piwik;
 use Piwik\Plugin\Dimension\VisitDimension;
+use Piwik\Plugins\PrivacyManager\Settings\CampaignParameterValuesMasked;
+use Piwik\Plugins\Referrers\AIAssistant as AIAssistantDetection;
 use Piwik\Plugins\Referrers\SearchEngine as SearchEngineDetection;
 use Piwik\Plugins\Referrers\Social as SocialNetworkDetection;
 use Piwik\Plugins\SitesManager\SiteUrls;
@@ -44,23 +46,27 @@ abstract class Base extends VisitDimension
     /**
      * Returns an array containing the following information:
      * - referer_type
-     *        - direct            -- absence of referrer URL OR referrer URL has the same host
-     *        - site                -- based on the referrer URL
-     *        - search_engine        -- based on the referrer URL
-     *        - campaign            -- based on campaign URL parameter
+     *        - direct             -- absence of referrer URL OR referrer URL has the same host
+     *        - site               -- based on the referrer URL
+     *        - search_engine      -- based on the referrer URL
+     *        - social_network     -- based on the referrer URL
+     *        - campaign           -- based on campaign URL parameter
+     *        - ai                 -- based on referrer URL
      *
      * - referer_name
      *         - ()
-     *         - piwik.net            -- site host name
-     *         - google.fr            -- search engine host name
-     *         - adwords-search    -- campaign name
+     *         - piwik.net           -- site host name
+     *         - Google              -- search engine name
+     *         - Facebook            -- social network name
+     *         - adwords-search      -- campaign name
+     *         - ChatGPT             -- AI name
      *
      * - referer_keyword
      *         - ()
      *         - ()
      *         - my keyword
-     *         - my paid keyword
      *         - ()
+     *         - my paid keyword
      *         - ()
      *
      * - referer_url : the same for all the referrer types
@@ -120,7 +126,10 @@ abstract class Base extends VisitDimension
             $this->referrerHost = $this->referrerUrlParse['host'];
         }
 
-        $referrerDetected = $this->detectReferrerCampaign($request, $visitor);
+        // Try to detect AI first, as campaign parameters should be ignored in that case
+        $referrerDetected = $this->detectReferrerAIAssistant();
+
+        $referrerDetected = $referrerDetected || $this->detectReferrerCampaign($request, $visitor);
 
         if (!$referrerDetected) {
             if (
@@ -162,6 +171,14 @@ abstract class Base extends VisitDimension
 
         if (!empty($referrerInformation['referer_keyword'])) {
             $referrerInformation['referer_keyword'] = $this->truncateReferrerKeyword($referrerInformation['referer_keyword']);
+        }
+
+        if (
+            $referrerInformation['referer_type'] == Common::REFERRER_TYPE_CAMPAIGN
+            && CampaignParameterValuesMasked::isEnabled((int) $this->idsite)
+        ) {
+            $referrerInformation['referer_name'] = CampaignParameterValuesMasked::getPlaceholderValue();
+            $referrerInformation['referer_keyword'] = CampaignParameterValuesMasked::getPlaceholderValue();
         }
 
         return $referrerInformation;
@@ -372,6 +389,60 @@ abstract class Base extends VisitDimension
     }
 
     /**
+     * AI detection
+     */
+    protected function detectReferrerAIAssistant(): bool
+    {
+        $cache = \Piwik\Cache::getTransientCache();
+        $cacheKey = 'cachedReferrerAIAssistants';
+
+        $cachedReferrerAIAssistants = [];
+        if ($cache->contains($cacheKey)) {
+            $cachedReferrerAIAssistants = $cache->fetch($cacheKey);
+        }
+
+        // Some AI like ChatGPT are sending their hostname as `utm_source`
+        $utmSource = UrlHelper::getParameterFromQueryString($this->currentUrlParse['query'] ?? '', 'utm_source');
+
+        $aiAssistantName = false;
+        if (isset($cachedReferrerAIAssistants[$this->referrerUrl])) {
+            $aiAssistantName = $cachedReferrerAIAssistants[$this->referrerUrl];
+        } else {
+            if (AIAssistantDetection::getInstance()->isAIAssistantUrl($this->referrerUrl)) {
+                $aiAssistantName = AIAssistantDetection::getInstance()->getAIAssistantFromDomain($this->referrerUrl);
+
+                /**
+                 * Triggered when detecting the AI of a referrer URL.
+                 *
+                 * Plugins can use this event to provide custom AI detection logic.
+                 *
+                 * @param string|false &$aiAssistantName Name of the AI Assistant, or false if none detected
+                 *
+                 *                                        This parameter is initialized to the results
+                 *                                        of Matomo's default AI detection
+                 *                                        logic.
+                 * @param string referrerUrl The referrer URL from the tracking request.
+                 */
+                Piwik::postEvent('Tracker.detectReferrerAIAssistant', [&$aiAssistantName, $this->referrerUrl]);
+
+                $cachedReferrerAIAssistants[$this->referrerUrl] = $aiAssistantName;
+                $cache->save($cacheKey, $cachedReferrerAIAssistants);
+            } elseif ($utmSource && AIAssistantDetection::getInstance()->isAIAssistantUrl($utmSource)) {
+                $aiAssistantName = AIAssistantDetection::getInstance()->getAIAssistantFromDomain($utmSource);
+            }
+        }
+
+        if ($aiAssistantName === false) {
+            return false;
+        }
+
+        $this->typeReferrerAnalyzed = Common::REFERRER_TYPE_AI_ASSISTANT;
+        $this->nameReferrerAnalyzed = $aiAssistantName;
+        $this->keywordReferrerAnalyzed = '';
+        return true;
+    }
+
+    /**
      * @param string $string
      * @return bool
      */
@@ -440,9 +511,6 @@ abstract class Base extends VisitDimension
     /**
      * Check if campaign parameters were directly provided in tracking request.
      * This might e.g. be the case when using image tracking
-     *
-     * @param Request $request
-     * @return void
      */
     protected function detectReferrerCampaignFromTrackerParams(Request $request): void
     {
@@ -457,7 +525,7 @@ abstract class Base extends VisitDimension
             }
         }
 
-        if (empty($campaignName)) {
+        if (empty($campaignName) || !is_string($campaignName)) {
             return;
         }
 
@@ -568,13 +636,9 @@ abstract class Base extends VisitDimension
         }
     }
 
-    /**
-     * @return string
-     */
-    protected function getParameterValueFromReferrerUrl($adsenseReferrerParameter)
+    protected function getParameterValueFromReferrerUrl($adsenseReferrerParameter): string
     {
-        $value = trim(urldecode(UrlHelper::getParameterFromQueryString($this->referrerUrlParse['query'], $adsenseReferrerParameter) ?? ''));
-        return $value;
+        return trim(urldecode(UrlHelper::getParameterFromQueryString($this->referrerUrlParse['query'], $adsenseReferrerParameter) ?? ''));
     }
 
     /**
@@ -586,10 +650,10 @@ abstract class Base extends VisitDimension
         $this->detectCampaignKeywordFromReferrerUrl();
         $this->detectReferrerCampaignFromTrackerParams($request);
 
-        $referrerNameAnalayzed = mb_strtolower($this->nameReferrerAnalyzed);
-        $referrerNameAnalayzed = $this->truncateReferrerName($referrerNameAnalayzed);
+        $referrerNameAnalyzed = mb_strtolower($this->nameReferrerAnalyzed);
+        $referrerNameAnalyzed = $this->truncateReferrerName($referrerNameAnalyzed);
 
-        $isCurrentVisitACampaignWithSameName = mb_strtolower($visitor->getVisitorColumn('referer_name') ?? '') == $referrerNameAnalayzed;
+        $isCurrentVisitACampaignWithSameName = mb_strtolower($visitor->getVisitorColumn('referer_name') ?? '') == $referrerNameAnalyzed;
         $isCurrentVisitACampaignWithSameName = $isCurrentVisitACampaignWithSameName && $visitor->getVisitorColumn('referer_type') == Common::REFERRER_TYPE_CAMPAIGN;
 
         // if we detected a campaign but there is still no keyword set, we set the keyword to the Referrer host
@@ -621,8 +685,6 @@ abstract class Base extends VisitDimension
     }
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @return mixed
      */
     public function getValueForRecordGoal(Request $request, Visitor $visitor)
@@ -667,17 +729,25 @@ abstract class Base extends VisitDimension
             $referrer = $this->getReferrerInformation($referrerUrl, $currentUrl = '', $idSite, $request, $visitor);
 
             // if the parsed referrer is interesting enough, ie. website, social network or search engine
-            if (in_array($referrer['referer_type'], [Common::REFERRER_TYPE_SEARCH_ENGINE, Common::REFERRER_TYPE_WEBSITE, Common::REFERRER_TYPE_SOCIAL_NETWORK])) {
+            if (in_array($referrer['referer_type'], [Common::REFERRER_TYPE_SEARCH_ENGINE, Common::REFERRER_TYPE_WEBSITE, Common::REFERRER_TYPE_SOCIAL_NETWORK, Common::REFERRER_TYPE_AI_ASSISTANT])) {
                 $type    = $referrer['referer_type'];
                 $name    = $referrer['referer_name'];
                 $keyword = $referrer['referer_keyword'];
 
-                Common::printDebug("Referrer URL (search engine, social network or website) is used.");
+                Common::printDebug("Referrer URL (search engine, social network, ai or website) is used.");
             } else {
                 Common::printDebug("No referrer attribution found for this user. Current user's visit referrer is used.");
             }
         } else {
             Common::printDebug("No referrer attribution found for this user. Current user's visit referrer is used.");
+        }
+
+        if (
+            $type === Common::REFERRER_TYPE_CAMPAIGN
+            && CampaignParameterValuesMasked::isEnabled((int) $request->getIdSite())
+        ) {
+            $name = CampaignParameterValuesMasked::getPlaceholderValue();
+            $keyword = CampaignParameterValuesMasked::getPlaceholderValue();
         }
 
         $this->setCampaignValuesToLowercase($type, $name, $keyword);

@@ -23,6 +23,7 @@ use Piwik\CronArchive\QueueConsumer;
 use Piwik\CronArchive\SharedSiteIds;
 use Piwik\CronArchive\StopArchiverException;
 use Piwik\DataAccess\ArchiveSelector;
+use Piwik\DataAccess\ArchiveWriter;
 use Piwik\DataAccess\Model;
 use Piwik\Exception\UnexpectedWebsiteFoundException;
 use Piwik\Metrics\Formatter;
@@ -79,7 +80,6 @@ class CronArchive
      */
     private $websiteIdArchiveList;
     private $requests = 0;
-    private $archiveAndRespectTTL = true;
     public $shouldArchiveAllSites = false;
 
     private $idSitesNotUsingTracker = [];
@@ -137,12 +137,11 @@ class CronArchive
     public $disableScheduledTasks = false;
 
     /**
-     * Forces CronArchive to invalidate data for the last [$dateLastForced] years when it notices a segment that
-     * was recently created or updated. By default this is 7.
+     * If set to true, yesterday and today won't be invalidated.
      *
-     * @var int|false
+     * @var bool
      */
-    public $dateLastForced = SegmentArchiving::DEFAULT_BEGINNING_OF_TIME_LAST_N_YEARS;
+    public $skipInvalidatingRecentDates = false;
 
     /**
      * The number of concurrent requests to issue per website. Defaults to {@link MAX_CONCURRENT_API_REQUESTS}.
@@ -256,11 +255,6 @@ class CronArchive
     private const STEP_SCHEDULED_TASKS = 3;
     private const STEP_FINISH = 4;
 
-    /**
-     * Constructor.
-     *
-     * @param LoggerInterface|null $logger
-     */
     public function __construct(?LoggerInterface $logger = null)
     {
         $this->logger = $logger ?: StaticContainer::get(LoggerInterface::class);
@@ -511,7 +505,7 @@ class CronArchive
         $urls = [];
         $archivesBeingQueried = [];
         foreach ($archives as $index => $archive) {
-            list($url, $segment, $plugin) = $this->generateUrlToArchiveFromArchiveInfo($archive);
+            [$url, $segment, $plugin] = $this->generateUrlToArchiveFromArchiveInfo($archive);
             if (empty($url)) {
                 // can happen if, for example, a segment was deleted after an archive was invalidated
                 // in this case, we can just delete the archive entirely.
@@ -545,6 +539,10 @@ class CronArchive
                 $params->onlyArchiveRequestedPlugin();
             }
 
+            if (!empty($archive['report'])) {
+                $params->setArchiveOnlyReport($archive['report']);
+            }
+
             $loader = new Loader($params);
             if ($loader->canSkipThisArchive()) {
                 $this->logger->info("Found no visits for site ID = {idSite}, {period} ({date1},{date2}), site is using the tracker so skipping archiving...", [
@@ -553,6 +551,11 @@ class CronArchive
                     'date1' => $archive['date1'],
                     'date2' => $archive['date2'],
                 ]);
+
+                // create an empty archive
+                $archiveWriter = new ArchiveWriter($params);
+                $archiveWriter->initNewArchive();
+                $archiveWriter->finalizeArchive();
 
                 // site is using the tracker, but there are no visits for this period, so just delete the archive and move on
                 $this->deleteInvalidatedArchives($archive);
@@ -608,6 +611,7 @@ class CronArchive
             }
 
             $visitsForPeriod = $this->getVisitsFromApiResponse($stats);
+            $peakMemory = $this->getPeakMemoryFromApiResponse($stats);
 
             $this->logArchiveJobFinished(
                 $url,
@@ -615,7 +619,8 @@ class CronArchive
                 $visitsForPeriod,
                 $archivesBeingQueried[$index]['plugin'],
                 $archivesBeingQueried[$index]['report'],
-                !$checkInvalid
+                !$checkInvalid,
+                $peakMemory
             );
 
             $this->deleteInvalidatedArchives($archivesBeingQueried[$index]);
@@ -676,16 +681,17 @@ class CronArchive
         return [$url, $segment, $plugin];
     }
 
-    private function logArchiveJobFinished($url, $timer, $visits, $plugin = null, $report = null, $wasSkipped = null)
+    private function logArchiveJobFinished($url, $timer, $visits, $plugin = null, $report = null, $wasSkipped = null, $peakMemory = null)
     {
         $params = UrlHelper::getArrayFromQueryString($url);
         $visits = (int) $visits;
 
         $message = $wasSkipped ? "Skipped Archiving website" : "Archived website";
+        $peakMemoryPart = $peakMemory ? ", Peak memory: $peakMemory" : "";
 
         $this->logger->info($message . " id {$params['idSite']}, period = {$params['period']}, date = "
             . "{$params['date']}, segment = '" . (isset($params['segment']) ? urldecode(urldecode($params['segment'])) : '') . "', "
-            . ($plugin ? "plugin = $plugin, " : "") . ($report ? "report = $report, " : "") . "$visits visits found. $timer");
+            . ($plugin ? "plugin = $plugin, " : "") . ($report ? "report = $report, " : "") . "$visits visits found. $timer$peakMemoryPart");
     }
 
     public function getErrors()
@@ -787,7 +793,8 @@ class CronArchive
      * @param string $idSite
      * @param string $period
      * @param string $date
-     * @param bool|false $segment
+     * @param string|false $segment
+     * @param string|null $plugin
      * @return string
      */
     private function getVisitsRequestUrl($idSite, $period, $date, $segment = false, $plugin = null)
@@ -868,7 +875,6 @@ class CronArchive
 
     /**
      * Initializes the various parameters to the script, based on input parameters.
-     *
      */
     private function initStateFromParameters()
     {
@@ -899,7 +905,7 @@ class CronArchive
 
     /**
      * @internal
-     * @param $api
+     * @param CoreAdminHomeAPI $api
      */
     public function setApiToInvalidateArchivedReport($api)
     {
@@ -993,17 +999,12 @@ class CronArchive
 
     public function invalidateRecentDate(string $dateStr, int $idSite): void
     {
-        $timezone = Site::getTimezoneFor($idSite);
-        $date = Date::factoryInTimezone($dateStr, $timezone);
-        $period = PeriodFactory::build('day', $date);
-
-        $params = new Parameters(new Site($idSite), $period, new Segment('', [$idSite], $period->getDateStart(), $period->getDateEnd()));
-
-        $loader = new Loader($params);
-        if ($loader->canSkipThisArchive()) {
-            $this->logger->debug("  " . ucfirst($dateStr) . " archive can be skipped due to no visits for idSite = $idSite, skipping invalidation...");
+        if ($this->skipInvalidatingRecentDates) {
             return;
         }
+
+        $timezone = Site::getTimezoneFor($idSite);
+        $date = Date::factoryInTimezone($dateStr, $timezone);
 
         $isYesterday = $dateStr === 'yesterday';
         $isToday = $dateStr === 'today';
@@ -1164,7 +1165,8 @@ class CronArchive
      *
      * Note: this method should only be used in the context of invalidation.
      *
-     * @params Parameters $params The parameters for the archive we want to invalidate.
+     * @param Parameters $params The parameters for the archive we want to invalidate.
+     * @param bool $doNotIncludeTtlInExistingArchiveCheck
      */
     private function canWeSkipInvalidatingBecauseThereIsAUsablePeriod(Parameters $params, $doNotIncludeTtlInExistingArchiveCheck = false): bool
     {
@@ -1390,6 +1392,15 @@ class CronArchive
         return (int) $stats['nb_visits'];
     }
 
+    private function getPeakMemoryFromApiResponse($stats): ?string
+    {
+        if (empty($stats['peak_memory_usage_pretty'])) {
+            return null;
+        }
+
+        return (string) $stats['peak_memory_usage_pretty'];
+    }
+
     /**
      * @return int
      */
@@ -1403,7 +1414,7 @@ class CronArchive
     }
 
     /**
-     * @return false|string
+     * @return string|int|false
      */
     private function getLastSuccessRunTimestamp()
     {
@@ -1418,7 +1429,7 @@ class CronArchive
     }
 
     /**
-     * @param $idSite
+     * @param int|string $idSite
      * @return array of date strings
      */
     private function getCustomDateRangeToPreProcess($idSite)
@@ -1454,7 +1465,7 @@ class CronArchive
         // and make sure it's pre-archived
         $allUsersPreferences = APIUsersManager::getInstance()->getAllUsersPreferences([
             APIUsersManager::PREFERENCE_DEFAULT_REPORT_DATE,
-            APIUsersManager::PREFERENCE_DEFAULT_REPORT
+            APIUsersManager::PREFERENCE_DEFAULT_REPORT,
         ]);
 
         foreach ($allUsersPreferences as $userLogin => $userPreferences) {
@@ -1489,7 +1500,7 @@ class CronArchive
     }
 
     /**
-     * @param $url
+     * @param string $url
      * @return string
      */
     private function makeRequestUrl($url)
@@ -1608,9 +1619,6 @@ class CronArchive
         return false;
     }
 
-    /**
-     * @param ArchiveFilter $archiveFilter
-     */
     public function setArchiveFilter(ArchiveFilter $archiveFilter): void
     {
         $this->archiveFilter = $archiveFilter;

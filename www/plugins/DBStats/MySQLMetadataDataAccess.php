@@ -20,7 +20,11 @@ class MySQLMetadataDataAccess
 {
     public function getDBStatus()
     {
-        if (function_exists('mysql_connect')) {
+        if (
+            function_exists('mysql_connect')
+            && function_exists('mysql_stat')
+            && function_exists('mysql_close')
+        ) {
             $configDb = Config::getInstance()->database;
             $link = mysql_connect($configDb['host'], $configDb['username'], $configDb['password']);
             $status = mysql_stat($link);
@@ -40,7 +44,7 @@ class MySQLMetadataDataAccess
                 'Flush tables'           => $fullStatus['Flush_commands']['Value'],
                 'Open tables'            => $fullStatus['Open_tables']['Value'],
                 'Opens'                  => 'unavailable', // not available via SHOW STATUS
-                'Queries per second avg' => 'unavailable' // not available via SHOW STATUS
+                'Queries per second avg' => 'unavailable', // not available via SHOW STATUS
             );
         }
 
@@ -60,7 +64,7 @@ class MySQLMetadataDataAccess
     public function getRowCountsByArchiveName($tableName, $extraCols)
     {
         // otherwise, create data table & cache it
-        $sql = "SELECT name as 'label', COUNT(*) as 'row_count'$extraCols FROM $tableName GROUP BY name";
+        $sql = "SELECT name as 'label', COUNT(*) as 'row_count'$extraCols FROM `$tableName` GROUP BY name";
         return Db::fetchAll($sql);
     }
 

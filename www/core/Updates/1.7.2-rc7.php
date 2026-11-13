@@ -15,8 +15,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_1_7_2_rc7 extends Updates
 {
     /**
@@ -32,7 +30,7 @@ class Updates_1_7_2_rc7 extends Updates
     public function getMigrations(Updater $updater)
     {
         return array(
-            $this->migration->db->addColumn('user_dashboard', 'name', 'VARCHAR( 100 ) NULL DEFAULT NULL', 'iddashboard')
+            $this->migration->db->addColumn('user_dashboard', 'name', 'VARCHAR( 100 ) NULL DEFAULT NULL', 'iddashboard'),
         );
     }
 

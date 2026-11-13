@@ -61,14 +61,6 @@ class FixDuplicateLogActions extends ConsoleCommand
      */
     private $logger;
 
-    /**
-     * Constructor.
-     *
-     * @param ArchiveInvalidator $invalidator
-     * @param DuplicateActionRemover $duplicateActionRemover
-     * @param Actions $actionsAccess
-     * @param LoggerInterface $logger
-     */
     public function __construct(
         ?ArchiveInvalidator $invalidator = null,
         ?DuplicateActionRemover $duplicateActionRemover = null,
@@ -123,7 +115,7 @@ class FixDuplicateLogActions extends ConsoleCommand
         $this->writeSuccessMessage(array(
             "Found and deleted $numberRemoved duplicate action entries in the $logActionTable table.",
             "References in log_link_visit_action, log_conversion and log_conversion_item were corrected.",
-            $timer->__toString()
+            $timer->__toString(),
         ));
 
         return self::SUCCESS;
@@ -165,7 +157,7 @@ class FixDuplicateLogActions extends ConsoleCommand
 
             $this->logger->debug("  idaction = {idaction}, duplicate idactions = {duplicateIdActions}", array(
                 'idaction' => $toIdAction,
-                'duplicateIdActions' => $fromIdActions
+                'duplicateIdActions' => $fromIdActions,
             ));
 
             foreach (DuplicateActionRemover::$tablesWithIdActionColumns as $table) {

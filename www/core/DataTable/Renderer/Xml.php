@@ -18,20 +18,17 @@ use Piwik\Piwik;
 
 /**
  * XML export of a given DataTable.
- * See the tests cases for more information about the XML format (/tests/core/DataTable/Renderer.test.php)
+ * See the tests for more information about the XML format (tests/PHPUnit/Unit/DataTable/Renderer/XmlTest.php).
  * Or have a look at the API calls examples.
  *
  * Works with recursive DataTable (when a row can be associated with a subDataTable).
- *
  */
 class Xml extends Renderer
 {
     /**
      * Computes the dataTable output and returns the string/binary
-     *
-     * @return string
      */
-    public function render()
+    public function render(): string
     {
         return '<?xml version="1.0" encoding="utf-8" ?>' . "\n" . $this->renderTable($this->table);
     }
@@ -39,13 +36,9 @@ class Xml extends Renderer
     /**
      * Computes the output for the given data table
      *
-     * @param DataTable|DataTable/Map $table
-     * @param bool $returnOnlyDataTableXml
-     * @param string $prefixLines
-     * @return array|string
-     * @throws Exception
+     * @param DataTable\DataTableInterface|array $table
      */
-    protected function renderTable($table, $returnOnlyDataTableXml = false, $prefixLines = '')
+    protected function renderTable($table, bool $returnOnlyDataTableXml = false, string $prefixLines = ''): string
     {
         $array = $this->convertDataTableToArray($table);
         if ($table instanceof Map) {
@@ -54,8 +47,7 @@ class Xml extends Renderer
             if ($returnOnlyDataTableXml) {
                 return $out;
             }
-            $out = "<results>\n$out</results>";
-            return $out;
+            return "<results>\n$out</results>";
         }
 
         // integer value of ZERO is a value we want to display
@@ -63,8 +55,7 @@ class Xml extends Renderer
             if ($returnOnlyDataTableXml) {
                 throw new Exception("Illegal state, what xml shall we return?");
             }
-            $out = "<result />";
-            return $out;
+            return "<result />";
         }
         if ($table instanceof Simple) {
             if (is_array($array)) {
@@ -94,8 +85,7 @@ class Xml extends Renderer
             if ($returnOnlyDataTableXml) {
                 return $out;
             }
-            $out = "<result>\n$out</result>";
-            return $out;
+            return "<result>\n$out</result>";
         }
 
         if (is_array($array)) {
@@ -105,6 +95,8 @@ class Xml extends Renderer
             }
             return "<result>\n$out</result>";
         }
+
+        return '';
     }
 
     /**
@@ -112,9 +104,8 @@ class Xml extends Renderer
      *
      * @param array $array The array to render.
      * @param string $prefixLines The string to prefix each line in the output.
-     * @return string
      */
-    private function renderArray($array, $prefixLines)
+    private function renderArray(array $array, string $prefixLines): string
     {
         $isAssociativeArray = Piwik::isAssociativeArray($array);
 
@@ -135,16 +126,21 @@ class Xml extends Renderer
         foreach ($array as $key => $value) {
             // based on the type of array & the key, determine how this node will look
             if ($isAssociativeArray) {
-                if (strpos($key, '=') !== false) {
-                    list($keyAttributeName, $key) = explode('=', $key, 2);
+                // a key like `idgoal=1` is rendered as a row attribute for backwards compatibility,
+                // but only when the part in front of the `=` can be used as an attribute name
+                if (strpos($key, '=') !== false && self::isValidXmlTagName(strstr($key, '=', true))) {
+                    [$keyAttributeName, $keyAttributeValue] = explode('=', $key, 2);
+                    $attribute = $keyAttributeName . '="' . self::formatAttributeValueXml($keyAttributeValue) . '"';
 
-                    $prefix = "<row $keyAttributeName=\"$key\">";
+                    $prefix = "<row $attribute>";
                     $suffix = "</row>";
-                    $emptyNode = "<row $keyAttributeName=\"$key\">";
+                    $emptyNode = "<row $attribute/>";
                 } elseif (!self::isValidXmlTagName($key)) {
-                    $prefix = "<row key=\"$key\">";
+                    $attribute = 'key="' . self::formatAttributeValueXml($key) . '"';
+
+                    $prefix = "<row $attribute>";
                     $suffix = "</row>";
-                    $emptyNode = "<row key=\"$key\"/>";
+                    $emptyNode = "<row $attribute/>";
                 } else {
                     $prefix = "<$key>";
                     $suffix = "</$key>";
@@ -197,13 +193,12 @@ class Xml extends Renderer
     /**
      * Computes the output for the given data table array
      *
-     * @param Map $table
      * @param array $array
-     * @param string $prefixLines
-     * @return string
      */
-    protected function renderDataTableMap($table, $array, $prefixLines = "")
+    protected function renderDataTableMap(Map $table, array $array, string $prefixLines = ''): string
     {
+        $nameDescriptionAttribute = self::getKeyNameForXml($table);
+
         // CASE 1
         //array
         //  'day1' => string '14' (length=2)
@@ -211,23 +206,22 @@ class Xml extends Renderer
         $firstTable = current($array);
         if (!is_array($firstTable)) {
             $xml = '';
-            $nameDescriptionAttribute = $table->getKeyName();
             foreach ($array as $valueAttribute => $value) {
                 if (empty($value)) {
-                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"$valueAttribute\" />\n";
+                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($valueAttribute) . "\" />\n";
                 } elseif ($value instanceof DataTable\DataTableInterface) {
                     //TODO somehow this code is not tested, cover this case
                     $out = $this->renderTable($value, true);
-                    $xml .= "\t<result $nameDescriptionAttribute=\"$valueAttribute\">\n$out</result>\n";
+                    $xml .= "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($valueAttribute) . "\">\n$out</result>\n";
                 } elseif (is_array($value)) {
                     if (!is_array(reset($value))) {
                         $out = $this->renderDataTableSimple($value);
                     } else {
                         $out = $this->renderDataTable($value);
                     }
-                    $xml .= "\t<result $nameDescriptionAttribute=\"$valueAttribute\">\n$out</result>\n";
+                    $xml .= "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($valueAttribute) . "\">\n$out</result>\n";
                 } else {
-                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"$valueAttribute\">" . self::formatValueXml($value) . "</result>\n";
+                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($valueAttribute) . "\">" . self::formatValueXml($value) . "</result>\n";
                 }
             }
             return $xml;
@@ -248,10 +242,9 @@ class Xml extends Renderer
         //      'nb_visits' => string '11'
         if ($firstTable instanceof Simple) {
             $xml = '';
-            $nameDescriptionAttribute = $table->getKeyName();
             foreach ($array as $valueAttribute => $dataTableSimple) {
                 if (count($dataTableSimple) == 0) {
-                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"$valueAttribute\" />\n";
+                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($valueAttribute) . "\" />\n";
                 } else {
                     if (is_array($dataTableSimple)) {
                         if (!is_array(reset($dataTableSimple))) {
@@ -260,7 +253,7 @@ class Xml extends Renderer
                             $dataTableSimple = "\n" . $this->renderDataTable($dataTableSimple, $prefixLines . "\t") . $prefixLines . "\t";
                         }
                     }
-                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"$valueAttribute\">" . $dataTableSimple . "</result>\n";
+                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($valueAttribute) . "\">" . $dataTableSimple . "</result>\n";
                 }
             }
             return $xml;
@@ -294,13 +287,12 @@ class Xml extends Renderer
         //          'nb_visits' => int 120
         if ($firstTable instanceof DataTable) {
             $xml = '';
-            $nameDescriptionAttribute = $table->getKeyName();
             foreach ($array as $keyName => $arrayForSingleDate) {
                 $dataTableOut = $this->renderDataTable($arrayForSingleDate, $prefixLines . "\t");
                 if (empty($dataTableOut)) {
-                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"$keyName\" />\n";
+                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($keyName) . "\" />\n";
                 } else {
-                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"$keyName\">\n";
+                    $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($keyName) . "\">\n";
                     $xml .= $dataTableOut;
                     $xml .= $prefixLines . "\t</result>\n";
                 }
@@ -311,10 +303,9 @@ class Xml extends Renderer
         if ($firstTable instanceof Map) {
             $xml = '';
             $tables = $table->getDataTables();
-            $nameDescriptionAttribute = $table->getKeyName();
             foreach ($tables as $valueAttribute => $tableInArray) {
                 $out = $this->renderTable($tableInArray, true, $prefixLines . "\t");
-                $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"$valueAttribute\">\n" . $out . $prefixLines . "\t</result>\n";
+                $xml .= $prefixLines . "\t<result $nameDescriptionAttribute=\"" . self::formatAttributeValueXml($valueAttribute) . "\">\n" . $out . $prefixLines . "\t</result>\n";
             }
             return $xml;
         }
@@ -326,10 +317,8 @@ class Xml extends Renderer
      * Computes the output for the given data array
      *
      * @param array $array
-     * @param string $prefixLine
-     * @return string
      */
-    protected function renderDataTable($array, $prefixLine = "")
+    protected function renderDataTable($array, string $prefixLine = ''): string
     {
         $columnsHaveInvalidChars = $this->areTableLabelsInvalidXmlTagNames(reset($array));
 
@@ -337,10 +326,11 @@ class Xml extends Renderer
         foreach ($array as $rowId => $row) {
             if (!is_array($row)) {
                 $value = self::formatValueXml($row);
+                [$tagStart, $tagEnd] = $this->getTagStartAndEndFor($rowId, false);
                 if (strlen($value) == 0) {
-                    $out .= $prefixLine . "\t\t<$rowId />\n";
+                    $out .= $prefixLine . "\t\t<$tagStart />\n";
                 } else {
-                    $out .= $prefixLine . "\t\t<$rowId>" . $value . "</$rowId>\n";
+                    $out .= $prefixLine . "\t\t<$tagStart>" . $value . "</$tagEnd>\n";
                 }
                 continue;
             }
@@ -348,8 +338,16 @@ class Xml extends Renderer
             // Handing case idgoal=7, creating a new array for that one
             $rowAttribute = '';
             if (strstr($rowId, '=') !== false) {
-                $rowAttribute = explode('=', $rowId);
-                $rowAttribute = " " . $rowAttribute[0] . "='" . $rowAttribute[1] . "'";
+                [$attributeName, $attributeValue] = explode('=', $rowId, 2);
+
+                // the part in front of the `=` has to be usable as an attribute name, otherwise the
+                // whole key is rendered as a `key` attribute instead
+                if (!self::isValidXmlTagName($attributeName)) {
+                    $attributeName = 'key';
+                    $attributeValue = $rowId;
+                }
+
+                $rowAttribute = " " . $attributeName . "='" . self::formatAttributeValueXml($attributeValue) . "'";
             }
             $out .= $prefixLine . "\t<row$rowAttribute>";
 
@@ -382,7 +380,7 @@ class Xml extends Renderer
                         $value = self::formatValueXml($value);
                     }
 
-                    list($tagStart, $tagEnd) = $this->getTagStartAndEndFor($name, $columnsHaveInvalidChars);
+                    [$tagStart, $tagEnd] = $this->getTagStartAndEndFor($name, $columnsHaveInvalidChars);
 
                     if (strlen((string) $value) == 0) {
                         $out .= $prefixLine . "\t\t<$tagStart />\n";
@@ -401,10 +399,8 @@ class Xml extends Renderer
      * Computes the output for the given data array (representing a simple data table)
      *
      * @param $array
-     * @param string $prefixLine
-     * @return string
      */
-    protected function renderDataTableSimple($array, $prefixLine = "")
+    protected function renderDataTableSimple($array, string $prefixLine = ''): string
     {
         if (!is_array($array)) {
             $array = array('value' => $array);
@@ -415,7 +411,7 @@ class Xml extends Renderer
         $out = '';
         foreach ($array as $keyName => $value) {
             $xmlValue = self::formatValueXml($value);
-            list($tagStart, $tagEnd) = $this->getTagStartAndEndFor($keyName, $columnsHaveInvalidChars);
+            [$tagStart, $tagEnd] = $this->getTagStartAndEndFor($keyName, $columnsHaveInvalidChars);
             if (is_string($xmlValue) && strlen($xmlValue) == 0) {
                 $out .= $prefixLine . "\t<$tagStart />\n";
             } elseif ($value instanceof DataTable || is_array($value)) {
@@ -434,17 +430,40 @@ class Xml extends Renderer
     }
 
     /**
-     * Returns true if a string is a valid XML tag name, false if otherwise.
-     *
-     * @param string $str
-     * @return bool
+     * Returns the key name of a map for use as an XML attribute name, or the generic `key` when it
+     * cannot be used as one.
      */
-    private static function isValidXmlTagName($str)
+    private static function getKeyNameForXml(Map $table): string
+    {
+        $keyName = (string) $table->getKeyName();
+
+        return self::isValidXmlTagName($keyName) ? $keyName : 'key';
+    }
+
+    /**
+     * Escapes a value so it can be used as an XML attribute value, no matter whether the attribute
+     * is quoted with double or single quotes.
+     *
+     * @param scalar $value
+     */
+    private static function formatAttributeValueXml($value): string
+    {
+        $value = (string) self::formatValueXml($value);
+
+        // legal in XML, but normalised to a space on parse unless encoded. the characters XML
+        // cannot hold at all are already dropped by formatValueXml()
+        return str_replace(["'", "\t", "\n", "\r"], ['&#039;', '&#9;', '&#10;', '&#13;'], $value);
+    }
+
+    /**
+     * Returns true if a string is a valid XML tag name, false if otherwise.
+     */
+    private static function isValidXmlTagName(string $str): bool
     {
         static $validTagRegex = null;
 
         if ($validTagRegex === null) {
-            $invalidTagChars = "!\"#$%&'()*+,\\/;<=>?@[\\]\\\\^`{|}~";
+            $invalidTagChars = "!\"#$%&'()*+,\\/;<=>?@[\\]\\\\^`{|}~\\s\\x00-\\x1f";
             $invalidTagStartChars = $invalidTagChars . "\\-.0123456789";
             $validTagRegex = "/^[^" . $invalidTagStartChars . "][^" . $invalidTagChars . "]*$/";
         }
@@ -453,7 +472,7 @@ class Xml extends Renderer
         return !empty($result);
     }
 
-    private function areTableLabelsInvalidXmlTagNames($rowArray)
+    private function areTableLabelsInvalidXmlTagNames($rowArray): bool
     {
         if (!empty($rowArray)) {
             foreach ($rowArray as $name => $value) {
@@ -465,15 +484,17 @@ class Xml extends Renderer
         return false;
     }
 
-    private function getTagStartAndEndFor($keyName, $columnsHaveInvalidChars)
+    private function getTagStartAndEndFor($keyName, $columnsHaveInvalidChars): array
     {
-        if ($columnsHaveInvalidChars) {
-            $tagStart = "col name=\"" . self::formatValueXml($keyName) . "\"";
+        // the name of a single column can be unusable as a tag name even when the columns of the
+        // first row, which decide the format used for the table, all were usable
+        if ($columnsHaveInvalidChars || !self::isValidXmlTagName((string) $keyName)) {
+            $tagStart = "col name=\"" . self::formatAttributeValueXml($keyName) . "\"";
             $tagEnd = "col";
         } else {
             $tagStart = $tagEnd = $keyName;
         }
 
-        return array($tagStart, $tagEnd);
+        return [$tagStart, $tagEnd];
     }
 }

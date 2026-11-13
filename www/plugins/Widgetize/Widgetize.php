@@ -19,7 +19,7 @@ class Widgetize extends \Piwik\Plugin
         return array(
             'AssetManager.getJavaScriptFiles'        => 'getJsFiles',
             'AssetManager.getStylesheetFiles'        => 'getStylesheetFiles',
-            'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys'
+            'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
         );
     }
 
@@ -51,6 +51,8 @@ class Widgetize extends \Piwik\Plugin
         $translations[] = 'Widgetize_DisplayDashboardInIframe';
         $translations[] = 'Widgetize_DisplayDashboardInIframeAllSites';
         $translations[] = 'Widgetize_ViewableAnonymously';
+        $translations[] = 'Widgetize_ViewableAnonymouslyUrlTokenRequirement';
+        $translations[] = 'Widgetize_UrlTokensDisabledByPolicy';
         $translations[] = 'Widgetize_EmbedIframe';
         $translations[] = 'Widgetize_DirectLink';
     }

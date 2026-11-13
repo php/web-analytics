@@ -19,9 +19,7 @@ abstract class ConsentManagerDetectionAbstract extends SiteContentDetectionAbstr
     /**
      * Returns if the consent manager was already connected to Matomo
      *
-     * @param string|null $data
-     * @param array|null $headers
-     * @return bool
+     * @param array<string,string>|null $headers
      */
     abstract public function checkIsConnected(?string $data = null, ?array $headers = null): bool;
 }

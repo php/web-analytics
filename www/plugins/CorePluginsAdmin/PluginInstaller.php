@@ -22,9 +22,6 @@ use Piwik\Plugins\Marketplace\Marketplace;
 use Piwik\Unzip;
 use Piwik\Plugins\Marketplace\Api\Client;
 
-/**
- *
- */
 class PluginInstaller
 {
     public const PATH_TO_DOWNLOAD = '/latest/plugins/';
@@ -129,7 +126,7 @@ class PluginInstaller
     {
         $dirs = array(
             StaticContainer::get('path.tmp') . self::PATH_TO_DOWNLOAD,
-            Manager::getPluginsDirectory()
+            Manager::getPluginsDirectory(),
         );
         // we do not require additional plugin directories to be writeable ({@link Manager::getPluginsDirectories()})
         // as we only upload to core plugins directory anyway
@@ -253,8 +250,7 @@ class PluginInstaller
 
     /**
      * @param $pluginDir
-     * @throws PluginInstallerException
-     * @return string
+     * @return string|false
      */
     private function getNameOfFirstSubfolder($pluginDir)
     {

@@ -12,8 +12,6 @@ namespace Piwik\Plugins\Transitions;
 use Piwik\Piwik;
 use Piwik\View;
 
-/**
- */
 class Controller extends \Piwik\Plugin\Controller
 {
     /**
@@ -33,6 +31,8 @@ class Controller extends \Piwik\Plugin\Controller
         'fromSearchEnginesInline'        => 'Referrers_TypeSearchEngines',
         'fromSocialNetworks'             => 'Transitions_FromSocialNetworks',
         'fromSocialNetworksInline'       => 'Referrers_TypeSocialNetworks',
+        'fromAIAssistants'       => 'Transitions_FromAIAssistants',
+        'fromAIAssistantsInline' => 'Referrers_TypeAIAssistants',
         'fromWebsites'                   => 'Transitions_FromWebsites',
         'fromWebsitesInline'             => 'Referrers_TypeWebsites',
         'fromCampaigns'                  => 'Transitions_FromCampaigns',
@@ -49,7 +49,7 @@ class Controller extends \Piwik\Plugin\Controller
         'outlinksInline'                 => 'Transitions_NumOutlinks',
         'exits'                          => 'General_ColumnExits',
         'exitsInline'                    => 'Transitions_ExitsInline',
-        'bouncesInline'                  => 'Transitions_BouncesInline'
+        'bouncesInline'                  => 'Transitions_BouncesInline',
     );
 
     /**
@@ -65,7 +65,7 @@ class Controller extends \Piwik\Plugin\Controller
         'PeriodNotAllowedDetails' => 'Transitions_PeriodNotAllowedDetails',
         'PeriodNotAllowedBack'    => 'Transitions_ErrorBack',
         'ShareOfAllPageviews'     => 'Transitions_ShareOfAllPageviews',
-        'DateRange'               => 'General_DateRange'
+        'DateRange'               => 'General_DateRange',
     );
 
     public static function getTranslation($key)

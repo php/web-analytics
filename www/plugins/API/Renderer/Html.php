@@ -28,20 +28,24 @@ class Html extends ApiRenderer
     {
         Common::sendHeader('Content-Type: text/plain; charset=utf-8', true);
 
-        return nl2br($message);
+        return $this->messageAsPlainText($message);
     }
 
     public function renderDataTable($dataTable)
     {
+        $idSite = $this->requestObj->getIntegerParameter('idSite', 0);
+        $method = Common::sanitizeInputValue($this->requestObj->getStringParameter('method', ''));
+
+        if (empty($idSite)) {
+            $idSite = 'all';
+        }
+
         /** @var \Piwik\DataTable\Renderer\Html $tableRenderer */
         $tableRenderer = $this->buildDataTableRenderer($dataTable);
-        $tableRenderer->setTableId($this->request['method']);
-
-        $method = Common::getRequestVar('method', '', 'string', $this->request);
-
+        $tableRenderer->setTableId($method);
         $tableRenderer->setApiMethod($method);
-        $tableRenderer->setIdSite(Common::getRequestVar('idSite', false, 'int', $this->request));
-        $tableRenderer->setTranslateColumnNames(Common::getRequestVar('translateColumnNames', false, 'int', $this->request));
+        $tableRenderer->setIdSite($idSite);
+        $tableRenderer->setTranslateColumnNames($this->requestObj->getBoolParameter('translateColumnNames', false));
 
         return $tableRenderer->render();
     }

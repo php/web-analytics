@@ -34,8 +34,6 @@ class UnexpectedFiles extends ConsoleCommand
 
     /**
      * Execute the command
-     *
-     * @return int
      */
     protected function doExecute(): int
     {
@@ -74,10 +72,6 @@ class UnexpectedFiles extends ConsoleCommand
 
     /**
      * Handle unexpected files command options
-     *
-     * @param bool $delete
-     *
-     * @return int
      */
     private function runUnexpectedFiles(bool $delete = false): int
     {
@@ -90,7 +84,7 @@ class UnexpectedFiles extends ConsoleCommand
             '/^config\/common.config.ini.php$/', // multi-tenant config file
             '/\.htaccess$/',                     // apache directory access rules
             '/^config\/config.php$/',            // DI customisation
-            '/^misc\/.*$/'                       // everything in the misc/ directory (geo databases, multi-tenant, etc)
+            '/^misc\/.*$/',                       // everything in the misc/ directory (geo databases, multi-tenant, etc)
         ];
 
         $files = FileIntegrity::getUnexpectedFilesList();
@@ -125,8 +119,6 @@ class UnexpectedFiles extends ConsoleCommand
 
     /**
      * Interact with the user to confirm the deletion
-     *
-     * @return bool
      */
     private function askForDeleteConfirmation(): bool
     {

@@ -14,8 +14,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_1_9_b16 extends Updates
 {
     /**
@@ -45,7 +43,7 @@ class Updates_1_9_b16 extends Updates
             ), 'excluded_parameters'),
 
             // enable Site Search for all websites, users can manually disable the setting
-            $this->migration->db->sql('UPDATE `' . Common::prefixTable('site') . '` SET `sitesearch` = 1')
+            $this->migration->db->sql('UPDATE `' . Common::prefixTable('site') . '` SET `sitesearch` = 1'),
         );
     }
 

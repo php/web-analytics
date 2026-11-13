@@ -33,14 +33,12 @@ class Sort extends BaseFilter
     public const ORDER_ASC  = 'asc';
 
     /**
-     * Constructor.
-     *
      * @param DataTable $table The table to eventually filter.
      * @param string $columnToSort The name of the column to sort by.
      * @param string $order order `'asc'` or `'desc'`.
      * @param bool $naturalSort Whether to use a natural sort or not (see {@link https://php.net/natsort}).
      * @param bool $recursiveSort Whether to sort all subtables or not.
-     * @param bool|callback $doSortBySecondaryColumn If true will sort by a secondary column. The column is automatically
+     * @param bool|callable $doSortBySecondaryColumn If true will sort by a secondary column. The column is automatically
      *                                               detected and will be either nb_visits or label, if possible.
      *                                               If callback given it will sort by the column returned by the callback (if any)
      *                                               callback will be called with 2 parameters: primaryColumnToSort and table

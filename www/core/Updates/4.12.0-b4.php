@@ -30,14 +30,12 @@ class Updates_4_12_0_b4 extends PiwikUpdates
     }
 
     /**
-     * @param Updater $updater
-     *
      * @return Migration[]
      */
     public function getMigrations(Updater $updater)
     {
         return [
-            $this->migration->db->addColumns('user', ['invite_link_token' => 'VARCHAR(191) DEFAULT null'])
+            $this->migration->db->addColumns('user', ['invite_link_token' => 'VARCHAR(191) DEFAULT null']),
         ];
     }
 

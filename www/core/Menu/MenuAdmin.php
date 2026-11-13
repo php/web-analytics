@@ -80,16 +80,26 @@ class MenuAdmin extends MenuAbstract
 
     /**
      * See {@link add()}. Adds a new menu item to the plugins section of the admin menu.
-     * @param string $menuName
      * @param array $url
-     * @param int $order
      * @param bool|string $tooltip
      * @api
      * @since 5.0.0
      */
-    public function addPluginItem(string $menuName, array $url, int $order = 50, $tooltip = false)
+    public function addPluginItem(string $menuName, array $url, int $order = 50, $tooltip = false, string $cssClass = '')
     {
-        $this->addItem('General_Plugins', $menuName, $url, $order, $tooltip);
+        $this->addItem(
+            'General_Plugins',
+            $menuName,
+            $url,
+            $order,
+            $tooltip,
+            $icon = false,
+            $onclick = false,
+            $attribute = false,
+            $help = false,
+            $badgeCount = 0,
+            $cssClass
+        );
     }
 
     /**
@@ -97,13 +107,14 @@ class MenuAdmin extends MenuAbstract
      * @param string $menuName
      * @param array $url
      * @param int $order
-     * @param bool|string $tooltip
+     * @param false|string $tooltip
+     * @param false|string $icon
      * @api
      * @since 3.0.0
      */
-    public function addMeasurableItem($menuName, $url, $order = 50, $tooltip = false)
+    public function addMeasurableItem($menuName, $url, $order = 50, $tooltip = false, $icon = false)
     {
-        $this->addItem('CoreAdminHome_MenuMeasurables', $menuName, $url, $order, $tooltip);
+        $this->addItem('CoreAdminHome_MenuMeasurables', $menuName, $url, $order, $tooltip, $icon);
     }
 
     /**
@@ -121,7 +132,8 @@ class MenuAdmin extends MenuAbstract
     }
 
     /**
-     * Triggers the Menu.MenuAdmin.addItems hook and returns the admin menu.
+     * Builds the admin menu by letting each plugin's Menu class configure it (via configureAdminMenu())
+     * and returns the resulting admin menu.
      *
      * @return array
      */

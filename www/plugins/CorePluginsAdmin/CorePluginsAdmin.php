@@ -31,7 +31,7 @@ class CorePluginsAdmin extends Plugin
             'Translate.getClientSideTranslationKeys' => 'getClientSideTranslationKeys',
             'Updater.componentUpdated'               => 'addPluginChanges',
             'PluginManager.pluginActivated'          => 'onPluginActivated',
-            'PluginManager.pluginDeactivated'        => 'removePluginChanges'
+            'PluginManager.pluginDeactivated'        => 'removePluginChanges',
         );
     }
 
@@ -46,9 +46,9 @@ class CorePluginsAdmin extends Plugin
     }
 
     /**
-     * Remove any changes from a plugin that has been uninstalled
+     * Remove any changes from a plugin that has been deactivated
      *
-     * @param string $pluginName The name of the plugin that was uninstalled
+     * @param string $pluginName The name of the plugin that was deactivated
      */
     public function removePluginChanges(string $pluginName)
     {
@@ -57,8 +57,6 @@ class CorePluginsAdmin extends Plugin
 
     /**
      * Retrieve an instantiated ChangesModel object
-     *
-     * @return ChangesModel
      */
     private function getChangesModel(): ChangesModel
     {
@@ -170,6 +168,14 @@ class CorePluginsAdmin extends Plugin
         $translations[] = 'General_Cancel';
         $translations[] = 'UsersManager_ConfirmThisChange';
         $translations[] = 'UsersManager_ConfirmWithPassword';
+        $translations[] = 'UsersManager_ConfirmWithReAuthentication';
         $translations[] = 'UsersManager_YourCurrentPassword';
+        $translations[] = 'PrivacyManager_PolicyControlledSettingLockedConfig';
+        $translations[] = 'PrivacyManager_PolicyControlledSettingLockedInstance';
+        $translations[] = 'PrivacyManager_PolicyControlledSettingLockedWebsite';
+        $translations[] = 'PrivacyManager_PolicyControlledSettingConstrainedConfig';
+        $translations[] = 'PrivacyManager_PolicyControlledSettingConstrainedInstance';
+        $translations[] = 'PrivacyManager_PolicyControlledSettingConstrainedWebsite';
+        $translations[] = 'PrivacyManager_ViewPrivacyComplianceOverview';
     }
 }

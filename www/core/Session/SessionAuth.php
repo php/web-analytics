@@ -46,6 +46,11 @@ class SessionAuth implements Auth
 
     private $tokenAuth;
 
+    /**
+     * @var bool
+     */
+    private $sessionExpired = false;
+
     public function __construct(?UsersModel $userModel = null, $shouldDestroySession = true)
     {
         $this->userModel = $userModel ?: new UsersModel();
@@ -54,11 +59,13 @@ class SessionAuth implements Auth
 
     public function getName()
     {
-        // empty
+        return null;
     }
 
-    public function setTokenAuth($token_auth)
-    {
+    public function setTokenAuth(
+        #[\SensitiveParameter]
+        $token_auth
+    ) {
         $this->tokenAuth = $token_auth;
     }
 
@@ -67,11 +74,13 @@ class SessionAuth implements Auth
         if (isset($this->user['login'])) {
             return $this->user['login'];
         }
+
+        return null;
     }
 
     public function getTokenAuthSecret()
     {
-        // empty
+        return null;
     }
 
     public function setLogin($login)
@@ -79,18 +88,23 @@ class SessionAuth implements Auth
         // empty
     }
 
-    public function setPassword($password)
-    {
+    public function setPassword(
+        #[\SensitiveParameter]
+        $password
+    ) {
         // empty
     }
 
-    public function setPasswordHash($passwordHash)
-    {
+    public function setPasswordHash(
+        #[\SensitiveParameter]
+        $passwordHash
+    ) {
         // empty
     }
 
     public function authenticate()
     {
+        $this->sessionExpired = false;
         $sessionFingerprint = new SessionFingerprint();
         $userModel = $this->userModel;
 
@@ -160,8 +174,11 @@ class SessionAuth implements Auth
         return new AuthResult(AuthResult::FAILURE, null, null);
     }
 
-    private function makeAuthSuccess($user, $tokenAuth)
-    {
+    private function makeAuthSuccess(
+        $user,
+        #[\SensitiveParameter]
+        $tokenAuth
+    ) {
         $this->user = $user;
         $this->tokenAuth = $tokenAuth;
 
@@ -222,7 +239,9 @@ class SessionAuth implements Auth
             Session::getSameSiteCookieValue()
         );
 
-        // ...and we also update the expiration time stored server side so we can prevent expired sessions from being reused
+        // ...and we keep the expiration stored server side in step with it, which is the value that
+        // actually prevents expired sessions from being reused. That one is only written once it
+        // has moved on materially, so it can lag the cookie slightly.
         $sessionFingerprint->updateSessionExpirationTime();
     }
 
@@ -234,7 +253,15 @@ class SessionAuth implements Auth
         }
 
         $isExpired = Date::now()->getTimestampUTC() > $expirationTime;
+        if ($isExpired) {
+            $this->sessionExpired = true;
+        }
         return $isExpired;
+    }
+
+    public function wasSessionExpired(): bool
+    {
+        return $this->sessionExpired;
     }
 
     private function checkIfSessionFailedToRead()

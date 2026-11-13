@@ -54,9 +54,6 @@ abstract class Period
     protected $translator;
 
     /**
-     * Constructor.
-     *
-     * @param Date $date
      * @ignore
      */
     public function __construct(Date $date)
@@ -137,7 +134,7 @@ abstract class Period
 
         $periods = $this->getSubperiods();
 
-        /** @var $currentPeriod Period */
+        /** @var Period $currentPeriod */
         $currentPeriod = $periods[0];
         while ($currentPeriod->getNumberOfSubperiods() > 0) {
             $periods       = $currentPeriod->getSubperiods();
@@ -182,7 +179,7 @@ abstract class Period
 
         $periods = $this->getSubperiods();
 
-        /** @var $currentPeriod Period */
+        /** @var Period $currentPeriod */
         $currentPeriod = $periods[count($periods) - 1];
         while ($currentPeriod->getNumberOfSubperiods() > 0) {
             $periods       = $currentPeriod->getSubperiods();
@@ -253,7 +250,6 @@ abstract class Period
      *
      * Note: the time component of the period's dates and `$date` is ignored.
      *
-     * @param Date $today
      * @return bool
      */
     public function isDateInPeriod(Date $date)
@@ -266,7 +262,6 @@ abstract class Period
     /**
      * Returns whether the given period date range intersects with this one.
      *
-     * @param Period $other
      * @return bool
      */
     public function isPeriodIntersectingWith(Period $other)
@@ -423,7 +418,7 @@ abstract class Period
         $intervalTokens = array(
             array('d', 'E', 'C'),
             array('M', 'L'),
-            array('y')
+            array('y'),
         );
 
         $offset = strlen($format);

@@ -13,8 +13,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_1_12_b1 extends Updates
 {
     /**
@@ -35,7 +33,7 @@ class Updates_1_12_b1 extends Updates
     public function getMigrations(Updater $updater)
     {
         return array(
-            $this->migration->db->addColumn('log_link_visit_action', 'custom_float', 'FLOAT NULL DEFAULT NULL')
+            $this->migration->db->addColumn('log_link_visit_action', 'custom_float', 'FLOAT NULL DEFAULT NULL'),
         );
     }
 

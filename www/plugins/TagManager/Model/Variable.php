@@ -9,12 +9,14 @@
 
 namespace Piwik\Plugins\TagManager\Model;
 
+use Piwik\Container\StaticContainer;
 use Piwik\Piwik;
 use Piwik\Plugins\TagManager\API\TagReference;
 use Piwik\Plugins\TagManager\API\TriggerReference;
 use Piwik\Plugins\TagManager\API\VariableReference;
 use Piwik\Plugins\TagManager\Dao\VariablesDao;
 use Piwik\Plugins\TagManager\Input\IdSite;
+use Piwik\Plugins\TagManager\Input\AccessValidator;
 use Piwik\Plugins\TagManager\Validators\LookupTable;
 use Piwik\Plugins\TagManager\Input\Name;
 use Piwik\Plugins\TagManager\Template\BaseTemplate;
@@ -87,6 +89,10 @@ class Variable extends BaseModel
         $this->validateValues($idSite, $name, $defaultValue, $lookupTable);
         $variable = $this->dao->getContainerVariable($idSite, $idContainerVersion, $idVariable);
         if (!empty($variable)) {
+            if ($variable['name'] !== $name) {
+                $this->checkRenameCanRewriteCustomTemplateReferences($idSite, $idContainerVersion, $variable['name']);
+            }
+
             $parameters = $this->formatParameters($variable['type'], $parameters);
             $columns = array(
                 'name' => $name,
@@ -268,6 +274,38 @@ class Variable extends BaseModel
         }
     }
 
+    private function checkRenameCanRewriteCustomTemplateReferences($idSite, $idContainerVersion, $oldVarName): void
+    {
+        $oldVarNameTemplate = $this->convertVariableNameToTemplateVar($oldVarName);
+
+        $tags = $this->tag->getContainerTags($idSite, $idContainerVersion);
+        $variables = $this->getContainerVariables($idSite, $idContainerVersion);
+
+        foreach (array_merge($tags, $variables) as $entity) {
+            if ($this->referenceIsInsideCustomTemplateBody($entity, $oldVarNameTemplate)) {
+                StaticContainer::get(AccessValidator::class)->checkUseCustomTemplatesCapability($idSite);
+                return;
+            }
+        }
+    }
+
+    private function referenceIsInsideCustomTemplateBody(array $entity, string $oldVarNameTemplate): bool
+    {
+        $type = isset($entity['type']) ? $entity['type'] : '';
+
+        if ($type === 'CustomJsFunction') {
+            $bodyParam = 'jsFunction';
+        } elseif ($type === 'CustomHtml') {
+            $bodyParam = 'customHtml';
+        } else {
+            return false;
+        }
+
+        return isset($entity['parameters'][$bodyParam])
+            && is_string($entity['parameters'][$bodyParam])
+            && strpos($entity['parameters'][$bodyParam], $oldVarNameTemplate) !== false;
+    }
+
     private function replaceVariableNameInParameters($entity, $oldVarName, $newVarName)
     {
         $oldVarNameTemplate = $this->convertVariableNameToTemplateVar($oldVarName);
@@ -295,15 +333,9 @@ class Variable extends BaseModel
 
     private function canParameterContainVariables(array $parameterMetadata, string $entityType)
     {
-        // If the parameter is for a variable component, or it's the jsFunction param of a CustomJsFunction variable
+        // Use the field metadata first, then keep legacy fallbacks for template types that allow inline variables.
         return (
-            (
-                isset($parameterMetadata['component'])
-                && in_array($parameterMetadata['component'], [
-                    BaseTemplate::FIELD_VARIABLE_COMPONENT,
-                    BaseTemplate::FIELD_VARIABLE_TYPE_COMPONENT
-                ])
-            )
+            self::hasFieldConfigVariableParameter($parameterMetadata)
             || ($entityType === 'CustomJsFunction' && $parameterMetadata['name'] === 'jsFunction')
             || ($entityType === 'CustomHtml' && $parameterMetadata['name'] === 'customHtml')
         );
@@ -331,9 +363,10 @@ class Variable extends BaseModel
                 $matches = [];
                 preg_match_all('/{{.[^}]+}}/', $parameters[$paramName], $matches);
                 $matches = array_unique($matches[0]);
-                $variables = array_map(function ($value) {
+                $matches = array_map(function ($value) {
                     return trim(str_replace(['{{', '}}'], '', $value));
                 }, $matches);
+                $variables = array_merge($variables, $matches);
             }
         }
 
@@ -351,9 +384,9 @@ class Variable extends BaseModel
         return $this->enrichVariables($variables);
     }
 
-    public function deleteContainerVariable($idSite, $idContainerVersion, $idVariable)
+    public function deleteContainerVariable($idSite, $idContainerVersion, $idVariable, $skipReferenceCheck = false)
     {
-        if ($this->getContainerVariableReferences($idSite, $idContainerVersion, $idVariable)) {
+        if (!$skipReferenceCheck && $this->getContainerVariableReferences($idSite, $idContainerVersion, $idVariable)) {
             throw new \Exception(Piwik::translate('TagManager_ErrorDeleteReferencedVariable'));
         }
         $this->dao->deleteContainerVariable($idSite, $idContainerVersion, $idVariable, $this->getCurrentDateTime());
@@ -369,6 +402,49 @@ class Variable extends BaseModel
     {
         $variable = $this->dao->findVariableByName($idSite, $idContainerVersion, $variableName);
         return $this->enrichVariable($variable);
+    }
+
+    public function usesCustomTemplates(int $idSite, int $idContainerVersion, int $idVariable, array &$checkedVariableNames = []): bool
+    {
+        $variable = $this->getContainerVariable($idSite, $idContainerVersion, $idVariable);
+
+        if (empty($variable)) {
+            return false;
+        }
+
+        return $this->variableUsesCustomTemplates($variable, $idSite, $idContainerVersion, $checkedVariableNames);
+    }
+
+    public function doesEntityReferenceCustomTemplates(array $entity, int $idSite, int $idContainerVersion, array &$checkedVariableNames = []): bool
+    {
+        $referencedVariableNames = $this->listVariableNamesInParameters($entity);
+
+        if (!empty($entity['idtrigger']) && !empty($entity['conditions']) && is_array($entity['conditions'])) {
+            foreach ($entity['conditions'] as $condition) {
+                if (!empty($condition['actual']) && is_string($condition['actual'])) {
+                    $referencedVariableNames[] = $condition['actual'];
+                }
+            }
+        }
+
+        foreach (array_unique($referencedVariableNames) as $variableName) {
+            if (isset($checkedVariableNames[$variableName])) {
+                continue;
+            }
+
+            $checkedVariableNames[$variableName] = true;
+
+            $variable = $this->findVariableByName($idSite, $idContainerVersion, $variableName);
+            if (empty($variable)) {
+                continue;
+            }
+
+            if ($this->variableUsesCustomTemplates($variable, $idSite, $idContainerVersion, $checkedVariableNames)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -452,12 +528,17 @@ class Variable extends BaseModel
         $idDestinationVersion = $idContainerVersion;
         if ($idDestinationSite !== null && !empty($idDestinationContainer)) {
             $idDestinationVersion = $this->getDraftContainerVersion($idDestinationSite, $idDestinationContainer);
+            $this->checkWriteCapabilityForContainerVersion($idDestinationSite, $idDestinationVersion, $idDestinationContainer);
+        } else {
+            $this->checkWriteCapabilityForContainerVersion($idDestinationSite, $idDestinationVersion);
         }
 
         $variable = $this->getContainerVariable($idSite, $idContainerVersion, $idVariable);
+        $this->checkDestinationCanUseCustomTemplate($variable, $idSite, $idDestinationSite);
         $newVarName = $this->dao->makeCopyNameUnique($idDestinationSite, $variable['name'], $idDestinationVersion);
 
         $this->copyReferencedVariables($variable, $idSite, $idContainerVersion, $idDestinationSite, $idDestinationVersion);
+        $this->postCopyVariableActivity($idSite, $idDestinationSite, $idContainerVersion, null, $idDestinationContainer, $variable);
 
         return $this->addContainerVariable(
             $idDestinationSite,
@@ -518,6 +599,7 @@ class Variable extends BaseModel
             throw new \Exception('Variable name cannot be empty');
         }
 
+        $this->checkDestinationCanUseCustomTemplate($variable, $idSite, $idDestinationSite);
         $this->copyReferencedVariables($variable, $idSite, $idContainerVersion, $idDestinationSite, $idDestinationContainerVersion);
 
         // Insert the new variable
@@ -533,7 +615,34 @@ class Variable extends BaseModel
             $variable['description']
         );
 
+        $this->postCopyVariableActivity($idSite, $idDestinationSite, $idContainerVersion, $idDestinationContainerVersion, null, $variable);
+
         return $newVarName;
+    }
+
+    private function variableUsesCustomTemplates(array $variable, int $idSite, int $idContainerVersion, array &$checkedVariableNames): bool
+    {
+        if (empty($variable)) {
+            return false;
+        }
+
+        if (!empty($variable['type']) && $this->variablesProvider->isCustomTemplate($variable['type'])) {
+            return true;
+        }
+
+        return $this->doesEntityReferenceCustomTemplates($variable, $idSite, $idContainerVersion, $checkedVariableNames);
+    }
+
+    private function checkDestinationCanUseCustomTemplate(array $variable, int $idSite, int $idDestinationSite): void
+    {
+        if ($idSite === $idDestinationSite || empty($variable['type'])) {
+            return;
+        }
+
+        $checkedVariableNames = [];
+        if ($this->variableUsesCustomTemplates($variable, $idSite, $variable['idcontainerversion'], $checkedVariableNames)) {
+            StaticContainer::get(AccessValidator::class)->checkUseCustomTemplatesCapability($idDestinationSite);
+        }
     }
 
     private function updateVariableColumns($idSite, $idContainerVersion, $idVariable, $columns)
@@ -587,5 +696,29 @@ class Variable extends BaseModel
         }
 
         return $variable;
+    }
+
+    private function postCopyVariableActivity(int $idSite, int $idDestinationSite, int $idContainerVersion, ?int $idDestinationContainerVersion, ?string $idDestinationContainer, array $variable)
+    {
+        if (class_exists('\Piwik\Plugins\ActivityLog\ActivityParamObject\EntityDuplicatedData')) {
+            $additionalData = [
+                'idSite' => $idSite,
+                'idDestinationSites' => $idDestinationSite,
+                'idContainerVersion' => $idContainerVersion,
+                'idDestinationContainer' => $idDestinationContainer,
+                'idDestinationContainerVersion' => $idDestinationContainerVersion,
+                'idVariable' => $variable['idvariable'],
+            ];
+            (
+            new \Piwik\Plugins\ActivityLog\ActivityParamObject\EntityDuplicatedData(
+                'TagManager_Variable',
+                $variable['name'],
+                $variable['idvariable'],
+                $idSite,
+                [$idDestinationSite],
+                $additionalData
+            )
+            )->postActivityEvent();
+        }
     }
 }

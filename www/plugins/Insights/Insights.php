@@ -9,8 +9,6 @@
 
 namespace Piwik\Plugins\Insights;
 
-/**
- */
 class Insights extends \Piwik\Plugin
 {
     /**
@@ -20,7 +18,7 @@ class Insights extends \Piwik\Plugin
     {
         return array(
             'AssetManager.getJavaScriptFiles' => 'getJsFiles',
-            'AssetManager.getStylesheetFiles' => 'getStylesheetFiles'
+            'AssetManager.getStylesheetFiles' => 'getStylesheetFiles',
         );
     }
 

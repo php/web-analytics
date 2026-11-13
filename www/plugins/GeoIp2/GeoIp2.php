@@ -17,9 +17,6 @@ use Piwik\Plugins\Installation\FormDefaultSettings;
 use Piwik\Plugins\UserCountry\LocationProvider;
 use Piwik\Scheduler\Scheduler;
 
-/**
- *
- */
 class GeoIp2 extends \Piwik\Plugin
 {
     public function registerEvents()
@@ -78,8 +75,6 @@ class GeoIp2 extends \Piwik\Plugin
 
     /**
      * Customize the Installation "default settings" form.
-     *
-     * @param FormDefaultSettings $form
      */
     public function installationFormInit(FormDefaultSettings $form)
     {
@@ -88,7 +83,7 @@ class GeoIp2 extends \Piwik\Plugin
             'setup_geoip2',
             null,
             [
-                'content' => '<div class="form-help">' . Piwik::translate('GeoIp2_AutomaticSetupDescription', ['<a rel="noreferrer noopener" target="_blank" href="https://db-ip.com/db/lite.php?refid=mtm">','</a>']) . '</div> &nbsp;&nbsp;' . Piwik::translate('GeoIp2_AutomaticSetup')
+                'content' => '<div class="form-help">' . Piwik::translate('GeoIp2_AutomaticSetupDescription', ['<a rel="noreferrer noopener" target="_blank" href="https://db-ip.com/db/lite.php?refid=mtm">','</a>']) . '</div> &nbsp;&nbsp;' . Piwik::translate('GeoIp2_AutomaticSetup'),
             ]
         );
 
@@ -100,8 +95,6 @@ class GeoIp2 extends \Piwik\Plugin
 
     /**
      * Process the submit on the Installation "default settings" form.
-     *
-     * @param FormDefaultSettings $form
      */
     public function installationFormSubmit(FormDefaultSettings $form)
     {
@@ -111,7 +104,7 @@ class GeoIp2 extends \Piwik\Plugin
             Option::set(GeoIP2AutoUpdater::AUTO_SETUP_OPTION_NAME, true);
             GeoIP2AutoUpdater::setUpdaterOptions([
                 'loc' => \Piwik\Plugins\GeoIp2\LocationProvider\GeoIp2::getDbIpLiteUrl(),
-                'period' => GeoIP2AutoUpdater::SCHEDULE_PERIOD_MONTHLY
+                'period' => GeoIP2AutoUpdater::SCHEDULE_PERIOD_MONTHLY,
             ]);
 
             $cliMulti = new CliMulti();

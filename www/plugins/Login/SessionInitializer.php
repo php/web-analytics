@@ -19,8 +19,6 @@ use Piwik\Plugins\UsersManager\API as UsersManagerAPI;
 use Piwik\ProxyHttp;
 use Piwik\Session;
 
-/**
- */
 class SessionInitializer
 {
     /**
@@ -57,8 +55,6 @@ class SessionInitializer
     private $authCookiePath;
 
     /**
-     * Constructor.
-     *
      * @param UsersManagerAPI|null $usersManagerAPI
      * @param string|null $authCookieName
      * @param int|null $authCookieValidTime
@@ -196,8 +192,11 @@ class SessionInitializer
      * @param string $token_auth authentication token
      * @return string hashed authentication token
      */
-    public static function getHashTokenAuth($login, $token_auth)
-    {
+    public static function getHashTokenAuth(
+        $login,
+        #[\SensitiveParameter]
+        $token_auth
+    ) {
         return md5($login . $token_auth);
     }
 }

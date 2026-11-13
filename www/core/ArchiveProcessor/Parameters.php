@@ -39,7 +39,7 @@ class Parameters
     private $segment = null;
 
     /**
-     * @var string Plugin name which triggered this archive processor
+     * @var string|bool Plugin name which triggered this archive processor, or false if none
      */
     private $requestedPlugin = false;
 
@@ -53,7 +53,7 @@ class Parameters
     /**
      * @var bool
      */
-    private $isArchiveOnlyReportHandled;
+    private $isArchiveOnlyReportHandled = false;
 
     /**
      * @var string[]|null
@@ -61,8 +61,6 @@ class Parameters
     private $foundRequestedReports;
 
     /**
-     * Constructor.
-     *
      * @ignore
      */
     public function __construct(Site $site, Period $period, Segment $segment)
@@ -290,6 +288,10 @@ class Parameters
             return false;
         }
 
+        if (!empty($this->getArchiveOnlyReport())) {
+            return true;
+        }
+
         return $this->isArchiveOnlyReportHandled;
     }
 
@@ -299,6 +301,7 @@ class Parameters
      * in an Archiver's __construct method.
      *
      * @param bool $isArchiveOnlyReportHandled
+     * @deprecated use `setArchiveOnlyReport` instead
      */
     public function setIsPartialArchive($isArchiveOnlyReportHandled)
     {

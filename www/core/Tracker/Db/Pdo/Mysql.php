@@ -23,7 +23,7 @@ use Piwik\Tracker\Db\DbException;
 class Mysql extends Db
 {
     /**
-     * @var PDO
+     * @var PDO|null
      */
     protected $connection = null;
 
@@ -148,7 +148,6 @@ class Mysql extends Db
 
     /**
      * @internal  tests only
-     * @param Exception $e
      * @return bool
      */
     public function isMysqlServerHasGoneAwayError(Exception $e)
@@ -192,8 +191,7 @@ class Mysql extends Db
      *
      * @param string $sql An SQL SELECT statement.
      * @param mixed $bind Data to bind into SELECT placeholders.
-     * @throws \Piwik\Tracker\Db\DbException
-     * @return string
+     * @return array|false
      */
     public function fetchCol($sql, $bind = array())
     {
@@ -266,7 +264,6 @@ class Mysql extends Db
 
     /**
      * @internal for tests only
-     * @param Exception $e
      * @throws Exception
      */
     public function reconnect(Exception $e)
@@ -358,7 +355,7 @@ class Mysql extends Db
     public function beginTransaction()
     {
         if ($this->activeTransaction !== null) {
-            return;
+            return null;
         }
 
         try {
@@ -378,13 +375,13 @@ class Mysql extends Db
             $this->activeTransaction = uniqid();
             return $this->activeTransaction;
         }
+
+        return null;
     }
 
     /**
      * Commit Transaction
      * @param $xid
-     * @throws DbException
-     * @internal param TransactionID $string from beginTransaction
      */
     public function commit($xid)
     {
@@ -402,8 +399,6 @@ class Mysql extends Db
     /**
      * Rollback Transaction
      * @param $xid
-     * @throws DbException
-     * @internal param TransactionID $string from beginTransaction
      */
     public function rollBack($xid)
     {

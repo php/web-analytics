@@ -16,11 +16,13 @@ use Piwik\DataTable\DataTableInterface;
 use Piwik\DataTable\Filter\ColumnDelete;
 use Piwik\DataTable\Filter\Pattern;
 use Piwik\DataTable\Renderer;
+use Piwik\ExceptionHandler;
 use Piwik\Http\HttpCodeException;
+use Piwik\Http\SecurityHeaders;
+use Piwik\Plugin\ReportsProvider;
 use Piwik\Plugins\Monolog\Processor\ExceptionToTextProcessor;
+use Piwik\Plugins\PrivacyManager\DataRounding;
 
-/**
- */
 class ResponseBuilder
 {
     private $outputFormat = null;
@@ -34,15 +36,27 @@ class ResponseBuilder
     private $shouldPrintBacktrace = false;
 
     /**
+     * Captured up front: a nested API call overlays `module=API` while it runs, which would
+     * otherwise make a page's own response look like API output. The module is checked rather
+     * than the root API method, as that is unset when the method name does not parse and the
+     * error response for those is a data response too.
+     *
+     * @var bool
+     */
+    private $isApiHttpRequest;
+
+    /**
      * @param string $outputFormat
      * @param array $request
+     * @param bool|null $shouldPrintBacktrace
      */
     public function __construct($outputFormat, $request = array(), $shouldPrintBacktrace = null)
     {
         $this->outputFormat = $outputFormat;
         $this->request      = $request;
         $this->apiRenderer  = ApiRenderer::factory($outputFormat, $request);
-        $this->shouldPrintBacktrace = $shouldPrintBacktrace === null ? \Piwik_ShouldPrintBackTraceWithMessage() : $shouldPrintBacktrace;
+        $this->shouldPrintBacktrace = $shouldPrintBacktrace === null ? ExceptionHandler::shouldPrintBackTraceWithMessage() : $shouldPrintBacktrace;
+        $this->isApiHttpRequest = Request::isApiHttpRequest();
     }
 
     public function disableSendHeader()
@@ -152,7 +166,7 @@ class ResponseBuilder
 
     /**
      * @param Exception|\Throwable $e
-     * @return Exception
+     * @return Exception|\Throwable
      */
     private function decorateExceptionWithDebugTrace($e)
     {
@@ -190,6 +204,17 @@ class ResponseBuilder
         if ($this->postProcessDataTable) {
             $postProcessor = new DataTablePostProcessor($this->apiModule, $this->apiMethod, $this->request);
             $datatable = $postProcessor->process($datatable);
+        } else {
+            $report = null;
+            if (
+                DataRounding::shouldApplyForRequest($this->request)
+                && !empty($this->apiModule)
+                && !empty($this->apiMethod)
+            ) {
+                $report = ReportsProvider::factory($this->apiModule, $this->apiMethod);
+            }
+
+            DataRounding::roundCountMetricsForRequest($datatable, $this->request, $report);
         }
 
         return $this->apiRenderer->renderDataTable($datatable);
@@ -197,6 +222,10 @@ class ResponseBuilder
 
     private function handleArray($array)
     {
+        if (!$this->shouldSkipRequestBasedArrayRounding() && DataRounding::shouldApplyForRequest($this->request)) {
+            $array = DataRounding::roundCountArrayValuesForRequest($array, $this->request);
+        }
+
         $firstArray = null;
         $firstKey   = null;
         if (!empty($array)) {
@@ -238,10 +267,30 @@ class ResponseBuilder
         return $this->apiRenderer->renderArray($array);
     }
 
+    private function shouldSkipRequestBasedArrayRounding(): bool
+    {
+        // MultiSites.getAllWithGroups applies per-row site-aware rounding later, so request-level array
+        // rounding here would double-round mixed-policy payloads based on the ambient request site list.
+        return $this->apiModule === 'MultiSites' && $this->apiMethod === 'getAllWithGroups';
+    }
+
     private function sendHeaderIfEnabled()
     {
-        if ($this->sendHeader) {
-            $this->apiRenderer->sendHeader();
+        if (!$this->sendHeader) {
+            return;
         }
+
+        if ($this->isApiHttpRequest) {
+            SecurityHeaders::sendForDataResponse();
+        }
+
+        // an API method that streamed its own response has already sent the content type for the
+        // body it wrote, and overwriting it would mislabel that body. A content type on its own
+        // says nothing, as one is also set for a response whose body is still to be rendered.
+        if (ob_get_contents() && '' !== Common::getSentHeader('Content-Type')) {
+            return;
+        }
+
+        $this->apiRenderer->sendHeader();
     }
 }

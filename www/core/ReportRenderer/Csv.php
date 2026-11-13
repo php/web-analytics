@@ -104,7 +104,7 @@ class Csv extends ReportRenderer
 
     /**
      * Render the provided report.
-     * Multiple calls to this method before calling outputRendering appends each report content.
+     * Multiple calls to this method before calling getRenderedReport appends each report content.
      *
      * @param array $processedReport @see API::getProcessedReport()
      */
@@ -134,7 +134,6 @@ class Csv extends ReportRenderer
     }
 
     /**
-     * @param DataTableInterface $table
      * @param string $uniqueId
      * @return \Piwik\DataTable\Renderer\Csv
      */

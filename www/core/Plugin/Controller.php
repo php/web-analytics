@@ -13,6 +13,8 @@ use Exception;
 use Piwik\Access;
 use Piwik\API\Proxy;
 use Piwik\API\Request;
+use Piwik\Plugins\UsersManager\UserPreferences;
+use Piwik\Request\AuthenticationToken;
 use Piwik\Changes\Model as ChangesModel;
 use Piwik\Changes\UserChanges;
 use Piwik\Common;
@@ -26,6 +28,7 @@ use Piwik\FrontController;
 use Piwik\Menu\MenuAdmin;
 use Piwik\Menu\MenuTop;
 use Piwik\NoAccessException;
+use Piwik\Notification;
 use Piwik\Notification\Manager as NotificationManager;
 use Piwik\Period\Month;
 use Piwik\Period;
@@ -76,6 +79,23 @@ use Piwik\ViewDataTable\Factory as ViewDataTableFactory;
 abstract class Controller
 {
     /**
+     * First upstream release of each PHP branch that fixes the critical vulnerabilities announced on 2026-10-21.
+     * Older branches get no upstream fix, newer branches were never affected.
+     */
+    private const PHP_CRITICAL_VULNERABILITY_FIXED_RELEASES = [
+        '8.2' => 35,
+        '8.3' => 36,
+        '8.4' => 27,
+        '8.5' => 12,
+    ];
+
+    private const PHP_CRITICAL_VULNERABILITY_ADVISORY_URL = 'https://www.php.net/archive/2026.php#2026-10-21-5';
+
+    private const PHP_CRITICAL_VULNERABILITY_ANNOUNCEMENT_URL = 'https://matomo.org/blog/2026/10/critical-php-security-vulnerabilities-important-update-for-matomo-users/';
+
+    private const PHP_CRITICAL_VULNERABILITY_NOTIFICATION_ID = 'PHPCriticalSecurityVulnerabilityCheck';
+
+    /**
      * The plugin name, eg. `'Referrers'`.
      *
      * @var string
@@ -124,8 +144,6 @@ abstract class Controller
     protected $securityPolicy = null;
 
     /**
-     * Constructor.
-     *
      * @api
      */
     public function __construct()
@@ -214,24 +232,24 @@ abstract class Controller
         $periodNames = array(
             'day'   => array(
                 'singular' => Piwik::translate('Intl_PeriodDay'),
-                'plural' => Piwik::translate('Intl_PeriodDays')
+                'plural' => Piwik::translate('Intl_PeriodDays'),
             ),
             'week'  => array(
                 'singular' => Piwik::translate('Intl_PeriodWeek'),
-                'plural' => Piwik::translate('Intl_PeriodWeeks')
+                'plural' => Piwik::translate('Intl_PeriodWeeks'),
             ),
             'month' => array(
                 'singular' => Piwik::translate('Intl_PeriodMonth'),
-                'plural' => Piwik::translate('Intl_PeriodMonths')
+                'plural' => Piwik::translate('Intl_PeriodMonths'),
             ),
             'year'  => array(
                 'singular' => Piwik::translate('Intl_PeriodYear'),
-                'plural' => Piwik::translate('Intl_PeriodYears')
+                'plural' => Piwik::translate('Intl_PeriodYears'),
             ),
             // Note: plural is not used for date range
             'range' => array(
                 'singular' => Piwik::translate('General_DateRangeInPeriodList'),
-                'plural' => Piwik::translate('General_DateRangeInPeriodList')
+                'plural' => Piwik::translate('General_DateRangeInPeriodList'),
             ),
         );
 
@@ -347,7 +365,6 @@ abstract class Controller
      *                                      an instance of an report.
      * @param bool $controllerAction The name of the Controller action name  that is rendering the report. Defaults
      *                               to the `$apiAction`.
-     * @param bool $fetch If `true`, the rendered string is returned, if `false` it is `echo`'d.
      * @throws \Exception if `$pluginName` is not an existing plugin or if `$apiAction` is not an
      *                    existing method of the plugin's API.
      * @return string|void See `$fetch`.
@@ -614,7 +631,6 @@ abstract class Controller
      * Will exit on error.
      *
      * @param View $view
-     * @param string|null $viewType 'basic' or 'admin'. If null, set based on the type of controller.
      * @return void
      * @api
      */
@@ -700,9 +716,61 @@ abstract class Controller
 
         $notifications = $view->notifications;
         if (empty($notifications)) {
+            self::notifyWhenPhpVersionHasCriticalVulnerability();
+
             $view->notifications = NotificationManager::getAllNotificationsToDisplay();
             NotificationManager::cancelAllNonPersistent();
         }
+    }
+
+    /**
+     * @internal temporary warning, will be removed again
+     */
+    protected static function notifyWhenPhpVersionHasCriticalVulnerability(): void
+    {
+        if (defined('PIWIK_TEST_MODE')) { // to avoid changing every UI test
+            return;
+        }
+
+        // a token_auth request is likely an embedded page shown to the public, not a signed-in user
+        if (Piwik::isUserIsAnonymous() || StaticContainer::get(AuthenticationToken::class)->getAuthToken() !== '') {
+            return;
+        }
+
+        if (!self::isPhpVersionAffectedByCriticalVulnerability(PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION)) {
+            // persistent notifications stay in the session, so drop it once PHP has been fixed
+            NotificationManager::cancel(self::PHP_CRITICAL_VULNERABILITY_NOTIFICATION_ID);
+            return;
+        }
+
+        $message = Piwik::translate('General_PhpCriticalSecurityUpdateRequired', [
+            PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION,
+            Url::getExternalLinkTag(self::PHP_CRITICAL_VULNERABILITY_ANNOUNCEMENT_URL),
+            '</a>',
+            '<a href="' . self::PHP_CRITICAL_VULNERABILITY_ADVISORY_URL . '" target="_blank" rel="noreferrer noopener">',
+            '</a>',
+        ]);
+
+        $notification = new Notification($message);
+        $notification->raw = true;
+        $notification->title = Piwik::translate('General_PhpCriticalSecurityUpdateRequiredTitle');
+        $notification->priority = Notification::PRIORITY_MAX;
+        $notification->context = Notification::CONTEXT_WARNING;
+        // persistent, so the reporting UI doesn't clear it when it renders a report like it does with transient ones
+        $notification->type = Notification::TYPE_PERSISTENT;
+        $notification->flags = Notification::FLAG_NO_CLEAR;
+        NotificationManager::notify(self::PHP_CRITICAL_VULNERABILITY_NOTIFICATION_ID, $notification);
+    }
+
+    private static function isPhpVersionAffectedByCriticalVulnerability(int $major, int $minor, int $release): bool
+    {
+        $branch = $major . '.' . $minor;
+
+        if (isset(self::PHP_CRITICAL_VULNERABILITY_FIXED_RELEASES[$branch])) {
+            return $release < self::PHP_CRITICAL_VULNERABILITY_FIXED_RELEASES[$branch];
+        }
+
+        return version_compare($branch, '8.2', '<');
     }
 
     private function getValidDate(Date $date, Date $minDate, Date $maxDate)
@@ -727,6 +795,7 @@ abstract class Controller
     {
         $view->clientSideConfig = PiwikConfig::getInstance()->getClientSideOptions();
         $view->isSuperUser = Access::getInstance()->hasSuperUserAccess();
+        $view->userCurrentRole = Access::getInstance()->getRoleForSite($this->idSite);
         $view->hasSomeAdminAccess = Piwik::isUserHasSomeAdminAccess();
         $view->hasSomeViewAccess  = Piwik::isUserHasSomeViewAccess();
         $view->isUserIsAnonymous  = Piwik::isUserIsAnonymous();
@@ -762,7 +831,9 @@ abstract class Controller
         $view->logoSVG = $customLogo->getSVGLogoUrl();
         $view->hasSVGLogo = $customLogo->hasSVGLogo();
         $view->contactEmail = implode(',', Piwik::getContactEmailAddresses());
-        $view->themeStyles = ThemeStyles::get();
+
+        $themeMode = (new UserPreferences())->getThemeMode();
+        $view->themeStyles = ThemeStyles::get($themeMode);
 
         $general = PiwikConfig::getInstance()->General;
         $view->enableFrames = $general['enable_framed_pages']
@@ -811,7 +882,6 @@ abstract class Controller
      * Also calls {@link setHostValidationVariablesView()}.
      *
      * @param View $view
-     * @param string $viewType 'basic' or 'admin'. Used by ControllerAdmin.
      * @api
      */
     protected function setBasicVariablesView($view)
@@ -831,13 +901,12 @@ abstract class Controller
         $customLogo = new CustomLogo();
         $view->isCustomLogo  = $customLogo->isEnabled();
         $view->customFavicon = $customLogo->getPathUserFavicon();
+        $view->hasCustomLogo = CustomLogo::hasUserLogo();
+        $view->hasCustomFavicon = CustomLogo::hasUserFavicon();
     }
 
     /**
      * Set the template variables to show the what's new popup if appropriate
-     *
-     * @param View $view
-     * @return void
      */
     protected function showWhatIsNew(View $view): void
     {
@@ -898,13 +967,13 @@ abstract class Controller
             $changeTrustedHostsUrl = "index.php"
                 . Url::getCurrentQueryStringWithParametersModified(array(
                                                                         'module' => 'CoreAdminHome',
-                                                                        'action' => 'generalSettings'
+                                                                        'action' => 'generalSettings',
                                                                    ))
                 . "#trustedHostsSection";
 
             $warningStart = Piwik::translate('CoreHome_InjectedHostWarningIntro', array(
                                                                                       '<strong>' . $invalidUrl . '</strong>',
-                                                                                      '<strong>' . $validUrl . '</strong>'
+                                                                                      '<strong>' . $validUrl . '</strong>',
                                                                                  )) . ' <br/>';
 
             if (Piwik::hasUserSuperUserAccess()) {
@@ -915,7 +984,7 @@ abstract class Controller
                                                                                     '</a>',
                                                                                     "<br/><a href=\"$validUrl\">",
                                                                                     Common::sanitizeInputValue($validHost),
-                                                                                    '</a>'
+                                                                                    '</a>',
                                                                                ));
             } elseif (Piwik::isUserIsAnonymous()) {
                 $view->invalidHostMessage = $warningStart . ' '
@@ -923,7 +992,7 @@ abstract class Controller
                         "<br/><a href=\"$validUrl\">",
                         '</a>',
                         '<span style="display:none">',
-                        '</span>'
+                        '</span>',
                     ));
             } else {
                 $view->invalidHostMessage = $warningStart . ' '
@@ -931,7 +1000,7 @@ abstract class Controller
                                                                                        "<br/><a href=\"$validUrl\">",
                                                                                        '</a>',
                                                                                        $mailLinkStart,
-                                                                                       '</a>'
+                                                                                       '</a>',
                                                                                   ));
             }
             $view->invalidHostMessageHowToFix = '<p><b>How do I fix this problem and how do I login again?</b><br/> The Matomo Super User can manually edit the file /path/to/matomo/config/config.ini.php
@@ -1054,7 +1123,7 @@ abstract class Controller
      */
     protected function checkTokenInUrl()
     {
-        $tokenRequest = Common::getRequestVar('token_auth', false);
+        $tokenRequest = StaticContainer::get(AuthenticationToken::class)->getAuthToken();
         $tokenUser = Piwik::getCurrentUserTokenAuth();
 
         if (empty($tokenRequest) && empty($tokenUser)) {
@@ -1124,7 +1193,7 @@ abstract class Controller
             $menu->urlForDefaultUserParams($websiteId, $defaultPeriod, $defaultDate),
             $parameters
         );
-        $queryParams = !empty($parameters) ? '&' . Url::getQueryStringFromParameters($parameters) : '';
+        $queryParams = '&' . Url::getQueryStringFromParameters($parameters);
         $url = "index.php?module=%s&action=%s";
         $url = sprintf($url, $moduleToRedirect, $actionToRedirect);
         $url = $url . $queryParams;

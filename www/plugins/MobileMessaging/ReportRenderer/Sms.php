@@ -15,9 +15,6 @@ use Piwik\ReportRenderer;
 use Piwik\Site;
 use Piwik\View;
 
-/**
- *
- */
 class Sms extends ReportRenderer
 {
     public const FLOAT_REGEXP = '/[-+]?[0-9]*[\.,]?[0-9]+/';
@@ -85,7 +82,7 @@ class Sms extends ReportRenderer
                         },
                         $value
                     );
-                }
+                },
             ]
         );
 
@@ -99,7 +96,7 @@ class Sms extends ReportRenderer
                 function ($value) use ($floatRegex) {
                     $matched = preg_match($floatRegex, $value, $matches);
                     return $matched ? (float)$matches[0] : $value;
-                }
+                },
             ]
         );
 

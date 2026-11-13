@@ -77,6 +77,7 @@ import {
   translate,
   ContentTable,
   Passthrough,
+  Matomo,
 } from 'CoreHome';
 
 interface ConfigFileState {
@@ -87,6 +88,10 @@ export default defineComponent({
   props: {
     allConfigValues: {
       type: Object,
+      required: true,
+    },
+    configFilePath: {
+      type: String,
       required: true,
     },
   },
@@ -132,7 +137,7 @@ export default defineComponent({
         return `<div class="pre">${JSON.stringify(value, null, 4)}</div>`;
       }
 
-      return `${value}`;
+      return Matomo.helper.htmlEntities(`${value}`);
     },
     onHideUnchanged(event: Event) {
       if ((event.target as HTMLElement).tagName !== 'A') {
@@ -146,7 +151,7 @@ export default defineComponent({
     configFileIntro() {
       return translate(
         'Diagnostics_ConfigFileIntroduction',
-        '<code>"config/config.ini.php"</code>',
+        `<code>"${Matomo.helper.htmlEntities(this.configFilePath)}"</code>`,
       );
     },
   },

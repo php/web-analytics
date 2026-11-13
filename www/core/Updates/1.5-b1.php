@@ -13,8 +13,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_1_5_b1 extends Updates
 {
     /**
@@ -47,7 +45,7 @@ class Updates_1_5_b1 extends Updates
 
             $this->migration->db->addColumns('log_visit', array(
                 'visitor_days_since_order' => 'SMALLINT(5) UNSIGNED NOT NULL',
-                'visit_goal_buyer' => 'TINYINT(1) NOT NULL'
+                'visit_goal_buyer' => 'TINYINT(1) NOT NULL',
             )),
 
             $this->migration->db->addColumn('log_conversion', 'visitor_days_since_order', 'SMALLINT(5) UNSIGNED NOT NULL'),
@@ -59,7 +57,7 @@ class Updates_1_5_b1 extends Updates
                 'revenue_shipping' => 'float default NULL',
                 'revenue_discount' => 'float default NULL',
             )),
-            $this->migration->db->addUniqueKey('log_conversion', array('idsite', 'idorder'))
+            $this->migration->db->addUniqueKey('log_conversion', array('idsite', 'idorder')),
         );
     }
 

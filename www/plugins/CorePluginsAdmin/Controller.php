@@ -15,6 +15,7 @@ use Piwik\API\Request;
 use Piwik\Common;
 use Piwik\Container\StaticContainer;
 use Piwik\Exception\MissingFilePermissionException;
+use Piwik\ExceptionHandler;
 use Piwik\Filechecks;
 use Piwik\Filesystem;
 use Piwik\Nonce;
@@ -70,11 +71,7 @@ class Controller extends Plugin\ControllerAdmin
 
     /**
      * Controller constructor.
-     * @param Translator $translator
-     * @param Plugin\SettingsProvider $settingsProvider
-     * @param PluginInstaller $pluginInstaller
      * @param Plugins $marketplacePlugins
-     * @param PasswordVerifier $passwordVerify
      */
     public function __construct(
         Translator $translator,
@@ -108,13 +105,7 @@ class Controller extends Plugin\ControllerAdmin
             throw new \Exception('Plugin upload disabled by config');
         }
 
-        $nonce = Common::getRequestVar('nonce', null, 'string');
-
-        if (!Nonce::verifyNonce(MarketplaceController::INSTALL_NONCE, $nonce)) {
-            throw new \Exception($this->translator->translate('General_ExceptionSecurityCheckFailed'));
-        }
-
-        Nonce::discardNonce(MarketplaceController::INSTALL_NONCE);
+        Nonce::checkNonce(MarketplaceController::INSTALL_NONCE);
 
         if (
             !$this->passwordVerify->isPasswordCorrect(
@@ -147,7 +138,7 @@ class Controller extends Plugin\ControllerAdmin
             'name'        => $pluginMetadata->name,
             'version'     => $pluginMetadata->version,
             'isTheme'     => !empty($pluginMetadata->theme),
-            'isActivated' => $this->pluginManager->isPluginActivated($pluginMetadata->name)
+            'isActivated' => $this->pluginManager->isPluginActivated($pluginMetadata->name),
         );
 
         return $view->render();
@@ -302,7 +293,7 @@ class Controller extends Plugin\ControllerAdmin
             if (!isset($plugin['info'])) {
                 $suffix = $this->translator->translate('CorePluginsAdmin_PluginNotWorkingAlternative');
                 // If the plugin has been renamed, we do not show message to ask user to update plugin
-                list($pluginNameRenamed, $methodName) = Request::getRenamedModuleAndAction($pluginName, 'index');
+                [$pluginNameRenamed, $methodName] = Request::getRenamedModuleAndAction($pluginName, 'index');
                 if ($pluginName != $pluginNameRenamed) {
                     $suffix = "You may uninstall the plugin or manually delete the files in /path/to/matomo/plugins/$pluginName/";
                 }
@@ -365,7 +356,7 @@ class Controller extends Plugin\ControllerAdmin
             $lastError = array(
                 'message' => Common::getRequestVar('error_message', null, 'string'),
                 'file'    => Common::getRequestVar('error_file', null, 'string'),
-                'line'    => Common::getRequestVar('error_line', null, 'integer')
+                'line'    => Common::getRequestVar('error_line', null, 'integer'),
             );
         } elseif (empty($lastError)) {
             throw new Exception('Safemode not available');
@@ -379,7 +370,7 @@ class Controller extends Plugin\ControllerAdmin
 
             if (
                 !empty($lastError['backtrace'])
-                && \Piwik_ShouldPrintBackTraceWithMessage()
+                && ExceptionHandler::shouldPrintBackTraceWithMessage()
             ) {
                 $errorMessage .= $lastError['backtrace'];
             }
@@ -398,7 +389,7 @@ class Controller extends Plugin\ControllerAdmin
             throw new Exception("Error: " . var_export($lastError, true));
         }
 
-        if (!\Piwik_ShouldPrintBackTraceWithMessage()) {
+        if (!ExceptionHandler::shouldPrintBackTraceWithMessage()) {
             unset($lastError['backtrace']);
         }
 
@@ -441,7 +432,7 @@ class Controller extends Plugin\ControllerAdmin
             'pluginName' => Common::getRequestVar('pluginName'),
             'nonce' => Common::getRequestVar('nonce'),
             'redirectTo' => Common::getRequestVar('redirectTo', '', 'string'),
-            'referrer' => urlencode(Url::getReferrer()),
+            'referrer' => urlencode($this->getReferrerToRedirectTo()),
         ];
 
         if (!$this->passwordVerify->requirePasswordVerifiedRecently($params)) {
@@ -498,7 +489,7 @@ class Controller extends Plugin\ControllerAdmin
             'pluginName' => Common::getRequestVar('pluginName'),
             'nonce' => Common::getRequestVar('nonce'),
             'redirectTo' => Common::getRequestVar('redirectTo'),
-            'referrer' => urlencode(Url::getReferrer()),
+            'referrer' => urlencode($this->getReferrerToRedirectTo()),
         ];
         if (!$this->passwordVerify->requirePasswordVerifiedRecently($params)) {
             return;
@@ -522,7 +513,7 @@ class Controller extends Plugin\ControllerAdmin
             'action' => 'uninstall',
             'pluginName' => Common::getRequestVar('pluginName'),
             'nonce' => Common::getRequestVar('nonce'),
-            'referrer' => urlencode(Url::getReferrer()),
+            'referrer' => urlencode($this->getReferrerToRedirectTo()),
         ];
         if (!$this->passwordVerify->requirePasswordVerifiedRecently($params)) {
             return;
@@ -582,13 +573,7 @@ class Controller extends Plugin\ControllerAdmin
     {
         Piwik::checkUserHasSuperUserAccess();
 
-        $nonce = Common::getRequestVar('nonce', null, 'string');
-
-        if (!Nonce::verifyNonce($nonceName, $nonce)) {
-            throw new \Exception($this->translator->translate('General_ExceptionSecurityCheckFailed'));
-        }
-
-        Nonce::discardNonce($nonceName);
+        Nonce::checkNonce($nonceName);
 
         $pluginName = Common::getRequestVar('pluginName', null, 'string');
 
@@ -597,6 +582,18 @@ class Controller extends Plugin\ControllerAdmin
         }
 
         return $pluginName;
+    }
+
+    /**
+     * The page to return to once the modification is done: the one the request names, if any, or
+     * else the HTTP referrer. A page can name itself to keep its URL fragment, which the Referer
+     * header never carries. Validated in {@link redirectAfterModification()}, not here.
+     */
+    private function getReferrerToRedirectTo(): string
+    {
+        $referrer = Common::unsanitizeInputValue(Common::getRequestVar('referrer', '', 'string'));
+
+        return $referrer !== '' ? $referrer : (string) Url::getReferrer();
     }
 
     protected function redirectAfterModification($redirectAfter)

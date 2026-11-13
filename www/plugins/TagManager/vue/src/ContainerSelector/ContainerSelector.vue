@@ -10,10 +10,11 @@
     @click="fetchContainers(); showContainerList = !showContainerList"
     :class="{expanded: showContainerList}"
     v-focus-anywhere-but-here="{ blur: onBlur }"
+    v-tooltips
     :title="translate('TagManager_ChooseContainer')"
   >
     <a class="title">
-      <span class="icon icon-chevron-down">&nbsp;</span>{{ truncateText(actualContainerName, 50) }}
+      {{ truncateText(actualContainerName, 50) }}<span class="icon icon-chevron-down">&nbsp;</span>
     </a>
     <div
       class="dropdown positionInViewport"
@@ -32,7 +33,7 @@
           </li>
           <li
             v-for="containerEntry in containers"
-            :title="`${containerEntry.name} (${containerEntry.idcontainer})`"
+            :title="this.htmlEntities(`${containerEntry.name} (${containerEntry.idcontainer})`)"
             :key="containerEntry.idcontainer"
           >
             <a :href="linkTo(containerEntry.idcontainer)">
@@ -54,6 +55,7 @@ import {
   FocusAnywhereButHere,
   ActivityIndicator,
   MatomoUrl,
+  Tooltips,
 } from 'CoreHome';
 import { Container } from '../types';
 
@@ -74,6 +76,7 @@ export default defineComponent({
   },
   directives: {
     FocusAnywhereButHere,
+    Tooltips,
   },
   data(): ContainerSelectorState {
     return {
@@ -118,6 +121,9 @@ export default defineComponent({
     },
     truncateText(text: string, length: number) {
       return tagManagerHelper.truncateText(text, length);
+    },
+    htmlEntities(v: string) {
+      return Matomo.helper.htmlEntities(v);
     },
   },
   computed: {

@@ -41,6 +41,8 @@ class Map implements DataTableInterface
      */
     protected $keyName = 'defaultKeyName';
 
+    protected $isBuiltWithoutArchives = true;
+
     /**
      * Returns a string description of the data used to index the DataTables.
      *
@@ -123,7 +125,7 @@ class Map implements DataTableInterface
      * If a key exists in this instance but not in one of the otherTables, $filter will be invoked with null
      * for that parameter.
      *
-     * @param Map[] $otherTables Other tables to invoke $filter with.
+     * @param (Map|null)[] $otherTables Other tables to invoke $filter with.
      * @param callable $filter A function like `function (DataTable $thisTable, $otherTable1, $otherTable2, ...) {}`.
      * @return mixed[] The return value of each `multiFilter()` call made on child tables, indexed by the keys in this Map instance.
      */
@@ -316,7 +318,7 @@ class Map implements DataTableInterface
      *
      * See {@link DataTable::deleteColumns()}.
      *
-     * @param array $columns The columns to delete.
+     * @param list<string|int> $columns The columns to delete.
      * @param bool $deleteRecursiveInSubtables This param is currently not used.
      */
     public function deleteColumns($columns, $deleteRecursiveInSubtables = false)
@@ -339,8 +341,8 @@ class Map implements DataTableInterface
     /**
      * Deletes the given column in every contained {@link DataTable}.
      *
+     * @param string|int $name
      * @see DataTable::deleteColumn
-     * @param string $name
      */
     public function deleteColumn($name)
     {
@@ -427,7 +429,7 @@ class Map implements DataTableInterface
         if ($firstChild instanceof Map) {
             $result = $firstChild->getEmptyClone();
 
-            /** @var $subDataTableMap Map */
+            /** @var Map $subDataTableMap */
             foreach ($this->getDataTables() as $label => $subDataTableMap) {
                 foreach ($subDataTableMap->getDataTables() as $innerLabel => $subTable) {
                     if (!isset($result->array[$innerLabel])) {
@@ -472,7 +474,7 @@ class Map implements DataTableInterface
             $row = new Row(array(
                                 Row::COLUMNS              => $columns,
                                 Row::METADATA             => $fromRow->getMetadata(),
-                                Row::DATATABLE_ASSOCIATED => $fromRow->getIdSubDataTable()
+                                Row::DATATABLE_ASSOCIATED => $fromRow->getIdSubDataTable(),
                            ));
             $toTable->addRow($row);
         }
@@ -484,8 +486,6 @@ class Map implements DataTableInterface
      * _Note: Will only add `$tableToSum` if the childTable has some rows._
      *
      * See {@link Piwik\DataTable::addDataTable()}.
-     *
-     * @param DataTable $tableToSum
      */
     public function addDataTable(DataTable $tableToSum)
     {
@@ -568,5 +568,15 @@ class Map implements DataTableInterface
             }
         }
         return array();
+    }
+
+    public function setAsBuiltWithoutArchives(bool $flag): void
+    {
+        $this->isBuiltWithoutArchives = $flag;
+    }
+
+    public function wasBuiltWithoutArchives(): bool
+    {
+        return $this->isBuiltWithoutArchives;
     }
 }

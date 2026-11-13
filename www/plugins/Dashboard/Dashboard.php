@@ -17,8 +17,6 @@ use Piwik\Category\Subcategory;
 use Piwik\Widget\WidgetConfig;
 use Piwik\Plugin;
 
-/**
- */
 class Dashboard extends \Piwik\Plugin
 {
     /**
@@ -34,7 +32,7 @@ class Dashboard extends \Piwik\Plugin
             'Widget.addWidgetConfigs'                => 'addWidgetConfigs',
             'Category.addSubcategories'              => 'addSubcategories',
             'Widgetize.shouldEmbedIframeEmpty'       => 'shouldEmbedIframeEmpty',
-            'Db.getTablesInstalled'                  => 'getTablesInstalled'
+            'Db.getTablesInstalled'                  => 'getTablesInstalled',
         );
     }
 
@@ -254,14 +252,14 @@ class Dashboard extends \Piwik\Plugin
         if (is_array($layoutObject)) {
             $layoutObject = (object)array(
                 'config'  => array('layout' => '33-33-33'),
-                'columns' => $layoutObject
+                'columns' => $layoutObject,
             );
         }
 
         if (empty($layoutObject) || empty($layoutObject->columns)) {
             $layoutObject = (object)array(
                 'config'  => array('layout' => '33-33-33'),
-                'columns' => array()
+                'columns' => array(),
             );
         }
 
@@ -279,7 +277,44 @@ class Dashboard extends \Piwik\Plugin
         $layout = str_replace("\\\"", "\"", $layout);
         $layout = str_replace("\n", "", $layout);
 
-        return json_decode($layout, $assoc = false);
+        $layout = json_decode($layout, $assoc = false);
+
+        $this->sanitizeWidgetUniqueIds($layout);
+
+        return $layout;
+    }
+
+    /**
+     * Restricts every widget unique id in a decoded layout to a plain-identifier character set.
+     *
+     * Widget unique ids are produced server side by {@see \Piwik\Widget\WidgetsList::getWidgetUniqueId()}
+     * and consist of identifier characters, so legitimate widgets are left untouched. Any value that was
+     * stored in a layout is reduced to that same set before consumers rely on it as a plain identifier.
+     *
+     * @param mixed $layout decoded layout as returned by json_decode()
+     */
+    private function sanitizeWidgetUniqueIds($layout): void
+    {
+        $columns = (is_object($layout) && isset($layout->columns)) ? $layout->columns : $layout;
+
+        // Columns and widgets are normally arrays, but a stored layout may encode them as objects.
+        // Iterate both shapes so the restriction cannot be sidestepped through the layout structure.
+        if (!is_array($columns) && !is_object($columns)) {
+            return;
+        }
+
+        foreach ($columns as $column) {
+            if (!is_array($column) && !is_object($column)) {
+                continue;
+            }
+
+            foreach ($column as $widget) {
+                if (is_object($widget) && property_exists($widget, 'uniqueId')) {
+                    $uniqueId = is_string($widget->uniqueId) ? $widget->uniqueId : '';
+                    $widget->uniqueId = preg_replace('/[^a-zA-Z0-9_.+-]/', '', $uniqueId);
+                }
+            }
+        }
     }
 
     public function encodeLayout($layout)
@@ -300,6 +335,7 @@ class Dashboard extends \Piwik\Plugin
         $stylesheets[] = "plugins/CoreHome/stylesheets/dataTable.less";
         $stylesheets[] = "plugins/Dashboard/stylesheets/dashboard.less";
         $stylesheets[] = "plugins/Dashboard/stylesheets/widget.less";
+        $stylesheets[] = "plugins/Dashboard/vue/src/AddWidgetModal/AddWidgetModal.less";
     }
 
     public function deleteDashboardLayout($userLogin)
@@ -332,6 +368,7 @@ class Dashboard extends \Piwik\Plugin
         $translationKeys[] = 'General_HelpResources';
         $translationKeys[] = 'General_Refresh';
         $translationKeys[] = 'Dashboard_ManageDashboard';
+        $translationKeys[] = 'Dashboard_ExportThisDashboard';
         $translationKeys[] = 'Dashboard_AddAWidget';
         $translationKeys[] = 'Dashboard_ResetDashboard';
         $translationKeys[] = 'Dashboard_ChangeDashboardLayout';
@@ -340,5 +377,7 @@ class Dashboard extends \Piwik\Plugin
         $translationKeys[] = 'Dashboard_SetAsDefaultWidgets';
         $translationKeys[] = 'Dashboard_CopyDashboardToUser';
         $translationKeys[] = 'Dashboard_CreateNewDashboard';
+        $translationKeys[] = 'General_Add';
+        $translationKeys[] = 'General_Added';
     }
 }

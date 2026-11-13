@@ -2,6 +2,10 @@
     "SitesManager": {
         "AddSite": "Add a new website",
         "AddMeasurable": "Add a new measurable",
+        "MeasurableNameHelpText": "Enter a unique name to clearly identify this measurable.",
+        "MeasurableNamePlaceholder": "Company website",
+        "MeasurableDescriptionHelpText": "Enter a description to provide additional context, such as the purpose or usage.",
+        "MeasurableDescriptionPlaceholder": "Tracking visitor activity for main website",
         "AdvancedTimezoneSupportNotFound": "Advanced timezones support was not found in your PHP (supported in PHP&gt;=5.2). You can still choose a manual UTC offset.",
         "AliasUrlHelp": "It is recommended, but not required, to specify the various URLs, one per line, that your visitors use to access this website. Alias URLs for a website will not appear in the Referrers → Websites report. Note that it is not necessary to specify the URLs with and without 'www' as Matomo automatically considers both.",
         "ChangingYourTimezoneWillOnlyAffectDataForward": "Changing your time zone will only affect data going forward, and will not be applied retroactively.",
@@ -21,6 +25,7 @@
         "ExceptionInvalidIPFormat": "The IP to exclude \"%1$s\" does not have a valid IP format (eg. %2$s).",
         "ExceptionInvalidTimezone": "The timezone \"%s\" is not valid. Please enter a valid timezone.",
         "ExceptionInvalidUrl": "The url '%s' is not a valid URL.",
+        "ExceptionInvalidWebsiteDescription": "The description is too long, max 255 characters are allowed.",
         "ExceptionNoUrl": "You must specify at least one URL for the website.",
         "ExcludedIps": "Excluded IPs",
         "ExcludedParameters": "Excluded Parameters",
@@ -105,12 +110,14 @@
         "UTCTimeIs": "UTC time is %s.",
         "OnlyMatchedUrlsAllowed": "Only track visits and actions when the action URL starts with one of the above URLs.",
         "OnlyMatchedUrlsAllowedHelp": "When enabled, Matomo will only track internal actions when the Page URL is one of the known URLs for your website. This prevents people from spamming your analytics with URLs for other websites.",
-        "OnlyMatchedUrlsAllowedHelpExamples": "The domain and the path have to be an exact match and each valid subdomain has to be specified separately. For example when the known URLs are 'http:\/\/example.com\/path' and 'http:\/\/good.example.com', tracking requests for 'http:\/\/example.com\/otherpath' or 'http:\/\/bad.example.com' are ignored.",
+        "OnlyMatchedUrlsAllowedHelpExamples": "The domain and the path have to be an exact match and each valid subdomain has to be specified separately. For example when the known URLs are 'http://example.com/path' and 'http://good.example.com', tracking requests for 'http://example.com/otherpath' or 'http://bad.example.com' are ignored.",
         "WebsitesManagement": "Websites Management",
         "WebsiteUpdated": "Website updated",
         "WebsiteCreated": "Website created",
         "XManagement": "Manage %s",
         "ChooseMeasurableTypeHeadline": "What would you like to measure?",
+        "ChooseMeasurableTypeSubheader": "A measurable is any website, app, or online system you want to track and analyse. Measurables are the foundation for collecting data and generating reports in Matomo.",
+        "ChooseMeasurableTypeSubheaderRollUp": "You can also group multiple measurables using a Roll-Up for a unified view.",
         "YouCurrentlyHaveAccessToNWebsites": "You currently have access to %s websites.",
         "YourCurrentIpAddressIs": "Your current IP address is %s",
         "DeleteSiteExplanation": "Deleting a website will delete all log data that has been collected for it. This action is permanent and cannot be undone.",
@@ -212,6 +219,10 @@
         "ExclusionViewListLink": "View list of exclusions",
         "ExceptionEmptyQueryParamsForCustomType": "Query parameters to exclude must be provided when exclusion type is custom",
         "ExceptionNonEmptyQueryParamsForNonCustomType": "Query parameters to exclude must not be provided when exclusion type is not custom",
-        "AddSensibleExclusionsToMyCustomListButtonText": "Add Matomo-recommended PII parameters"
+        "AddSensibleExclusionsToMyCustomListButtonText": "Add Matomo-recommended PII parameters",
+        "FilterPIIParametersSettingTitle": "PII Data Filtering Enabled",
+        "FilterPIIParametersSettingWhatItDoes": "Personally identifiable information is filtered from URL query parameters using Matomo's recommended PII exclusion list.<br><br>This prevents information such as names, email addresses, phone numbers, and account identifiers from being stored in URLs and reports.",
+        "FilterPIIParametersSettingImpact": "Matching personal information is removed from tracked and stored URLs. Reports cannot display or analyse the filtered values.",
+        "FilterPiiParametersSettingRequirementNote": "Personally Identifiable Information (PII) data must be filtered by the Matomo-recommended PII exclusion list."
     }
 }

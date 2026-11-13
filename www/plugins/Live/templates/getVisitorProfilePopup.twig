@@ -32,7 +32,7 @@
                                 {%- if visitorData.userId is empty %}
                                     {{ 'Live_VisitorProfile'|translate }}
                                 {%- else %}
-                                    <span title="{{ 'General_UserId'|translate }}: {{ visitorData.userId|rawSafeDecoded }}">{{ visitorData.userId|rawSafeDecoded }}</span>
+                                    <span title="{{ 'General_UserId'|translate }}: {{ visitorData.userId|rawSafeDecoded|e('html_attr') }}">{{ visitorData.userId|rawSafeDecoded }}</span>
                                 {% endif -%}
                             </h1>
                             {% if visitorData.nextVisitorId is not empty %}<a class="visitor-profile-next-visitor"
@@ -49,7 +49,7 @@
                                     <span>{{ visitorData.visitorId }}</span>
                                     {%- if widgetizedLink is defined %}</a>{% endif %}
                                 <a class="visitor-profile-export" href="{{ exportLink }}" target="_blank"
-                                   title="{{ 'General_ExportThisReport'|translate }}">
+                                   title="{{ 'Live_ExportThisDatasetToXml'|translate }}">
                                     <span class="icon-export"></span>
                                 </a>
                             </div>
@@ -70,9 +70,10 @@
                 </div>
                 <div class="visitor-profile-more-info">
                     {% if visitorData.lastVisits.getRowsCount() >= constant("Piwik\\Plugins\\Live\\VisitorProfile::VISITOR_PROFILE_MAX_VISITS_TO_SHOW") %}
-                        <a href="#">{{ 'Live_LoadMoreVisits'|translate }}</a> <img class="loadingPiwik"
-                                                                                   style="display:none;"
-                                                                                   src="plugins/Morpheus/images/loading-blue.gif"/>
+                        <a href="#">{{ 'Live_LoadMoreVisits'|translate }}</a>
+                        <span class="loadingPiwik" style="display:none;">
+                            {% include "@CoreHome/_loader.twig" %}
+                        </span>
                     {% else %}
                         <span class="visitor-profile-no-visits">
                             {% if visitorData.hasMoreVisits %}

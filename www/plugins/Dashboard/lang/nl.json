@@ -1,6 +1,6 @@
 {
     "Dashboard": {
-        "AddAWidget": "Widget toevoegen",
+        "AddAWidget": "Voeg widget toe aan dit dashboard",
         "AddPreviewedWidget": "Klik om het widget aan het dashboard toe te voegen",
         "ChangeDashboardLayout": "Wijzig de dashboard lay-out",
         "CopyDashboardToUser": "Dashboard naar gebruiker kopiëren",
@@ -15,7 +15,7 @@
         "DeleteWidgetConfirm": "Weet u zeker dat u dit widget van het dashboard wilt verwijderen?",
         "EmptyDashboard": "Maak het dashboard leeg - kies uw favoriete widgets",
         "LoadingWidget": "Bezig widget te laden, even geduld aub…",
-        "ManageDashboard": "Dashboard beheren",
+        "ManageDashboard": "Beheer dit dashboard",
         "Maximise": "Maximaliseren",
         "Minimise": "Minimaliseren",
         "NotUndo": "Je kunt deze verwijdering niet ongedaan maken.",
@@ -32,6 +32,7 @@
         "SetAsDefaultWidgetsConfirm": "Weet je zeker dat je de huidige selectie van widgets en dashboard lay-out wilt toepassen als het nieuwe standaard dashboard sjabloon?",
         "SetAsDefaultWidgetsConfirmHelp": "Deze selectie van widgets en dashboard lay-out zal gebruikt worden om nieuwe dashboards te maken voor nieuwe gebruikers, of wanneer de \"%s\" functie gebruikt is.",
         "TopLinkTooltip": "Bekijk web analyse rapporten voor %s.",
+        "TopMenuTitle": "Analytics",
         "WidgetNotFound": "Widget niet gevonden",
         "WidgetPreview": "Widget voorbeeld"
     }

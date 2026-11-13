@@ -26,10 +26,8 @@ class Console extends Renderer
 
     /**
      * Computes the dataTable output and returns the string/binary
-     *
-     * @return string
      */
-    public function render()
+    public function render(): string
     {
         return $this->renderTable($this->table);
     }
@@ -39,7 +37,7 @@ class Console extends Renderer
      *
      * @param string $str new prefix
      */
-    public function setPrefixRow($str)
+    public function setPrefixRow(string $str): void
     {
         $this->prefixRows = $str;
     }
@@ -49,9 +47,8 @@ class Console extends Renderer
      *
      * @param DataTable\Map $map data tables to render
      * @param string $prefix prefix to output before table data
-     * @return string
      */
-    protected function renderDataTableMap(DataTable\Map $map, $prefix)
+    protected function renderDataTableMap(DataTable\Map $map, string $prefix): string
     {
         $output = "Set<hr />";
         $prefix = $prefix . '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
@@ -66,11 +63,10 @@ class Console extends Renderer
     /**
      * Computes the given dataTable output and returns the string/binary
      *
-     * @param DataTable $table data table to render
+     * @param array|DataTable|DataTable\Map $table data table to render
      * @param string $prefix prefix to output before table data
-     * @return string
      */
-    protected function renderTable($table, $prefix = "")
+    protected function renderTable($table, string $prefix = ''): string
     {
         if (is_array($table)) {
             // convert array to DataTable
@@ -111,20 +107,25 @@ class Console extends Renderer
             }
             $columns = implode(", ", $columns);
 
-            $metadata = array();
-            foreach ($row->getMetadata() as $name => $value) {
-                if (is_string($value)) {
-                    $value = "'$value'";
-                } elseif (is_array($value)) {
-                    $value = var_export($value, true);
+            if ($this->hideMetadata) {
+                $output .= str_repeat($this->prefixRows, $depth)
+                    . "- $i [" . $columns . "]<br />\n";
+            } else {
+                $metadata = [];
+                foreach ($row->getMetadata() as $name => $value) {
+                    if (is_string($value)) {
+                        $value = "'$value'";
+                    } elseif (is_array($value)) {
+                        $value = var_export($value, true);
+                    }
+                    $metadata[] = "'$name' => $value";
                 }
-                $metadata[] = "'$name' => $value";
-            }
-            $metadata = implode(", ", $metadata);
+                $metadata = implode(", ", $metadata);
 
-            $output .= str_repeat($this->prefixRows, $depth)
-                . "- $i [" . $columns . "] [" . $metadata . "] [idsubtable = "
-                . $row->getIdSubDataTable() . "]<br />\n";
+                $output .= str_repeat($this->prefixRows, $depth)
+                    . "- $i [" . $columns . "] [" . $metadata . "] [idsubtable = "
+                    . $row->getIdSubDataTable() . "]<br />\n";
+            }
 
             if (!is_null($row->getIdSubDataTable())) {
                 $subTable = $row->getSubtable();
@@ -139,23 +140,25 @@ class Console extends Renderer
             $i++;
         }
 
-        $metadata = $table->getAllTableMetadata();
-        if (!empty($metadata)) {
-            $output .= "<hr />Metadata<br />";
-            foreach ($metadata as $id => $metadataIn) {
-                $output .= "<br />";
-                $output .= $prefix . " <b>$id</b><br />";
-                if (is_array($metadataIn)) {
-                    foreach ($metadataIn as $name => $value) {
-                        if (is_object($value) && !method_exists($value, '__toString')) {
-                            $value = 'Object [' . get_class($value) . ']';
-                        } elseif (is_array($value)) {
-                            $value = 'Array ' . json_encode($value);
+        if (!$this->hideMetadata) {
+            $metadata = $table->getAllTableMetadata();
+            if (!empty($metadata)) {
+                $output .= "<hr />Metadata<br />";
+                foreach ($metadata as $id => $metadataIn) {
+                    $output .= "<br />";
+                    $output .= $prefix . " <b>$id</b><br />";
+                    if (is_array($metadataIn)) {
+                        foreach ($metadataIn as $name => $value) {
+                            if (is_object($value) && !method_exists($value, '__toString')) {
+                                $value = 'Object [' . get_class($value) . ']';
+                            } elseif (is_array($value)) {
+                                $value = 'Array ' . json_encode($value);
+                            }
+                            if (is_array($value)) {
+                                $value = json_encode($value);
+                            }
+                            $output .= $prefix . $prefix . "$name => $value";
                         }
-                        if (is_array($value)) {
-                            $value = json_encode($value);
-                        }
-                        $output .= $prefix . $prefix . "$name => $value";
                     }
                 }
             }

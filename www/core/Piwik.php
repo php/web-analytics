@@ -291,7 +291,6 @@ class Piwik
     /**
      * Returns if the given user needs to confirm his password in UI and for certain API methods
      *
-     * @param string $login
      * @return bool
      */
     public static function doesUserRequirePasswordConfirmation(string $login)
@@ -526,9 +525,8 @@ class Piwik
 
     /**
      * Checks whether the user has the given capability or not.
-     * @param array $idSites
+     * @param int|array|string $idSites
      * @param string $capability
-     * @throws NoAccessException Thrown if the user does not have the given capability
      */
     public static function checkUserHasCapability($idSites, $capability)
     {
@@ -599,7 +597,7 @@ class Piwik
     /**
      * Checks that the current user has view access to the requested list of sites
      *
-     * @param int|array $idSites The list of site IDs to check access for.
+     * @param int|array|string $idSites The list of site IDs to check access for.
      * @throws Exception if the current user does not have view access to every site in the list.
      * @api
      */
@@ -700,8 +698,9 @@ class Piwik
      * array[]=value1&array[]=value2 in the URL.
      * This function will handle both cases and return the array.
      *
-     * @param array|string $columns
-     * @return array
+     * @param array<string>|string|null|false $columns
+     * @param bool $unique
+     * @return array<string>
      */
     public static function getArrayFromApiParameter($columns, $unique = true)
     {
@@ -752,9 +751,9 @@ class Piwik
     }
 
     /**
-     * Returns `true` if the login is valid.
+     * Checks that the login string is valid.
      *
-     * _Warning: does not check if the login already exists! You must use UsersManager_API->userExists as well._
+     * _Warning: does not check if the login already exists! You must use UsersManager\API->userExists as well._
      *
      * @param string $userLogin
      * @throws Exception

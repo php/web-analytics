@@ -11,8 +11,6 @@ namespace Piwik\Plugins\CoreConsole\Commands;
 
 use Piwik\Plugin\Manager;
 
-/**
- */
 class GenerateSettings extends GeneratePluginBase
 {
     protected function configure()
@@ -40,7 +38,7 @@ class GenerateSettings extends GeneratePluginBase
         $this->writeSuccessMessage(array(
              sprintf('%s for %s generated.', $settingsFilename, $pluginName),
              'You can now start defining your ' . $settingsType,
-             'Enjoy!'
+             'Enjoy!',
         ));
 
         return self::SUCCESS;

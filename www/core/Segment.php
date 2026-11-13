@@ -113,8 +113,6 @@ class Segment
     public const SEGMENT_HAS_BUILT_CACHE_KEY = 'segmenthashbuilt';
 
     /**
-     * Constructor.
-     *
      * When using segments that contain a != or !@ condition on a non visit dimension (e.g. action, conversion, ...) it
      * is needed to use a subquery to get correct results. To avoid subqueries that fetch too many data it's required to
      * set a startDate and/or an endDate in this case. That date will be used to limit the subquery (along with possibly
@@ -126,7 +124,6 @@ class Segment
      *                       dependent on the site, such as goal segments.
      * @param Date|null $startDate start date used to limit subqueries
      * @param Date|null $endDate end date used to limit subqueries
-     * @throws
      */
     public function __construct($segmentCondition, $idSites, ?Date $startDate = null, ?Date $endDate = null)
     {
@@ -184,9 +181,7 @@ class Segment
     /**
      * Checks if the provided segmentCondition is valid and available for the given idSites
      *
-     * @param string $segmentCondition
      * @params array $idSites
-     * @return bool
      * @api since Matomo 5.3.0
      */
     public static function isAvailable(string $segmentCondition, array $idSites): bool
@@ -353,7 +348,7 @@ class Segment
     {
         $requiresSubQuery = in_array($operator, [
                 SegmentExpression::MATCH_DOES_NOT_CONTAIN,
-                SegmentExpression::MATCH_NOT_EQUAL
+                SegmentExpression::MATCH_NOT_EQUAL,
             ]) && !$this->isVisitSegment($segmentName);
 
         if ($requiresSubQuery && empty($this->startDate) && empty($this->endDate)) {
@@ -438,11 +433,23 @@ class Segment
             // then we would join an extra table per segment when we ideally want to join each table only once. However, we still need
             // to see which table/column it joins to join it accurately each table extra if the same table is joined with different columns;
             $tableAlias = $join->getTable() . '_segment_' . str_replace('.', '', $sqlName ?: '');
+
+            $joinConditions = [$sqlName . ' = ' . $tableAlias . '.' . $join->getColumn()];
+
+            // additional key columns scope the join to the same row on both tables (eg the site id),
+            // so a value cannot match a row that only shares the primary join column
+            $sourceTable = strpos((string) $sqlName, '.') !== false ? strstr($sqlName, '.', true) : null;
+            if ($sourceTable !== null) {
+                foreach ($join->getAdditionalKeyColumns() as $keyColumn) {
+                    $joinConditions[] = $sourceTable . '.' . $keyColumn . ' = ' . $tableAlias . '.' . $keyColumn;
+                }
+            }
+
             $joinTable = [
                 'table' => $join->getTable(),
                 'tableAlias' => $tableAlias,
                 'field' => $tableAlias . '.' . $join->getTargetColumn(),
-                'joinOn' => $sqlName . ' = ' . $tableAlias . '.' . $join->getColumn(),
+                'joinOn' => implode(' AND ', $joinConditions),
             ];
 
             if ($dbDiscriminator) {
@@ -600,13 +607,17 @@ class Segment
      * @param false|string $groupBy (optional) Group by clause, eg, `"t2.col2"`.
      * @param int $limit Limit number of result to $limit
      * @param int $offset Specified the offset of the first row to return
-     * @param bool $forceGroupBy Force the group by and not using a subquery. Note: This may make the query slower see https://github.com/matomo-org/matomo/issues/9200#issuecomment-183641293
-     *                           A $groupBy value needs to be set for this to work.
-     * @param int If set to value >= 1 then the Select query (and All inner queries) will be LIMIT'ed by this value.
-     *              Use only when you're not aggregating or it will sample the data.
-     * @return array The entire select query.
+     * @param bool $forceGroupBy Keep the group by in the query instead of moving it into a subquery,
+     *                           see https://github.com/matomo-org/matomo/issues/9200#issuecomment-183641293
+     *                           A $groupBy value needs to be set for this to work. When the [Live]
+     *                           use_semi_join_query setting is enabled, which it is not by default, a
+     *                           query built the way the visits log builds it can get the group by
+     *                           replaced by a subquery matching the joined tables instead, which
+     *                           returns the same visits without sorting the whole date range first.
+     *                           Every other query keeps the group by.
+     * @return array{sql: string, bind: array<scalar>} The entire select query.
      */
-    public function getSelectQuery($select, $from, $where = false, $bind = array(), $orderBy = false, $groupBy = false, $limit = 0, $offset = 0, $forceGroupBy = false)
+    public function getSelectQuery($select, $from, $where = false, $bind = array(), $orderBy = false, $groupBy = false, $limit = 0, $offset = 0, $forceGroupBy = false, bool $withRollup = false)
     {
         if (Development::isEnabled() && !empty($this->missingDatesException)) {
             $e = new Exception();
@@ -635,7 +646,8 @@ class Segment
                 $bind,
                 $groupBy,
                 $orderBy,
-                $limitAndOffset
+                $limitAndOffset,
+                $withRollup
             );
         } catch (Exception $e) {
             if ($forceGroupBy && $groupBy) {

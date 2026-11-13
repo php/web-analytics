@@ -9,14 +9,12 @@
 
 namespace Piwik\Plugins\UserCountry;
 
+use Piwik\Columns\Dimension;
 use Piwik\Config;
 use Piwik\Container\StaticContainer;
 use Piwik\Intl\Data\Provider\RegionDataProvider;
 use Piwik\Plugins\GeoIp2\LocationProvider\GeoIp2;
 
-/**
- *
- */
 class UserCountry extends \Piwik\Plugin
 {
     /**
@@ -30,7 +28,16 @@ class UserCountry extends \Piwik\Plugin
             'AssetManager.getJavaScriptFiles'        => 'getJsFiles',
             'Tracker.setTrackerCacheGeneral'         => 'setTrackerCacheGeneral',
             'Insights.addReportToOverview'           => 'addReportToInsightsOverview',
+            'Metrics.getDefaultMetricSemanticTypes'  => 'addMetricSemanticTypes',
         );
+    }
+
+    /**
+     * @param array<string, string> $types
+     */
+    public function addMetricSemanticTypes(array &$types): void
+    {
+        $types[Archiver::DISTINCT_COUNTRIES_METRIC] = Dimension::TYPE_NUMBER;
     }
 
     public function getClientSideTranslationKeys(&$translations)

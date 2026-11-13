@@ -16,11 +16,15 @@ use Piwik\Common;
 use Piwik\Container\StaticContainer;
 use Piwik\DataTable;
 use Piwik\DataTable\DataTableInterface;
+use Piwik\DataTable\Map;
 use Piwik\DataTable\Row;
 use Piwik\Period;
 use Piwik\Period\Range;
 use Piwik\Piwik;
+use Piwik\Plugin\Manager;
+use Piwik\Plugins\BotTracking\Metrics as BotTrackingMetrics;
 use Piwik\Plugins\CoreHome\Columns\Metrics\EvolutionMetric;
+use Piwik\Plugins\PrivacyManager\DataRounding;
 use Piwik\Plugins\Goals\Archiver;
 use Piwik\Plugins\MultiSites\Columns\Metrics\EcommerceOnlyEvolutionMetric;
 use Piwik\Plugins\SitesManager\API as APISitesManager;
@@ -47,11 +51,13 @@ class API extends \Piwik\Plugin\API
     public const NB_PAGEVIEWS_LABEL = 'nb_pageviews';
     public const NB_PAGEVIEWS_METRIC = 'Actions_nb_pageviews';
     public const GOAL_REVENUE_METRIC = 'revenue';
+    public const AI_CHATBOTS_REQUESTS_LABEL = 'ai_chatbots_requests';
+    public const AI_CHATBOTS_REQUESTS_EVOLUTION_LABEL = 'ai_chatbots_requests_evolution';
     public const GOAL_CONVERSION_METRIC = 'nb_conversions';
     public const ECOMMERCE_ORDERS_METRIC = 'orders';
     public const ECOMMERCE_REVENUE_METRIC = 'ecommerce_revenue';
 
-    /** @var array<string,array<string,string>> */
+    /** @var array<string,array<string,string|false>> */
     private static $baseMetrics = [
         self::NB_VISITS_METRIC   => [
             self::METRIC_TRANSLATION_KEY        => 'General_ColumnNbVisits',
@@ -66,7 +72,7 @@ class API extends \Piwik\Plugin\API
             self::METRIC_RECORD_NAME_KEY        => self::NB_ACTIONS_METRIC,
             self::METRIC_COL_NAME_KEY           => self::NB_ACTIONS_METRIC,
             self::METRIC_IS_ECOMMERCE_KEY       => false,
-        ]
+        ],
     ];
 
     protected $autoSanitizeInputParams = false;
@@ -85,15 +91,22 @@ class API extends \Piwik\Plugin\API
      * site. If a date range is specified, the result will be a
      * DataTable\Map, but it will still be merged.
      *
-     * @param string $period The period type to get data for.
-     * @param string $date The date(s) to get data for.
-     * @param null|string $segment The segments to get data for.
-     * @param null|string $_restrictSitesToLogin Hack used to enforce we restrict the returned data to the specified username
-     *                                        Only used when a scheduled task is running
-     * @param bool $enhanced When true, return additional goal & ecommerce metrics
-     * @param null|string $pattern If specified, only the website which names (or site ID) match the pattern will be returned using SitesManager.getPatternMatchSites
-     * @param string|array<string> $showColumns If specified, only the requested columns will be fetched
-     * @return DataTableInterface
+     * @param 'day'|'week'|'month'|'year'|'range' $period The period to process, processes data for the period
+     *                                                   containing the specified date.
+     * @param string $date The date or date range to process.
+     *                     'YYYY-MM-DD', magic keywords (today, yesterday, lastWeek, lastMonth, lastYear),
+     *                     or date range (ie, 'YYYY-MM-DD,YYYY-MM-DD', lastX, previousX).
+     * @param string|null $segment Custom segment to filter the report.
+     *                             Example: "referrerName==example.com"
+     *                             Supports AND (;) and OR (,) operators.
+     * @param string|null $_restrictSitesToLogin Username used internally to restrict the visible sites while a
+     *                                           scheduled task is running.
+     * @param bool $enhanced `true` to include additional goal and ecommerce metrics, `false` to return the default
+     *                       metric set.
+     * @param string|null $pattern Site name or site ID pattern used to limit the matched websites.
+     * @param string|string[] $showColumns Metric columns to include, either as a comma-separated list or an array of
+     *                                     metric names.
+     * @return DataTable|Map Report rows for each matched site, including evolution metrics when available.
      */
     public function getAll(
         string $period,
@@ -150,9 +163,7 @@ class API extends \Piwik\Plugin\API
     /**
      * Fetches the list of sites which names match the string pattern
      *
-     * @param ?string $pattern
-     * @param ?string $_restrictSitesToLogin
-     * @return array<int>
+     * @return list<int>
      */
     private function getSitesIdFromPattern(?string $pattern, ?string $_restrictSitesToLogin): array
     {
@@ -178,7 +189,7 @@ class API extends \Piwik\Plugin\API
                 [
                     'pattern' => $pattern,
                     'limit'   => SettingsPiwik::getWebsitesCountToDisplay(),
-                    'format'  => 'original'
+                    'format'  => 'original',
                 ],
                 []
             );
@@ -193,17 +204,24 @@ class API extends \Piwik\Plugin\API
     }
 
     /**
-     * Same as getAll but for a unique Matomo site
+     * Returns the MultiSites metrics for a single website.
+     *
+     * @param int $idSite The numeric ID of the website to query.
+     * @param 'day'|'week'|'month'|'year'|'range' $period The period to process, processes data for the period
+     *                                                   containing the specified date.
+     * @param string $date The date or date range to process.
+     *                     'YYYY-MM-DD', magic keywords (today, yesterday, lastWeek, lastMonth, lastYear),
+     *                     or date range (ie, 'YYYY-MM-DD,YYYY-MM-DD', lastX, previousX).
+     * @param string|null $segment Custom segment to filter the report.
+     *                             Example: "referrerName==example.com"
+     *                             Supports AND (;) and OR (,) operators.
+     * @param string|null $_restrictSitesToLogin Username used internally to restrict the visible sites while a
+     *                                           scheduled task is running.
+     * @param bool $enhanced `true` to include additional goal and ecommerce metrics, `false` to return the default
+     *                       metric set.
+     * @return DataTable|Map Metrics for the requested website.
      * @see \Piwik\Plugins\MultiSites\API::getAll()
      *
-     * @param int $idSite Id of the Matomo site
-     * @param string $period The period type to get data for.
-     * @param string $date The date(s) to get data for.
-     * @param null|string $segment The segments to get data for.
-     * @param null|string $_restrictSitesToLogin Hack used to enforce we restrict the returned data to the specified username
-     *                                        Only used when a scheduled task is running
-     * @param bool $enhanced When true, return additional goal & ecommerce metrics
-     * @return DataTableInterface
      */
     public function getOne(
         int $idSite,
@@ -234,13 +252,17 @@ class API extends \Piwik\Plugin\API
     }
 
     /**
-     * @param null|string  $period
-     * @param null|string  $date
-     * @param null|string $segment
-     * @param string       $pattern
-     * @param int          $filter_limit
-     * @return array<string,mixed>
-     * @throws Exception
+     * Returns the MultiSites dashboard response grouped for the widget UI.
+     *
+     * @param 'day'|'week'|'month'|'year'|'range'|null $period Period type to query, or `null` to use the request
+     *                                                         default.
+     * @param string|null $date Date or date range to query, or `null` to use the request default.
+     * @param string|null $segment Custom segment to filter the report.
+     *                             Example: "referrerName==example.com"
+     *                             Supports AND (;) and OR (,) operators.
+     * @param string $pattern Search term used to filter the listed websites by name.
+     * @param int $filter_limit Maximum number of sites to include in the grouped response.
+     * @return array<string,mixed> Dashboard totals, last date, and grouped site rows for the MultiSites widget.
      */
     public function getAllWithGroups(
         ?string $period = null,
@@ -268,12 +290,17 @@ class API extends \Piwik\Plugin\API
             'numSites' => $dashboard->getNumSites(),
             'totals'   => $dashboard->getTotals(),
             'lastDate' => $dashboard->getLastDate(),
-            'sites'    => $dashboard->getSites($request, $filter_limit)
+            'sites'    => $dashboard->getSites($request, $filter_limit),
         ];
 
         return $response;
     }
 
+    /**
+     * @param list<int> $idSites
+     * @param list<string>|null $showColumns
+     * @return DataTable|Map
+     */
     private function buildDataTable(
         array $idSites,
         string $period,
@@ -296,7 +323,7 @@ class API extends \Piwik\Plugin\API
         $fieldsToGet = [];
         $columnNameRewrites = [];
         $apiECommerceMetrics = [];
-        $apiMetrics = API::getApiMetrics($enhanced);
+        $apiMetrics = API::getApiMetrics($enhanced, $segment);
         foreach ($apiMetrics as $metricName => $metricSettings) {
             if (!empty($showColumns) && !in_array($metricName, $showColumns)) {
                 unset($apiMetrics[$metricName]);
@@ -310,13 +337,17 @@ class API extends \Piwik\Plugin\API
             }
         }
 
-        /** @var DataTable|DataTable\Map $dataTable */
+        /** @var DataTable|Map $dataTable */
         $dataTable = $archive->getDataTableFromNumericAndMergeChildren($fieldsToGet);
 
         $this->populateLabel($dataTable);
 
         // replace record names with user friendly metric names
         $dataTable->filter('ReplaceColumnNames', [$columnNameRewrites]);
+
+        if (empty($segment)) {
+            $this->addAiChatbotsRequestsToHits($dataTable);
+        }
 
         $totalMetrics = $this->preformatApiMetricsForTotalsCalculation($apiMetrics);
         $this->setMetricsTotalsMetadata($dataTable, $totalMetrics);
@@ -334,9 +365,13 @@ class API extends \Piwik\Plugin\API
             }
 
             $pastArchive = Archive::build($idSites, $period, $strLastDate, $segment, $_restrictSitesToLogin);
+            /** @var DataTable|Map $pastData */
             $pastData = $pastArchive->getDataTableFromNumericAndMergeChildren($fieldsToGet);
             $pastData->filter('ReplaceColumnNames', [$columnNameRewrites]);
             $this->populateLabel($pastData); // labels are needed to calculate evolution
+            if (empty($segment)) {
+                $this->addAiChatbotsRequestsToHits($pastData);
+            }
             $this->calculateEvolutionPercentages($dataTable, $pastData, $apiMetrics);
             $this->setPreviousMetricsTotalsMetadata($dataTable, $pastData, $totalMetrics);
 
@@ -353,7 +388,7 @@ class API extends \Piwik\Plugin\API
                     return '';
                 }
                 return Site::getGroupFor($idSite);
-            }, []
+            }, [],
         ]);
         $dataTable->queueFilter('MetadataCallbackAddMetadata', [
             'idsite', 'main_url', function ($idSite) {
@@ -361,7 +396,7 @@ class API extends \Piwik\Plugin\API
                     return '';
                 }
                 return Site::getMainUrlFor($idSite);
-            }, []
+            }, [],
         ]);
 
         // set the label of each row to the site name
@@ -372,7 +407,7 @@ class API extends \Piwik\Plugin\API
                         return Piwik::translate('General_Others');
                     }
                     return Site::getNameFor($idSite);
-                }
+                },
             ]);
         } else {
             $dataTable->queueFilter('ColumnDelete', ['label']);
@@ -392,7 +427,7 @@ class API extends \Piwik\Plugin\API
                     self::NB_VISITS_METRIC,
                     function ($value) {
                         return $value == 0;
-                    }
+                    },
                 ]
             );
         }
@@ -411,6 +446,12 @@ class API extends \Piwik\Plugin\API
             unset($simpleTable);
         }
 
+        $roundingRequest = [
+            'idSite' => implode(',', $idSites),
+            'segment' => $segment ?? '',
+        ];
+        DataRounding::roundCountMetricsForRequest($dataTable, $roundingRequest);
+
         return $dataTable;
     }
 
@@ -418,10 +459,9 @@ class API extends \Piwik\Plugin\API
      * Performs a binary filter of two
      * DataTables in order to correctly calculate evolution metrics.
      *
-     * @param DataTable|DataTable\Map $currentData
-     * @param DataTable|DataTable\Map $pastData
+     * @param DataTable|Map $currentData
+     * @param DataTable|Map $pastData
      * @param array<string,array<string,string>> $apiMetrics The array of string fields to calculate evolution metrics for.
-     * @throws Exception
      */
     private function calculateEvolutionPercentages(
         DataTableInterface $currentData,
@@ -436,13 +476,15 @@ class API extends \Piwik\Plugin\API
             ));
         }
 
-        if ($currentData instanceof DataTable\Map) {
+        if ($currentData instanceof Map) {
+            /** @var Map $pastData */
             $pastArray = $pastData->getDataTables();
             foreach ($currentData->getDataTables() as $subTable) {
                 $this->calculateEvolutionPercentages($subTable, current($pastArray), $apiMetrics);
                 next($pastArray);
             }
         } else {
+            /** @var DataTable $pastData */
             $extraProcessedMetrics = $currentData->getMetadata(DataTable::EXTRA_PROCESSED_METRICS_METADATA_NAME);
             foreach ($apiMetrics as $metricSettings) {
                 $evolutionMetricClass = $this->isEcommerceEvolutionMetric($metricSettings)
@@ -463,9 +505,10 @@ class API extends \Piwik\Plugin\API
     }
 
     /**
+     * @return array<string,array<string,string|bool>>
      * @ignore
      */
-    public static function getApiMetrics(bool $enhanced): array
+    public static function getApiMetrics(bool $enhanced, ?string $segment = null): array
     {
         $metrics = self::$baseMetrics;
 
@@ -482,6 +525,16 @@ class API extends \Piwik\Plugin\API
                 self::METRIC_EVOLUTION_COL_NAME_KEY => 'hits_evolution',
                 self::METRIC_RECORD_NAME_KEY        => self::NB_HITS_METRIC,
                 self::METRIC_COL_NAME_KEY           => self::NB_HITS_LABEL,
+                self::METRIC_IS_ECOMMERCE_KEY       => false,
+            ];
+        }
+
+        if (Manager::getInstance()->isPluginActivated('BotTracking') && empty($segment)) {
+            $metrics[self::AI_CHATBOTS_REQUESTS_LABEL] = [
+                self::METRIC_TRANSLATION_KEY        => 'MultiSites_AiChatbotsRequests',
+                self::METRIC_EVOLUTION_COL_NAME_KEY => self::AI_CHATBOTS_REQUESTS_EVOLUTION_LABEL,
+                self::METRIC_RECORD_NAME_KEY        => BotTrackingMetrics::METRIC_AI_CHATBOTS_REQUESTS,
+                self::METRIC_COL_NAME_KEY           => self::AI_CHATBOTS_REQUESTS_LABEL,
                 self::METRIC_IS_ECOMMERCE_KEY       => false,
             ];
         }
@@ -544,7 +597,6 @@ class API extends \Piwik\Plugin\API
      * Sets the total visits, actions & revenue for a DataTable returned by
      * $this->buildDataTable.
      *
-     * @param DataTableInterface $dataTable
      * @param array<string,string> $apiMetrics Metrics info.
      */
     private function setMetricsTotalsMetadata(DataTableInterface $dataTable, array $apiMetrics): void
@@ -573,8 +625,8 @@ class API extends \Piwik\Plugin\API
      * Sets the previous total visits, actions & revenue for a DataTable returned by
      * $this->buildDataTable.
      *
-     * @param DataTable|DataTable\Map $dataTable
-     * @param DataTable|DataTable\Map $pastData
+     * @param DataTable|Map $dataTable
+     * @param DataTable|Map $pastData
      * @param array<string,string> $apiMetrics Metrics info.
      */
     private function setPreviousMetricsTotalsMetadata(
@@ -582,8 +634,9 @@ class API extends \Piwik\Plugin\API
         DataTableInterface $pastData,
         array $apiMetrics
     ): void {
-        if ($dataTable instanceof DataTable\Map) {
+        if ($dataTable instanceof Map) {
             $currentDataTables = $dataTable->getDataTables();
+            /** @var Map $pastData */
             $pastDataTables = $pastData->getDataTables();
             $currentLabels = array_keys($currentDataTables);
             $pastLabels = array_keys($pastDataTables);
@@ -656,6 +709,25 @@ class API extends \Piwik\Plugin\API
         return 'last_period_' . $name;
     }
 
+    /**
+     * @param DataTable|Map $table
+     */
+    private function addAiChatbotsRequestsToHits(DataTableInterface $table): void
+    {
+        $table->filter(function (DataTable $dataTable) {
+            foreach ($dataTable->getRows() as $row) {
+                $hits       = $row->getColumn(self::NB_HITS_LABEL);
+                $aiRequests = $row->getColumn(self::AI_CHATBOTS_REQUESTS_LABEL);
+
+                if (!is_numeric($hits) || !is_numeric($aiRequests)) {
+                    continue;
+                }
+
+                $row->setColumn(self::NB_HITS_LABEL, $hits + $aiRequests);
+            }
+        });
+    }
+
     private function populateLabel(DataTableInterface $dataTable): void
     {
         // ensure label column is set and always the first column
@@ -672,7 +744,7 @@ class API extends \Piwik\Plugin\API
         return in_array($metricSettings[self::METRIC_EVOLUTION_COL_NAME_KEY], [
             self::GOAL_REVENUE_METRIC . '_evolution',
             self::ECOMMERCE_ORDERS_METRIC . '_evolution',
-            self::ECOMMERCE_REVENUE_METRIC . '_evolution'
+            self::ECOMMERCE_REVENUE_METRIC . '_evolution',
         ]);
     }
 }

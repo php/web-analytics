@@ -508,9 +508,10 @@ class Zend_Session extends Zend_Session_Abstract
         }
 
         if (isset($_SESSION['data']) && is_string($_SESSION['data'])) {
-            $_SESSION = \Piwik\Common::safe_unserialize(base64_decode($_SESSION['data']), [
-                \Piwik\Notification::class
-            ]);
+            $_SESSION = \Piwik\Common::safe_unserialize(
+                base64_decode($_SESSION['data']),
+                \Piwik\Session::SESSION_DATA_ALLOWED_CLASSES
+            );
         }
 
         // run validators if they exist
@@ -712,7 +713,7 @@ class Zend_Session extends Zend_Session_Abstract
 
         if (isset($_SESSION)) {
             $sessionBkp = $_SESSION;
-            $_SESSION = array('data' => base64_encode(serialize($_SESSION)));
+            $_SESSION = self::buildSessionData($_SESSION);
         }
 
         session_write_close();
@@ -721,6 +722,11 @@ class Zend_Session extends Zend_Session_Abstract
         if (isset($sessionBkp)) {
             $_SESSION = $sessionBkp;
         }
+    }
+
+    public static function buildSessionData(array $data): array
+    {
+        return ['data' => base64_encode(serialize($data))];
     }
 
 

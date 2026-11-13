@@ -11,8 +11,6 @@ namespace Piwik\Plugins\CoreConsole\Commands;
 
 use Piwik\Plugin\Manager;
 
-/**
- */
 class GenerateApi extends GeneratePluginBase
 {
     protected function configure()
@@ -36,7 +34,7 @@ class GenerateApi extends GeneratePluginBase
         $this->writeSuccessMessage(array(
              sprintf('API.php for %s generated.', $pluginName),
              'You can now start adding API methods',
-             'Enjoy!'
+             'Enjoy!',
         ));
 
         return self::SUCCESS;

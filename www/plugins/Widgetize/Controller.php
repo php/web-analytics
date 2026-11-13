@@ -9,21 +9,26 @@
 
 namespace Piwik\Plugins\Widgetize;
 
-use Piwik\API\Request;
+use Piwik\API\Request as ApiRequest;
+use Piwik\Config\GeneralConfig;
+use Piwik\Request\AuthenticationToken;
 use Piwik\Common;
+use Piwik\Container\StaticContainer;
 use Piwik\FrontController;
 use Piwik\Piwik;
+use Piwik\Plugins\API\WidgetMetadata;
+use Piwik\Request;
 use Piwik\Url;
 use Piwik\View;
+use Piwik\Widget\WidgetConfig;
+use Piwik\Widget\WidgetsList;
 
-/**
- *
- */
 class Controller extends \Piwik\Plugin\Controller
 {
     public function index()
     {
         $view = new View('@Widgetize/index');
+        $view->onlyAllowSecureAuthTokens = GeneralConfig::getBoolConfigValue('only_allow_secure_auth_tokens', false);
         $this->setGeneralVariablesView($view);
         return $view->render();
     }
@@ -31,10 +36,11 @@ class Controller extends \Piwik\Plugin\Controller
     public function iframe()
     {
         // also called by FrontController, we call it explicitly as a safety measure in case something changes in the future
-        $token_auth = Common::getRequestVar('token_auth', '', 'string');
-        if (!empty($token_auth)) {
-            Request::checkTokenAuthIsNotLimited('Widgetize', 'iframe');
+        if (StaticContainer::get(AuthenticationToken::class)->getAuthToken()) {
+            ApiRequest::checkTokenAuthIsNotLimited('Widgetize', 'iframe');
         }
+
+        $this->assertUrlTokenAuthDidNotFail();
 
         $this->init();
 
@@ -73,7 +79,7 @@ class Controller extends \Piwik\Plugin\Controller
          *         }
          *     }
          *
-         * @param string &$shouldEmbedEmpty Defines whether the iframe should be embedded empty or wrapped within the widgetized html.
+         * @param bool   &$shouldEmbedEmpty Defines whether the iframe should be embedded empty or wrapped within the widgetized html.
          * @param string $controllerName    The name of the controller that will be executed.
          * @param string $actionName        The name of the action within the controller that will be executed.
          */
@@ -87,8 +93,110 @@ class Controller extends \Piwik\Plugin\Controller
 
         $this->setGeneralVariablesView($view);
         $view->setXFrameOptions('allow');
-        $view->content = FrontController::getInstance()->fetchDispatch($controllerName, $actionName);
+
+        $clientWidget = $this->findClientWidgetMetadata($controllerName, $actionName);
+        if (!empty($clientWidget)) {
+            $widgetView = new View('@Widgetize/clientWidget');
+            $widgetView->widget = $clientWidget;
+            $view->content = $widgetView->render();
+        } else {
+            $view->content = FrontController::getInstance()->fetchDispatch($controllerName, $actionName);
+
+            // Only actions that return HTML may be embedded into the widgetized iframe document.
+            $this->assertDispatchedContentIsEmbeddable($controllerName, $actionName);
+        }
 
         return $view->render();
+    }
+
+    /**
+     * When a widget URL includes a token_auth query parameter but the request ends up anonymous,
+     * the generic "You must be logged in" message hides the real cause (usually a token created
+     * with "Only allow secure requests" enabled, which cannot authenticate a GET request). Replace
+     * that message with a targeted one that explains the URL token requirement.
+     */
+    private function assertUrlTokenAuthDidNotFail(): void
+    {
+        $tokenAuth = Request::fromGet()->getStringParameter('token_auth', '');
+
+        // 'anonymous' is a valid token that intentionally authenticates as the anonymous user,
+        // so an anonymous result is not a failure for it.
+        if ($tokenAuth === '' || $tokenAuth === 'anonymous' || !Piwik::isUserIsAnonymous()) {
+            return;
+        }
+
+        if (GeneralConfig::getBoolConfigValue('only_allow_secure_auth_tokens', false)) {
+            $message = Piwik::translate(
+                'Widgetize_ErrorTokenAuthFailedDisabledByPolicy',
+                [
+                    '<a href="index.php?module=UsersManager" rel="noreferrer noopener" target="_blank">',
+                    '</a>',
+                ]
+            );
+        } else {
+            $message = Piwik::translate(
+                'Widgetize_ErrorTokenAuthFailed',
+                [
+                    '<a href="index.php?module=UsersManager&action=userSecurity" rel="noreferrer noopener" target="_blank">',
+                    '</a>',
+                    '<a href="index.php?module=UsersManager" rel="noreferrer noopener" target="_blank">',
+                    '</a>',
+                ]
+            );
+        }
+
+        $ex = new UrlTokenAuthFailedException($message);
+        $ex->setIsHtmlMessage();
+        throw $ex;
+    }
+
+    private function assertDispatchedContentIsEmbeddable(string $module, string $action): void
+    {
+        $contentType = Common::getSentHeader('Content-Type');
+
+        // An empty content type means the action did not set one explicitly and the (HTML) default applies.
+        // Only actions returning HTML (or no explicit content type) can be embedded into the iframe document.
+        if (
+            $contentType !== ''
+            && stripos($contentType, 'text/html') === false
+            && stripos($contentType, 'application/xhtml') === false
+        ) {
+            throw new \Exception(sprintf(
+                "%s.%s cannot be widgetized: only actions returning HTML can be embedded.",
+                $module,
+                $action
+            ));
+        }
+    }
+
+    private function findClientWidgetMetadata(string $module, string $action): ?array
+    {
+        $widgetsList = WidgetsList::get();
+
+        foreach ($widgetsList->getWidgetConfigs() as $config) {
+            if ($config->getModule() !== $module || $config->getAction() !== $action) {
+                continue;
+            }
+
+            if (empty($config->getClientSideComponent())) {
+                return null;
+            }
+
+            return $this->buildClientWidgetMetadata($config);
+        }
+
+        return null;
+    }
+
+    private function buildClientWidgetMetadata(WidgetConfig $config): ?array
+    {
+        if (!$config->isWidgetizeable()) {
+            return null;
+        }
+
+        $config->checkIsEnabled();
+
+        $metadata = new WidgetMetadata();
+        return $metadata->buildWidgetMetadata($config);
     }
 }

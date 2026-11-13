@@ -95,7 +95,11 @@ class Updater
 
         $newVersion = $this->getLatestVersion();
         $url = $this->getArchiveUrl($newVersion, $https);
-        $messages = array();
+        $messages = [];
+
+        $pluginManager = PluginManager::getInstance();
+        $activatedPlugins = $pluginManager->getActivatedPlugins();
+        Option::set('OneClickUpdate_ActivatedPlugins', json_encode($activatedPlugins));
 
         try {
             $archiveFile = $this->downloadArchive($newVersion, $url);
@@ -130,7 +134,7 @@ class Updater
                 $messages = array_merge($messages, $responseCliMulti);
             } else {
                 // there was likely an error eg such as an invalid ssl certificate... let's try executing it directly
-                // in case this works. For explample $response is in this case not an array but a string because the "communcation"
+                // in case this works. For example $response is in this case not an array but a string because the "communication"
                 // with the controller went wrong: "Got invalid response from API request: https://ABC/?module=CoreUpdater&action=oneClickUpdatePartTwo&nonce=ABC. Response was \'curl_exec: SSL certificate problem: unable to get local issuer certificate. Hostname requested was: ABC"
                 try {
                     $response = $this->oneClickUpdatePartTwo($newVersion);
@@ -168,7 +172,7 @@ class Updater
             $environment->setPiwikVersion($newVersion);
             /** @var \Piwik\Plugins\Marketplace\Api\Client $marketplaceClient */
             $marketplaceClient = StaticContainer::getContainer()->make('Piwik\Plugins\Marketplace\Api\Client', [
-                'environment' => $environment
+                'environment' => $environment,
             ]);
 
             try {
@@ -194,6 +198,37 @@ class Updater
             } catch (Exception $e) {
                 throw new UpdaterException($e, $messages);
             }
+        }
+
+        // get a list of previously activated plugins and try to reactivate them if there are no missing requirements
+        $previouslyActivePlugins = Option::get('OneClickUpdate_ActivatedPlugins');
+        if (false !== $previouslyActivePlugins) {
+            $previouslyActivePlugins = json_decode($previouslyActivePlugins, true);
+        } else {
+            $previouslyActivePlugins = [];
+        }
+        Option::delete('OneClickUpdate_ActivatedPlugins');
+
+        $reactivatedPlugins = [];
+        if (!empty($previouslyActivePlugins)) {
+            $pluginManager = PluginManager::getInstance();
+            foreach ($previouslyActivePlugins as $previouslyActivePluginName) {
+                if (!$pluginManager->isPluginActivated($previouslyActivePluginName)) {
+                    try {
+                        $plugin = $pluginManager->loadPlugin($previouslyActivePluginName);
+                        if (empty($plugin->getMissingDependencies($newVersion))) {
+                            $pluginManager->activatePlugin($previouslyActivePluginName);
+                            $reactivatedPlugins[] = $previouslyActivePluginName;
+                        }
+                    } catch (\Throwable $e) {
+                        // noop - we will try to reactivate other plugins in the list.
+                    }
+                }
+            }
+        }
+
+        if (!empty($reactivatedPlugins)) {
+            $messages[] = $this->translator->translate('CoreUpdater_ReactivatedPlugins', implode(', ', $reactivatedPlugins));
         }
 
         try {
@@ -275,7 +310,7 @@ class Updater
             '/core/Piwik.php',
             '/piwik.php',
             '/matomo.php',
-            '/plugins/API/API.php'
+            '/plugins/API/API.php',
         );
         foreach ($someExpectedFiles as $file) {
             if (!is_file($extractedArchiveDirectory . $file)) {
@@ -304,8 +339,40 @@ class Updater
         return $disabledPluginNames;
     }
 
+    /**
+     * Some dependency classes move to a different file path between Matomo major versions (for example
+     * psr/log moved from Psr/Log to src). Loading them now - while the current files are still in place -
+     * keeps them available to this already running process after installNewFiles() has replaced the files.
+     * Otherwise the initialised autoloader can no longer resolve them from their old paths and the rest of
+     * the update request fails (e.g. "Class Psr\Log\NullLogger not found").
+     *
+     * This is only needed for the one-click update from Matomo 5 to Matomo 6 (the upgrade in which psr/log
+     * relocates). It can be removed again in Matomo 6: once an install runs Matomo 6 the classes are already
+     * at their new location, so no preloading is required for subsequent updates.
+     */
+    private function preloadRelocatedClasses(): void
+    {
+        $classesToPreload = [
+            'Psr\Log\LoggerInterface',
+            'Psr\Log\AbstractLogger',
+            'Psr\Log\NullLogger',
+            'Psr\Log\LoggerTrait',
+            'Psr\Log\LogLevel',
+            'Psr\Log\InvalidArgumentException',
+            'Psr\Log\LoggerAwareInterface',
+            'Psr\Log\LoggerAwareTrait',
+        ];
+
+        foreach ($classesToPreload as $classToPreload) {
+            class_exists($classToPreload) || interface_exists($classToPreload) || trait_exists($classToPreload);
+        }
+    }
+
     private function installNewFiles($extractedArchiveDirectory)
     {
+        // Load classes that move to a different file path in the new version before any files are replaced.
+        $this->preloadRelocatedClasses();
+
         // Make sure the execute bit is set for this shell script
         if (!Rules::isBrowserTriggerEnabled()) {
             @chmod($extractedArchiveDirectory . '/misc/cron/archive.sh', 0755);
@@ -327,7 +394,7 @@ class Updater
          * These files are visible in the web root and are generally
          * served directly by the web server.  May be shared.
          */
-        if (PIWIK_INCLUDE_PATH !== PIWIK_DOCUMENT_ROOT) {
+        if (PIWIK_INCLUDE_PATH !== PIWIK_DOCUMENT_ROOT) { // @phpstan-ignore notIdentical.alwaysFalse
             // Copy PHP files that expect to be in the document root
             $specialCases = array(
                 '/index.php',

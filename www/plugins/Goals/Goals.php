@@ -23,10 +23,9 @@ use Piwik\Plugins\CoreHome\SystemSummary;
 use Piwik\Plugins\Goals\RecordBuilders\ProductRecord;
 use Piwik\Tracker\GoalManager;
 use Piwik\Category\Subcategory;
+use Piwik\Plugins\SegmentEditor\Settings\LimitSegments;
+use Piwik\Segment\SegmentsList;
 
-/**
- *
- */
 class Goals extends \Piwik\Plugin
 {
     public static function getReportsWithGoalMetrics()
@@ -111,6 +110,7 @@ class Goals extends \Piwik\Plugin
             'Metric.addComputedMetrics'              => 'addComputedMetrics',
             'System.addSystemSummaryItems'           => 'addSystemSummaryItems',
             'Archiver.addRecordBuilders'             => 'addRecordBuilders',
+            'Segment.filterSegments'                 => 'filterSegments',
         );
         return $hooks;
     }
@@ -236,7 +236,7 @@ class Goals extends \Piwik\Plugin
             'revenue_tax'       => 'General_Tax',
             'revenue_shipping'  => 'General_Shipping',
             'revenue_discount'  => 'General_Discount',
-            'avg_order_revenue' => 'General_AverageOrderValue'
+            'avg_order_revenue' => 'General_AverageOrderValue',
         );
 
         $metrics = array_map(array('\\Piwik\\Piwik', 'translate'), $metrics);
@@ -268,14 +268,13 @@ class Goals extends \Piwik\Plugin
     {
         $model = new Model();
         $model->deleteGoalsForSite($idSite);
+
+        (new Recommendations\RecommendationStore())->deleteAllForSite((int) $idSite);
     }
 
     /**
-     * Returns the Metadata for the Goals plugin API.
-     * The API returns general Goal metrics: conv, conv rate and revenue globally
-     * and for each goal.
-     *
-     * Also, this will update metadata of all other reports that have Goal segmentation
+     * Adds Goal metrics (conversions, conversion rate, revenue) to the metadata of all
+     * other reports that support Goal segmentation.
      */
     public function getReportMetadataEnd(&$reports, $info)
     {
@@ -289,7 +288,7 @@ class Goals extends \Piwik\Plugin
         $goalMetrics = array(
             'nb_conversions'  => Piwik::translate('Goals_ColumnConversions'),
             'conversion_rate' => Piwik::translate('General_ColumnConversionRate'),
-            'revenue'         => Piwik::translate('General_ColumnRevenue')
+            'revenue'         => Piwik::translate('General_ColumnRevenue'),
         );
 
         $goalMetricTypes = [
@@ -405,7 +404,7 @@ class Goals extends \Piwik\Plugin
                     'name'     => $report->getName(),
                     'module'   => $report->getModule(),
                     'action'   => $report->getAction(),
-                    'parameters' => $report->getParameters()
+                    'parameters' => $report->getParameters(),
                 );
             }
         }
@@ -482,6 +481,10 @@ class Goals extends \Piwik\Plugin
         $translationKeys[] = 'Goals_ClickToViewThisGoal';
         $translationKeys[] = 'Goals_ManageGoals';
         $translationKeys[] = 'Goals_GoalName';
+        $translationKeys[] = 'Goals_GoalNameHelpText';
+        $translationKeys[] = 'Goals_GoalNamePlaceholder';
+        $translationKeys[] = 'Goals_GoalDescriptionHelpText';
+        $translationKeys[] = 'Goals_GoalDescriptionPlaceholder';
         $translationKeys[] = 'Goals_GoalIsTriggeredWhen';
         $translationKeys[] = 'Goals_ThereIsNoGoalToManage';
         $translationKeys[] = 'Goals_ManuallyTriggeredUsingJavascriptFunction';
@@ -502,6 +505,7 @@ class Goals extends \Piwik\Plugin
         $translationKeys[] = 'Goals_Filename';
         $translationKeys[] = 'Goals_ExternalWebsiteUrl';
         $translationKeys[] = 'Goals_VisitDuration';
+        $translationKeys[] = 'Goals_VisitDurationMatchAttr';
         $translationKeys[] = 'Goals_AtLeastMinutes';
         $translationKeys[] = 'Goals_VisitPageTitle';
         $translationKeys[] = 'Intl_NMinutes';
@@ -521,6 +525,7 @@ class Goals extends \Piwik\Plugin
         $translationKeys[] = 'Goals_YouCanEnableEcommerceReports';
         $translationKeys[] = 'Goals_CategoryTextGeneral_Actions';
         $translationKeys[] = 'General_ForExampleShort';
+        $translationKeys[] = 'General_PleaseSpecifyValue';
         $translationKeys[] = 'General_Id';
         $translationKeys[] = 'General_Description';
         $translationKeys[] = 'General_ColumnRevenue';
@@ -530,5 +535,67 @@ class Goals extends \Piwik\Plugin
         $translationKeys[] = 'General_Yes';
         $translationKeys[] = 'General_No';
         $translationKeys[] = 'General_OrCancel';
+        $translationKeys[] = 'Goals_GoalCreated';
+        $translationKeys[] = 'Goals_GoalUpdated';
+        $translationKeys[] = 'Goals_ViewGoalReport';
+        $translationKeys[] = 'Goals_RecommendedGoals';
+        $translationKeys[] = 'Goals_RecommendedGoalsIntro';
+        $translationKeys[] = 'Goals_RecommendUseAi';
+        $translationKeys[] = 'Goals_RecommendAiToggleHelp';
+        $translationKeys[] = 'Goals_RecommendAiProviderFallback';
+        $translationKeys[] = 'Goals_RecommendAiNotActivated';
+        $translationKeys[] = 'Goals_RecommendAiNotActivatedHelp';
+        $translationKeys[] = 'Goals_RecommendAiNotConfigured';
+        $translationKeys[] = 'Goals_RecommendAiNotConfiguredHelp';
+        $translationKeys[] = 'Goals_RecommendGoals';
+        $translationKeys[] = 'Goals_RecommendCreate';
+        $translationKeys[] = 'Goals_RecommendCreateAll';
+        $translationKeys[] = 'Goals_RecommendCreateError';
+        $translationKeys[] = 'Goals_RecommendCreating';
+        $translationKeys[] = 'Goals_RecommendDismiss';
+        $translationKeys[] = 'Goals_RecommendDismissError';
+        $translationKeys[] = 'Goals_RecommendDismissSuggestion';
+        $translationKeys[] = 'Goals_RecommendNeedsSetup';
+        $translationKeys[] = 'Goals_RecommendNeedsSetupHelp';
+        $translationKeys[] = 'Goals_RecommendNoneFound';
+        $translationKeys[] = 'Goals_RecommendError';
+        $translationKeys[] = 'Goals_RecommendManualTitle';
+        $translationKeys[] = 'Goals_RecommendManualIntro';
+        $translationKeys[] = 'Goals_RecommendManualHowTo';
+        $translationKeys[] = 'Goals_RecommendManualStartInForm';
+        $translationKeys[] = 'Goals_RecommendationFallbackUsed';
+        $translationKeys[] = 'Goals_RecommendLastScanned';
+        $translationKeys[] = 'Goals_RecommendGoalsCreated';
+        $translationKeys[] = 'Goals_RecommendProgressAiRanking';
+        $translationKeys[] = 'Goals_RecommendProgressCrawling';
+        $translationKeys[] = 'Goals_RecommendProgressHint';
+        $translationKeys[] = 'Goals_RecommendRescan';
+        $translationKeys[] = 'Goals_RecommendScanAlreadyRunning';
+        $translationKeys[] = 'Goals_RecommendScansRemainingToday';
+        $translationKeys[] = 'Goals_RecommendShowMore';
+        $translationKeys[] = 'Goals_RecommendWhatDataIsShared';
+        $translationKeys[] = 'Goals_RecommendWhySuggested';
+        $translationKeys[] = 'Goals_RecommendTriggerContains';
+        $translationKeys[] = 'Goals_RecommendTriggerExact';
+        $translationKeys[] = 'Goals_RecommendTriggerGreaterThan';
+        $translationKeys[] = 'Goals_RecommendTriggerMatchesExpression';
+        $translationKeys[] = 'Goals_RecommendTriggerEventLabel';
+        $translationKeys[] = 'General_Added';
+        $translationKeys[] = 'General_ColumnPageviews';
+    }
+
+    public function filterSegments(SegmentsList &$list, array $idSites)
+    {
+        $limitSegmentsSettingEnabled = false;
+        if (empty($idSites)) {
+            $limitSegmentsSettingEnabled = LimitSegments::getInstance()->getValue();
+        } else {
+            foreach ($idSites as $idsite) {
+                $limitSegmentsSettingEnabled |= LimitSegments::getInstance($idsite)->getValue();
+            }
+        }
+        if ($limitSegmentsSettingEnabled) {
+            $list->remove('Goals_Conversion', 'orderId');
+        }
     }
 }

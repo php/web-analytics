@@ -10,11 +10,18 @@
 namespace Piwik\Plugins\Actions\Reports;
 
 use Piwik\Common;
+use Piwik\Config\GeneralConfig;
 use Piwik\Metrics;
 use Piwik\Metrics\Formatter;
 use Piwik\Piwik;
 use Piwik\Plugin\ViewDataTable;
 use Piwik\Plugins\Actions\Actions;
+use Piwik\Plugins\Actions\Columns\EntryPageTitle;
+use Piwik\Plugins\Actions\Columns\EntryPageUrl;
+use Piwik\Plugins\Actions\Columns\ExitPageTitle;
+use Piwik\Plugins\Actions\Columns\ExitPageUrl;
+use Piwik\Plugins\Actions\Columns\PageTitle;
+use Piwik\Plugins\Actions\Columns\PageUrl;
 use Piwik\Plugins\CoreVisualizations\Visualizations\HtmlTable;
 use Piwik\API\Request;
 
@@ -23,7 +30,7 @@ abstract class Base extends \Piwik\Plugin\Report
     protected function init()
     {
         $this->categoryId = 'General_Actions';
-        $this->processedMetrics = false;
+        $this->processedMetrics = [];
         $this->recursiveLabelSeparator = '/';
     }
 
@@ -69,7 +76,7 @@ abstract class Base extends \Piwik\Plugin\Report
     {
         $view->config->addTranslations(array(
             'nb_hits'             => Piwik::translate('General_ColumnPageviews'),
-            'nb_visits'           => Piwik::translate('General_ColumnUniquePageviews')
+            'nb_visits'           => Piwik::translate('General_ColumnUniquePageviews'),
         ));
 
         $formatter = new Formatter();
@@ -84,15 +91,15 @@ abstract class Base extends \Piwik\Plugin\Report
                 $hits,
                 "<br />",
                 $formatter->getPrettyTimeFromSeconds($min, true),
-                $formatter->getPrettyTimeFromSeconds($max, true)
+                $formatter->getPrettyTimeFromSeconds($max, true),
             ));
         };
         $view->config->filters[] = array('ColumnCallbackAddMetadata',
             array(
                 array('nb_hits_with_time_generation', 'min_time_generation', 'max_time_generation'),
                 'avg_time_generation_tooltip',
-                $tooltipCallback
-            )
+                $tooltipCallback,
+            ),
         );
 
         $this->addExcludeLowPopDisplayProperties($view);
@@ -122,5 +129,31 @@ abstract class Base extends \Piwik\Plugin\Report
                 return min($visitsInfo->getColumn('max_actions') - 1, $nbActionsLowPopulationThreshold - 1);
             };
         }
+    }
+
+    public function getRecursiveLabelSeparator()
+    {
+        $legacyDelimiter = GeneralConfig::getConfigValue('action_category_delimiter');
+        if (!empty($legacyDelimiter)) {
+            return $legacyDelimiter;
+        }
+
+        if (
+            $this->dimension instanceof PageTitle
+            || $this->dimension instanceof EntryPageTitle
+            || $this->dimension instanceof ExitPageTitle
+        ) {
+            return GeneralConfig::getConfigValue('action_title_category_delimiter') ?: $this->recursiveLabelSeparator;
+        }
+
+        if (
+            $this->dimension instanceof PageUrl
+            || $this->dimension instanceof EntryPageUrl
+            || $this->dimension instanceof ExitPageUrl
+        ) {
+            return GeneralConfig::getConfigValue('action_url_category_delimiter') ?: $this->recursiveLabelSeparator;
+        }
+
+        return parent::getRecursiveLabelSeparator();
     }
 }

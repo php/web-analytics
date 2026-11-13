@@ -1,5 +1,26 @@
 ## Changelog
 
+0.2.11
+
+* Fixed the "URI-decode Cookie" option of the Cookie variable having no effect
+
+0.2.10 - 22/06/2026
+
+* Fixed issue where ecommerce object would break when null
+
+0.2.9 - 05/05/2026
+
+*  Updated inline helptexts
+
+0.2.8 - 27/04/2026
+
+*  Updated API documentation
+
+
+0.2.7 - 02/03/2026
+
+*  Updated API documentation
+
 0.2.6
 
 * Fix changing name of variable causes removing trigger in a tag

@@ -54,8 +54,6 @@ class IniFileChain
     protected $mergedSettings = [];
 
     /**
-     * Constructor.
-     *
      * @param string[] $defaultSettingsFiles The list of paths to INI files w/ the default setting values.
      * @param string|null $userSettingsFile The path to the user settings file.
      */
@@ -76,7 +74,7 @@ class IniFileChain
             $this->mergedSettings[$name] = [];
         }
 
-        $result =& $this->mergedSettings[$name];
+        $result = & $this->mergedSettings[$name];
         return $result;
     }
 
@@ -137,7 +135,7 @@ class IniFileChain
      * all default setting files), it is not written to the user settings file.
      *
      * @param string $header The header of the INI output.
-     * @return string The dumped INI contents.
+     * @return string|null The dumped INI contents, or null if there are no changes to write.
      */
     public function dumpChanges($header = '')
     {
@@ -165,10 +163,8 @@ class IniFileChain
             // if either local/config have non-default values and the other doesn't,
             // OR both have values, but different values, we must write to config.ini.php
             if (
-                empty($changedSection) xor empty($existingMutableSection)
-                || (!empty($changedSection)
-                    && !empty($existingMutableSection)
-                    && self::compareElements($changedSection, $existingMutableSection))
+                (empty($changedSection) xor empty($existingMutableSection))
+                || self::compareElements($changedSection, $existingMutableSection)
             ) {
                 $dirty = true;
             }
@@ -366,7 +362,7 @@ class IniFileChain
      *
      * @param mixed $elem1
      * @param mixed $elem2
-     * @return int;
+     * @return int
      */
     public static function compareElements($elem1, $elem2)
     {

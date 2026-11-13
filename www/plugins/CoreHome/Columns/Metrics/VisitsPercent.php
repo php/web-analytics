@@ -29,8 +29,6 @@ class VisitsPercent extends ProcessedMetric
     private $forceTotalVisits = null;
 
     /**
-     * Constructor.
-     *
      * @param int|null $totalVisits The forced value of total visits to use.
      */
     public function __construct($totalVisits = null)
@@ -46,6 +44,11 @@ class VisitsPercent extends ProcessedMetric
     public function getTranslatedName()
     {
         return Piwik::translate('General_ColumnPercentageVisits');
+    }
+
+    public function getDocumentation()
+    {
+        return Piwik::translate('General_ColumnPercentageVisitsDocumentation');
     }
 
     public function compute(Row $row)

@@ -28,13 +28,10 @@
       >
         <div>
           <div
-            class="alert alert-warning"
+            class="alert alert-danger"
             v-show="isTriggerDisabled"
+            v-html="$sanitize(getNoCustomTemplatePermissionErrorMessage())"
           >
-            {{ translate(
-                'TagManager_UseCustomTemplateCapabilityRequired',
-                translate('TagManager_CapabilityUseCustomTemplates'),
-              ) }}
           </div>
           <div>
             <Field
@@ -44,7 +41,10 @@
               @update:model-value="trigger.name = $event; setValueHasChanged()"
               :maxlength="255"
               :title="translate('General_Name')"
-              :inline-help="translate('TagManager_TriggerNameHelp')"
+              :inline-help="translate(
+                'TagManager_NameHelpText',
+                translate('TagManager_TriggerLowercase'),
+              )"
               :placeholder="translate('TagManager_TriggerNamePlaceholder')"
             />
           </div>
@@ -56,7 +56,8 @@
               @update:model-value="trigger.description = $event; setValueHasChanged()"
               :maxlength="1000"
               :title="translate('TagManager_Description')"
-              :inline-help="translate('TagManager_TriggerDescriptionHelp')"
+              :inline-help="translate('TagManager_DescriptionHelpText')"
+              :ui-control-attributes="{ class: 'compact-textarea' }"
               :placeholder="translate('TagManager_TriggerDescriptionPlaceholder')"
             />
           </div>
@@ -152,17 +153,14 @@
             </div>
           </div>
           <div
-            class="alert alert-warning"
+            class="alert alert-danger"
             v-show="isTriggerDisabled"
+            v-html="$sanitize(getNoCustomTemplatePermissionErrorMessage())"
           >
-            {{ translate(
-                'TagManager_UseCustomTemplateCapabilityRequired',
-                translate('TagManager_CapabilityUseCustomTemplates'),
-              ) }}
           </div>
           <SaveButton
             class="createButton"
-            v-show="!isTriggerDisabled"
+            v-if="!isTriggerDisabled"
             @confirm="edit ? updateTrigger() : createTrigger()"
             :disabled="isUpdating || !isDirty"
             :saving="isUpdating"
@@ -645,6 +643,14 @@ export default defineComponent({
     hasPublishCapability() {
       return Matomo.hasUserCapability('tagmanager_write') && Matomo.hasUserCapability('tagmanager_use_custom_templates');
     },
+    getNoCustomTemplatePermissionErrorMessage() {
+      return translate(
+        'TagManager_UseCustomTemplateCapabilityPermissionRequiredDescription',
+        '<strong>',
+        translate('TagManager_CapabilityUseCustomTemplates'),
+        '</strong>',
+      );
+    },
   },
   computed: {
     isLoading() {
@@ -672,8 +678,10 @@ export default defineComponent({
     },
     collectionItemAvatarText() {
       return translate(
-        'TagManager_UseCustomTemplateCapabilityRequired',
+        'TagManager_UseCustomTemplateCapabilityPermissionRequiredDescription',
+        '',
         translate('TagManager_CapabilityUseCustomTemplates'),
+        '',
       );
     },
     triggerInlineHelpText() {

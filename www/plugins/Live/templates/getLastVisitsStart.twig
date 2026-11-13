@@ -4,33 +4,35 @@
 {% if error is not empty %}
 <div vue-entry="CoreHome.Alert" severity="danger">{{ error }}</div>
 {% else %}
-<ul id="visitsLive" vue-directive="Live.LastVisits">
+<ul id="visitsLive">
     {% for visitor in visitors.getRows() %}
-        <li id="{{ visitor.getColumn('idVisit') }}" class="visit">
+        <li id="vid{{ visitor.getColumn('idVisit') }}" class="visit" data-hash="{{ visitor|json_encode|md5 }}">
             <div style="display:none;" class="idvisit">{{ visitor.idVisit }}</div>
-            <div title="{{ visitor.getColumn('actionDetails')|length }} {{ 'General_Actions'|translate }}" class="datetime">
+            <div class="datetime">
                 <span style="display:none;" class="serverTimestamp">{{ visitor.getColumn('serverTimestamp')|raw }}</span>
                 {{ postEvent('Live.visitorLogWidgetViewBeforeVisitInfo', visitor) }}
                 {% set year = visitor.getColumn('serverTimestamp')|date('Y') %}
                 <span class="realTimeWidget_datetime">{{ visitor.getColumn('serverDatePretty')|replace({(year): ' '}) }} - {{ visitor.getColumn('serverTimePretty') }} {% if visitor.getColumn('visitDuration') > 0 %}({{ visitor.getColumn('visitDurationPretty')|raw }}){% endif %}</span>
-                {% if visitor.getColumn('userId')|default(false) is not empty %}
-                  &nbsp;  <a class="visits-live-launch-visitor-profile rightLink" title="{{ 'Live_ViewVisitorProfile'|translate }} {% if visitor.getColumn('userId') is not empty %}{{ visitor.getColumn('userId') }}{% endif %}" data-visitor-id="{{ visitor.getColumn('visitorId') }}">
-                        <span>{{ visitor.getColumn('userId')|rawSafeDecoded}}</span>
-                    </a>
-                {% endif %}
 
                 {{ postEvent('Live.renderVisitorIcons', visitor) }}
                 {% if isProfileEnabled and not userIsAnonymous %}
-                <a class="visits-live-launch-visitor-profile rightLink" title="{{ 'Live_ViewVisitorProfile'|translate }} {% if visitor.getColumn('userId') is not empty %}{{ visitor.getColumn('userId') }}{% endif %}" data-visitor-id="{{ visitor.getColumn('visitorId') }}">
-                    <span class="icon-visitor-profile"></span>
-                </a>
+                    <a class="visits-live-launch-visitor-profile rightLink" title="{{ 'Live_ViewVisitorProfile'|translate }} {% if visitor.getColumn('userId') is not empty %}{{ visitor.getColumn('userId') }}{% endif %}" data-visitor-id="{{ visitor.getColumn('visitorId') }}">
+                        <span class="icon-visitor-profile"></span>
+                    </a>
                 {% endif %}
 
                 <span class="referrer">
                     {% include "@Referrers/_visitorDetails.twig" with {'visitInfo': visitor} %}
                  </span>
+
+                {% if visitor.getColumn('userId')|default(false) is not empty %}
+                    <a class="visits-live-launch-visitor-profile rightLink" title="{{ 'Live_ViewVisitorProfile'|translate }} {% if visitor.getColumn('userId') is not empty %}{{ visitor.getColumn('userId') }}{% endif %}" data-visitor-id="{{ visitor.getColumn('visitorId') }}">
+                        <span>{{ visitor.getColumn('userId')|rawSafeDecoded}}</span>
+                    </a>
+                {% endif %}
+
             </div>
-            <div id="{{ visitor.getColumn('idVisit') }}_actions" class="settings">
+            <div id="actions_{{ visitor.getColumn('idVisit') }}" class="settings">
                 <span class="pagesTitle"
                       title="{{ visitor.getColumn('actionDetails')|length }} {{ 'General_Actions'|translate }}"
                       >{{ 'General_Actions'|translate }}:</span>&nbsp;
@@ -63,8 +65,8 @@
                                     {%- endfor %}
                                 {%- endif %}
                             {% endset %}
-                            <span title="{{- title -}}">
-						        <img class='iconPadding' src="{{ action.iconSVG|default(action.icon) }}"/>
+                            <span title="{{- title|e('html') -}}">
+                                <img class='iconPadding' src="{{ action.iconSVG|default(action.icon) }}"/>
                                 {% if action.type == 'ecommerceOrder' %}
                                     {{ 'General_ColumnRevenue'|translate }}: {{ action.revenue|money(idSite)|raw }}
                                 {% endif %}
@@ -73,25 +75,25 @@
                         {% else %}
 
                             {% if action.url is defined and action.url is not empty %}
-                            <a href="{{ action.url|safelink }}" target="_blank" rel="noreferrer noopener">
+                            <a href="{{ action.url|safelink|e('html_attr') }}" target="_blank" rel="noreferrer noopener">
                             {% endif %}
                                 {% if action.type == 'action' %}
 {# white spacing matters as Chrome tooltip display whitespaces #}
 {% set title %}
-{% if action.url|trim is not empty %}<span class='tooltip-action-url'>{{ action.url }}</span>{% endif %}
+{% if action.url|trim is not empty %}<span>{{ action.url }}</span>{% endif %}
 
-{% if action.pageTitle is not empty %}<span class='tooltip-action-page-title'>{{ action.pageTitle|rawSafeDecoded }}</span>{% endif %}
+{% if action.pageTitle is not empty %}<span>{{ action.pageTitle|rawSafeDecoded }}</span>{% endif %}
 
-<span class="tooltip-action-server-time">{{ action.serverTimePretty }}</span>
-    {% if action.timeSpentPretty is defined %}<span class='tooltip-time-on-page'>{{ 'General_TimeOnPage'|translate }}: {{ action.timeSpentPretty|raw }}</span>{% endif %}
+<span>{{ action.serverTimePretty }}</span>
+    {% if action.timeSpentPretty is defined %}<span>{{ 'General_TimeOnPage'|translate }}: {{ action.timeSpentPretty|raw }}</span>{% endif %}
 {%- endset %}
                                     <img class='iconPadding' src="{{ action.iconSVG|default(action.icon) }}" title="{{- title|e('html') -}}"/>
                                 {% elseif action.type == 'outlink' or action.type == 'download' %}
                                     <img class='iconPadding' src="{{ action.iconSVG|default(action.icon) }}"
-                                         title="{% if action.url is defined %}{{ action.url }} - {% endif %}{{ action.serverTimePretty }}"/>
+                                         title="{% if action.url is defined %}{{ action.url|e('html')|e('html') }} - {% endif %}{{ action.serverTimePretty }}"/>
                                 {% elseif action.type == 'search' %}
                                     <img class='iconPadding' src="{{ action.iconSVG|default(action.icon) }}"
-                                         title="{{ 'Actions_SubmenuSitesearch'|translate }}: {{ action.siteSearchKeyword }} - {{ action.serverTimePretty }}"/>
+                                         title="{{ 'Actions_SubmenuSitesearch'|translate }}: {{ action.siteSearchKeyword|rawSafeDecoded|e('html_attr') }} - {{ action.serverTimePretty }}"/>
                                 {% elseif action.eventCategory|default(false) is not empty %}
                                     <img  class="iconPadding" src='{{ action.iconSVG|default(action.icon) }}'
                                         title="{{ 'Events_Event'|translate }} {{ action.eventCategory }} - {{ action.eventAction }} {% if action.eventName is defined %}- {{ action.eventName }}{% endif %} {% if action.eventValue is defined %}- {{ action.eventValue }}{% endif %}"/>

@@ -18,7 +18,7 @@ use Piwik\Updater\Migration;
  * SQL queries and/or PHP code to update an environment to a newer version.
  *
  * To create a new update script, create a class that extends `Updates`. Name the class and file
- * after the version, eg, `class Updates_3_0_0` and `3.0.0.php`. Override the {@link getMigrationQueries()}
+ * after the version, eg, `class Updates_3_0_0` and `3.0.0.php`. Override the {@link getMigrations()}
  * method if you need to run SQL queries. Override the {@link doUpdate()} method to do other types
  * of updating, eg, to activate/deactivate plugins or create files.
  *
@@ -33,7 +33,6 @@ abstract class Updates
      * of which migrations and database queries an update will run. If you execute migrations directly in `doUpdate()`,
      * they won't be displayed to the user.
      *
-     * @param Updater $updater
      * @return Migration[]
      * @api
      */
@@ -50,7 +49,6 @@ abstract class Updates
      *
      * See {@link \Piwik\Plugins\ExamplePlugin\Updates\Updates_0_0_2} for an example.
      *
-     * @param Updater $updater
      * @api
      */
     public function doUpdate(Updater $updater)
@@ -58,8 +56,10 @@ abstract class Updates
     }
 
     /**
-     * Tell the updater that this is a major update.
-     * Leads to a more visible notice.
+     * Tell the updater that this update has major operational impact.
+     *
+     * This is not tied to semantic major versions. Use it for product-level changes that can
+     * require substantial work or downtime on large instances, such as modifying large db tables.
      *
      * NOTE to release manager: Remember to mention in the Changelog
      * that this update contains major DB upgrades and will take some time!

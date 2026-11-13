@@ -65,26 +65,43 @@ class DataSubjects
 
         $idSitesNoLongerExisting = array_diff($idSitesUsed, $allExistingIdSites);
 
-        if (empty($idSitesNoLongerExisting)) {
-            // nothing to be deleted... if there is no entry for that table in log_visit or log_link_visit_action
-            // then there shouldn't be anything to be deleted in other tables either
-            return [];
-        }
-
-        $logTables = $this->getLogTablesToDeleteFrom();
-        // It's quicker to call the delete queries one site at a time instead of using the IN operator and potentially
-        // creating a huge result set
-        foreach ($idSitesNoLongerExisting as $idSiteNoLongerExisting) {
-            $r = $this->deleteLogDataFrom($logTables, function ($tableToSelectFrom) use ($idSiteNoLongerExisting) {
-                return [$tableToSelectFrom . '.idsite = ' . $idSiteNoLongerExisting, []];
-            });
-            foreach ($r as $k => $v) {
-                if (!array_key_exists($k, $results)) {
-                    $results[$k] = 0;
+        if (!empty($idSitesNoLongerExisting)) {
+            $logTables = $this->getLogTablesToDeleteFrom();
+            // It's quicker to call the delete queries one site at a time instead of using the IN operator and potentially
+            // creating a huge result set
+            foreach ($idSitesNoLongerExisting as $idSiteNoLongerExisting) {
+                $r = $this->deleteLogDataFrom($logTables, function ($tableToSelectFrom) use ($idSiteNoLongerExisting) {
+                    return [$tableToSelectFrom . '.idsite = ' . $idSiteNoLongerExisting, []];
+                });
+                foreach ($r as $k => $v) {
+                    if (!array_key_exists($k, $results)) {
+                        $results[$k] = 0;
+                    }
+                    $results[$k] += $v;
                 }
-                $results[$k] += $v;
             }
         }
+
+        /**
+         * Lets you delete data subjects to make your plugin GDPR compliant.
+         * This can be useful if you have developed a plugin which stores any data for specific sites, not bound to a visit but doesn't
+         * use any core logic to store this data. If core API's are used, for example log tables, then the data may
+         * be deleted automatically.
+         *
+         * **Example**
+         *
+         *     public function deleteDataSubjectsForDeletedSites(&$result)
+         *     {
+         *         $existingSiteIds = SitesManager\API::getInstance()->getAllSitesId();
+         *         $idSitesInTable = $this->>getAllSiteIdsInLogTable();
+         *         $idSitesNoLongerExisting = array_diff($existingSiteIds, $idSitesInTable);
+         *         $numDeletes = $this->deleteDataForSites($idSitesNoLongerExisting);
+         *         $result['myplugin'] = $numDeletes;
+         *     }
+         *
+         * @param array &$results An array storing the result of how much data was deleted for.
+         */
+        Piwik::postEvent('PrivacyManager.deleteDataSubjectsForDeletedSites', [&$results]);
 
         krsort($results); // make sure test results are always in same order
         return $results;
@@ -112,8 +129,8 @@ class DataSubjects
          *         $result['myplugin'] = $numDeletes;
          *     }
          *
-         * @param array &$results An array storing the result of how much data was deleted for .
-         * @param array &$visits An array with multiple visit entries containing an idvisit and idsite each. The data
+         * @param array &$results An array storing the result of how much data was deleted for each plugin.
+         * @param array $visits An array with multiple visit entries containing an idvisit and idsite each. The data
          *                       for these visits is requested to be deleted.
          */
         Piwik::postEvent('PrivacyManager.deleteDataSubjects', [&$results, $visits]);
@@ -191,7 +208,6 @@ class DataSubjects
 
     /**
      * @param LogTable[] $logTables
-     * @param callable $generateWhere
      * @throws \Zend_Db_Statement_Exception
      */
     private function deleteLogDataFrom($logTables, callable $generateWhere)
@@ -453,7 +469,7 @@ class DataSubjects
          *     }
          *
          * @param array &$results An array containing the exported data subjects.
-         * @param array &$visits An array with multiple visit entries containing an idvisit and idsite each. The data
+         * @param array $visits An array with multiple visit entries containing an idvisit and idsite each. The data
          *                       for these visits is requested to be exported.
          */
         Piwik::postEvent('PrivacyManager.exportDataSubjects', [&$results, $visits]);
@@ -542,12 +558,12 @@ class DataSubjects
             if ($joinTable->getColumnToJoinOnIdVisit()) {
                 $from[] = [
                     'table' => $joinTable->getName(),
-                    'joinOn' => sprintf('%s.%s = %s.%s', $logTableName, $joinColumn, $joinTable->getName(), $joinColumn)
+                    'joinOn' => sprintf('%s.%s = %s.%s', $logTableName, $joinColumn, $joinTable->getName(), $joinColumn),
                 ];
                 if ($joinTable->getName() !== 'log_visit') {
                     $from[] = [
                         'table' => 'log_visit',
-                        'joinOn' => sprintf('%s.%s = %s.%s', $joinTable->getName(), $joinTable->getColumnToJoinOnIdVisit(), 'log_visit', $joinTable->getColumnToJoinOnIdVisit())
+                        'joinOn' => sprintf('%s.%s = %s.%s', $joinTable->getName(), $joinTable->getColumnToJoinOnIdVisit(), 'log_visit', $joinTable->getColumnToJoinOnIdVisit()),
                     ];
                 }
                 $tableToSelect = 'log_visit';
@@ -558,7 +574,7 @@ class DataSubjects
                 if ($tableToSelect) {
                     $from[] = [
                         'table' => $joinTable->getName(),
-                        'joinOn' => sprintf('%s.%s = %s.%s', $logTableName, $joinColumn, $joinTable->getName(), $joinColumn)
+                        'joinOn' => sprintf('%s.%s = %s.%s', $logTableName, $joinColumn, $joinTable->getName(), $joinColumn),
                     ];
                     foreach ($subFroms as $subFrom) {
                         $from[] = $subFrom;

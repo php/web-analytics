@@ -84,7 +84,7 @@ class Log extends Singleton
     /**
      * Singleton instance.
      *
-     * @var Log
+     * @var Log|null
      */
     private static $instance;
 
@@ -109,9 +109,6 @@ class Log extends Singleton
         self::$instance = $instance;
     }
 
-    /**
-     * @param LoggerInterface $logger
-     */
     public function __construct(LoggerInterface $logger)
     {
         $this->logger = $logger;
@@ -202,7 +199,7 @@ class Log extends Singleton
 
         if (is_object($message) || is_array($message) || is_resource($message)) {
             $this->logger->warning('Trying to log a message that is not a string', array(
-                'exception' => new \InvalidArgumentException('Trying to log a message that is not a string')
+                'exception' => new \InvalidArgumentException('Trying to log a message that is not a string'),
             ));
             return;
         }

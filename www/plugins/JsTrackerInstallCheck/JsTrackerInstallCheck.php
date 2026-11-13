@@ -43,23 +43,25 @@ class JsTrackerInstallCheck extends \Piwik\Plugin
         $stylesheets[] = "plugins/JsTrackerInstallCheck/vue/src/JsTrackerInstallCheck/JsTrackerInstallCheck.less";
     }
 
+    /**
+     * Any request with the install check parameter is a test request and isn't recorded as a visit.
+     */
     public function isExcludedVisit(&$excluded, Request $request)
     {
         // We don't have an early return when the request has already been excluded because we want the test to work even if the request is excluded due to a VPN or something
 
-        $hasInstallCheckParam = $request->hasParam(self::QUERY_PARAM_NAME);
-        if (!$hasInstallCheckParam) {
-            return;
-        }
-
-        $trackerInstallCheckParam = $request->getParams()[self::QUERY_PARAM_NAME];
-        if (empty($trackerInstallCheckParam)) {
+        if (!$request->hasParam(self::QUERY_PARAM_NAME)) {
             return;
         }
 
         // Make sure that the request is marked as excluded if it isn't already
         $excluded = true;
         StaticContainer::get(LoggerInterface::class)->debug('Excluding visit as JS tracker install test.');
+
+        $trackerInstallCheckParam = $request->getParams()[self::QUERY_PARAM_NAME];
+        if (!is_string($trackerInstallCheckParam) || empty($trackerInstallCheckParam)) {
+            return;
+        }
 
         // If the nonce exists and isn't expired, update it to indicate success
         StaticContainer::get(JsTrackerInstallCheckOption::class)->markNonceAsSuccessFul($request->getIdSite(), $trackerInstallCheckParam);
@@ -70,7 +72,6 @@ class JsTrackerInstallCheck extends \Piwik\Plugin
      * result for the site will be returned. This is determined by whether there's only one previous nonce or if the URL
      * matches the main URL of the site.
      *
-     * @param int $idSite
      * @param string $nonce The unique nonce used to identify the test requests. Optionally can be left empty if simply
      * wanting to check if the site has been successfully tested.
      * @return bool Indicating whether the nonce check was marked as successful
@@ -81,7 +82,7 @@ class JsTrackerInstallCheck extends \Piwik\Plugin
         // If the nonce was provided, filter out the expired nonces
         $nonceMap = !empty($nonce) ? $optionHelper->getCurrentNonceMap($idSite) : $optionHelper->getNonceMap($idSite);
         if (!empty($nonce)) {
-            return !empty($nonceMap[$nonce]['isSuccessful']);
+            return !empty($nonceMap[$nonce][JsTrackerInstallCheckOption::NONCE_DATA_IS_SUCCESS]);
         }
 
         if (empty($nonceMap)) {
@@ -100,7 +101,7 @@ class JsTrackerInstallCheck extends \Piwik\Plugin
                 !empty($mainUrl) && !empty($nonceData[JsTrackerInstallCheckOption::NONCE_DATA_URL])
                 && $mainUrl === $nonceData[JsTrackerInstallCheckOption::NONCE_DATA_URL]
             ) {
-                return !empty($nonceData['isSuccessful']);
+                return !empty($nonceData[JsTrackerInstallCheckOption::NONCE_DATA_IS_SUCCESS]);
             }
         }
 
@@ -111,12 +112,10 @@ class JsTrackerInstallCheck extends \Piwik\Plugin
      * Initiate a test whether the JS tracking code has been successfully installed for a site. It generates a nonce and
      * stores it in the option table so that it can be accessed later during the Tracker.isExcludedVisit event.
      *
-     * @param int $idSite
      * @param string $url Optional URL to append the nonce to. If not provided, it uses the main URL of the site
-     * @return array containing the URL constructed using the main URL for the site and the newly created nonce as a
+     * @return array{url:string, nonce:string} containing the URL constructed using the main URL for the site and the newly created nonce as a
      * query parameter.
      * E.g ['url' => 'https://some-site.com?tracker_install_check=c3dfa1abbbab6381baca0793b8dd5d', 'nonce' => 'c3dfa1abbbab6381baca0793b8dd5d']
-     * @throws \Exception
      */
     public function initiateJsTrackerInstallTest(int $idSite, string $url = ''): array
     {

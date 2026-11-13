@@ -12,7 +12,7 @@ namespace Piwik\Plugins\CoreVisualizations\Visualizations\HtmlTable;
 use Piwik\ViewDataTable\Config as VisualizationConfig;
 
 /**
- * DataTable Visualization that derives from HtmlTable and sets show_extra_columns to true.
+ * Configuration for the HtmlTable visualization.
  */
 class Config extends VisualizationConfig
 {
@@ -109,10 +109,14 @@ class Config extends VisualizationConfig
     public $report_ratio_columns = array();
 
     /**
-     * If true, dimensions in flattened reports will be shown as separate columns
+     * Whether this report displays at least one column that has a meaningful percentage value,
+     * ie. whether the setting to show percentage values should be offered for this report.
+     *
+     * Derived from columns_to_display, so it is only accurate once those are final. A visualization
+     * that rewrites the columns after HtmlTable::beforeRender() has run must set this again.
      * @var bool
      */
-    public $show_dimensions = false;
+    public $report_supports_percentage_values = false;
 
     /**
      * The minimum width for the label column in table visualizations.
@@ -143,7 +147,6 @@ class Config extends VisualizationConfig
             'enable_sort',
             'keep_summary_row',
             'subtable_controller_action',
-            'show_dimensions',
             'row_identifier',
             'min_label_width',
             'max_label_width',
@@ -158,7 +161,6 @@ class Config extends VisualizationConfig
             'disable_subtable_when_show_goals',
             'keep_summary_row',
             'highlight_summary_row',
-            'show_dimensions',
         ));
     }
 }

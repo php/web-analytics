@@ -46,7 +46,7 @@ class Formatter
     /**
      * Returns a prettified time value (in seconds).
      *
-     * @param int $numberOfSeconds The number of seconds.
+     * @param int|float $numberOfSeconds The number of seconds.
      * @param bool $displayTimeAsSentence If set to true, will output `"5min 17s"`, if false `"00:05:17"`.
      * @param bool $round Whether to round to the nearest second or not.
      * @return string
@@ -120,7 +120,7 @@ class Formatter
     /**
      * Returns a prettified memory size value.
      *
-     * @param number $size The size in bytes.
+     * @param string|int|float $size The size in bytes.
      * @param string $unit The specific unit to use, if any. If null, the unit is determined by $size.
      * @param int $precision The precision to use when rounding.
      * @return string eg, `'128 M'` or `'256 K'`.
@@ -281,8 +281,6 @@ class Formatter
     }
 
     /**
-     * @param DataTable $dataTable
-     * @param Report $report
      * @return Metric[]
      */
     private function getMetricsToFormat(DataTable $dataTable, ?Report $report = null)

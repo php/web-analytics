@@ -12,8 +12,6 @@ namespace Piwik\Plugins\LanguagesManager\Commands;
 use Piwik\Plugin\Manager;
 use Piwik\Plugins\LanguagesManager\API;
 
-/**
- */
 class Validate extends TranslationBase
 {
     protected function configure()
@@ -71,7 +69,7 @@ class Validate extends TranslationBase
                         '--code' => basename($filename, '.json'),
                         '--file' => $filename,
                         '--plugin' => $plugin,
-                        '--validate' => PIWIK_DOCUMENT_ROOT . '/filter.txt'
+                        '--validate' => PIWIK_DOCUMENT_ROOT . '/filter.txt',
                     ]
                 );
             }
@@ -121,7 +119,7 @@ class Validate extends TranslationBase
             [
                 '--token'    => $input->getOption('token'),
                 '--slug'     => $input->getOption('slug'),
-                '--plugin'   => $plugin
+                '--plugin'   => $plugin,
             ]
         );
     }

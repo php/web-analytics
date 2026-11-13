@@ -33,7 +33,7 @@ class FileIntegrity
 
             return array(
                 $success = false,
-                $messages
+                $messages,
             );
         }
 
@@ -46,7 +46,7 @@ class FileIntegrity
 
         return array(
             $success = empty($messages),
-            $messages
+            $messages,
         );
     }
 
@@ -64,8 +64,6 @@ class FileIntegrity
 
     /**
      * Include the manifest
-     *
-     * @return void
      */
     private static function loadManifest(): void
     {
@@ -459,7 +457,7 @@ class FileIntegrity
      *
      * @param $directory
      * @param $directories
-     * @return string
+     * @return string|null
      */
     protected static function getDirectoryParentFromList($directory, $directories)
     {

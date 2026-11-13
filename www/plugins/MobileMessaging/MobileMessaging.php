@@ -18,9 +18,6 @@ use Piwik\Plugins\MobileMessaging\ReportRenderer\Sms;
 use Piwik\Plugins\ScheduledReports\API as APIScheduledReports;
 use Piwik\View;
 
-/**
- *
- */
 class MobileMessaging extends \Piwik\Plugin
 {
     public const DELEGATED_MANAGEMENT_OPTION = 'MobileMessaging_DelegatedManagement';
@@ -41,11 +38,11 @@ class MobileMessaging extends \Piwik\Plugin
     );
 
     private static $managedReportTypes = array(
-        self::MOBILE_TYPE => 'plugins/MobileMessaging/images/phone.png'
+        self::MOBILE_TYPE => 'plugins/MobileMessaging/images/phone.png',
     );
 
     private static $managedReportFormats = array(
-        self::SMS_FORMAT => 'plugins/MobileMessaging/images/phone.png'
+        self::SMS_FORMAT => 'plugins/MobileMessaging/images/phone.png',
     );
 
     private static $availableReports = array(

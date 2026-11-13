@@ -9,9 +9,6 @@
 
 namespace Piwik\Plugins\MobileMessaging;
 
-/**
- *
- */
 class CountryCallingCodes
 {
     // list taken from core/DataFiles/Countries.php
@@ -264,6 +261,6 @@ class CountryCallingCodes
         'yt' => '262',
         'za' => '27',
         'zm' => '260',
-        'zw' => '263'
+        'zw' => '263',
     );
 }

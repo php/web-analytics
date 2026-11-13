@@ -12,7 +12,7 @@
     >
       <p v-show="isLoading || isUpdating">
         <span class="loadingPiwik">
-          <img src="plugins/Morpheus/images/loading-blue.gif" />
+          <MatomoLoader />
           {{ translate('General_LoadingData') }}
         </span>
       </p>
@@ -26,7 +26,21 @@
               :maxlength="255"
               :required="true"
               :title="translate('General_Name')"
-              :inline-help="translate('CustomDimensions_NameAllowedCharacters')"
+              :placeholder="translate('CustomDimensions_NamePlaceholder')"
+              :inline-help="nameInlineHelpText"
+            >
+            </Field>
+          </div>
+          <div>
+            <Field
+              uicontrol="textarea"
+              name="description"
+              v-model="dimension.description"
+              :maxlength="1000"
+              :title="`${translate('General_Description')} ${translate('Goals_Optional')}`"
+              :placeholder="translate('CustomDimensions_DescriptionPlaceholder')"
+              :inline-help="translate('CustomDimensions_DescriptionHelpText')"
+              :ui-control-attributes="{ class: 'compact-textarea' }"
             >
             </Field>
           </div>
@@ -48,7 +62,7 @@
             <div class="col s12 m6">
               <div
                 v-for="(extraction, index) in dimension.extractions"
-                :class="`${index}extraction `"
+                :class="`extraction${index}`"
                 :key="index"
               >
                 <div class="row">
@@ -56,7 +70,7 @@
                     <div>
                       <Field
                         uicontrol="select"
-                        :name="`${index}dimension`"
+                        :name="`dimension${index}`"
                         v-model="extraction.dimension"
                         :full-width="true"
                         :options="extractionDimensionsOptions"
@@ -68,7 +82,7 @@
                     <div>
                       <Field
                         uicontrol="text"
-                        :name="`${index}pattern`"
+                        :name="`pattern${index}`"
                         v-model="extraction.pattern"
                         :full-width="true"
                         :title="extraction.dimension === 'urlparam'
@@ -172,16 +186,17 @@ import { defineComponent } from 'vue';
 import {
   clone,
   translate,
-  Matomo,
   ContentBlock,
   CopyToClipboard,
+  Matomo,
+  MatomoLoader,
+  MatomoUrl,
   NotificationsStore,
   NotificationType,
-  MatomoUrl,
 } from 'CoreHome';
 import { Field } from 'CorePluginsAdmin';
 import CustomDimensionsStore from '../CustomDimensions.store';
-import { CustomDimension } from '../types';
+import type { CustomDimension } from '../types';
 import { ucfirst } from '../utilities';
 
 interface EditState {
@@ -202,6 +217,7 @@ export default defineComponent({
   components: {
     ContentBlock,
     Field,
+    MatomoLoader,
   },
   directives: {
     CopyToClipboard,
@@ -255,7 +271,8 @@ export default defineComponent({
           this.dimension = {
             idsite: Matomo.idSite,
             name: '',
-            active: false,
+            description: '',
+            active: true,
             extractions: [],
             scope: this.dimensionScope,
             case_sensitive: true,
@@ -318,6 +335,12 @@ export default defineComponent({
     },
     isUpdating() {
       return CustomDimensionsStore.isUpdating.value || this.isUpdatingDim;
+    },
+    nameInlineHelpText() {
+      return [
+        translate('CustomDimensions_NameHelpText'),
+        translate('CustomDimensions_NameAllowedCharacters'),
+      ].join(' ');
     },
     create() {
       return this.dimensionId === 0;

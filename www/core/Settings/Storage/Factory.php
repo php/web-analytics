@@ -44,7 +44,7 @@ class Factory
 
     /**
      * @param string $section
-     * @return mixed
+     * @return Storage
      */
     public function getConfigStorage($section)
     {
@@ -126,7 +126,6 @@ class Factory
     /**
      * Makes a new storage object based on a custom backend interface.
      *
-     * @param BackendInterface $backend
      * @return Storage
      */
     public function makeStorage(BackendInterface $backend)

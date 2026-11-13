@@ -100,11 +100,6 @@
                 :title="translate('TagManager_EditTrigger')"
               />
               <a
-                class="table-action icon-delete"
-                @click="deleteTrigger(trigger)"
-                :title="translate('TagManager_DeleteX', translate('TagManager_Trigger'))"
-              />
-              <a
                 class="table-action icon-content-copy"
                 v-show="hasPublishCapability()"
                 @click="openCopyDialog(trigger)"
@@ -112,6 +107,12 @@
                   'TagManager_CopyX',
                   translate('TagManager_Trigger'),
                 )"
+              />
+              <a
+                v-show="!trigger.typeMetadata?.isCustomTemplate || canUseCustomTemplates"
+                class="table-action icon-delete"
+                @click="deleteTrigger(trigger)"
+                :title="translate('TagManager_DeleteX', translate('TagManager_Trigger'))"
               />
             </td>
           </tr>
@@ -339,6 +340,9 @@ export default defineComponent({
     getActionClasses(): string {
       const copyClass = this.hasPublishCapability() ? ' hasCopyAction' : '';
       return `action${copyClass}`;
+    },
+    canUseCustomTemplates() {
+      return Matomo.hasUserCapability('tagmanager_use_custom_templates');
     },
   },
 });

@@ -13,6 +13,7 @@ use Exception;
 use Piwik\Archive\Chunk;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\ArchiveProcessor;
+use Piwik\Config;
 use Piwik\Container\StaticContainer;
 use Piwik\Date;
 use Piwik\Db;
@@ -61,7 +62,8 @@ class ArchiveWriter
     public const DONE_INVALIDATED = 4;
 
     /**
-     * Flag indicating that the archive is
+     * Flag indicating that the archive only contains data for a single requested plugin/report rather
+     * than the full set of reports for the period.
      *
      * @var int
      */
@@ -83,7 +85,7 @@ class ArchiveWriter
 
     private $recordsToWriteSpool = [
         'numeric' => [],
-        'blob' => []
+        'blob' => [],
     ];
 
     public const MAX_SPOOL_SIZE = 50;
@@ -130,8 +132,6 @@ class ArchiveWriter
 
     /**
      * ArchiveWriter constructor.
-     * @param ArchiveProcessor\Parameters $params
-     * @param bool $isArchiveTemporary Deprecated. Has no effect.
      * @throws Exception
      */
     public function __construct(ArchiveProcessor\Parameters $params)
@@ -152,7 +152,7 @@ class ArchiveWriter
      * @param string $name
      * @param string|string[] $values  A blob string or an array of blob strings. If an array
      *                                 is used, the first element in the array will be inserted
-     *                                 with the `$name` name. The others will be splitted into chunks. All subtables
+     *                                 with the `$name` name. The others will be split into chunks. All subtables
      *                                 within one chunk will be serialized as an array where the index is the
      *                                 subtableId.
      */
@@ -237,8 +237,12 @@ class ArchiveWriter
 
     protected function compress($data)
     {
+        $compressionLevel = (int) Config::getInstance()->General['archive_blob_compression_level'];
+        // ensure value is between -1 and 9
+        $compressionLevel = min(max(-1, $compressionLevel), 9);
+
         if (Db::get()->hasBlobDataType()) {
-            return gzcompress($data);
+            return gzcompress($data, $compressionLevel);
         }
 
         return $data;
@@ -271,11 +275,6 @@ class ArchiveWriter
 
         $valueSeen = false;
         foreach ($records as $record) {
-            // don't record zero
-            if (empty($record[1])) {
-                continue;
-            }
-
             $bind     = $bindSql;
             $bind[]   = $record[0]; // name
             $bind[]   = $record[1]; // value
@@ -311,14 +310,10 @@ class ArchiveWriter
      */
     public function insertRecord($name, $value)
     {
-        if ($this->isRecordZero($value)) {
-            return false;
-        }
-
         $valueType = $this->isRecordNumeric($value) ? 'numeric' : 'blob';
         $this->recordsToWriteSpool[$valueType][] = [
             0 => $name,
-            1 => $value
+            1 => $value,
         ];
 
         if (count($this->recordsToWriteSpool[$valueType]) >= self::MAX_SPOOL_SIZE) {
@@ -378,22 +373,17 @@ class ArchiveWriter
             return $this->getTableNumeric();
         }
 
-        return ArchiveTableCreator::getBlobTable($this->dateStart);
+        return ArchiveTableCreator::getBlobTable($this->dateStart, true);
     }
 
     protected function getTableNumeric()
     {
-        return ArchiveTableCreator::getNumericTable($this->dateStart);
+        return ArchiveTableCreator::getNumericTable($this->dateStart, true);
     }
 
     protected function getInsertFields()
     {
         return $this->fields;
-    }
-
-    protected function isRecordZero($value)
-    {
-        return ($value === '0' || $value === false || $value === 0 || $value === 0.0);
     }
 
     private function isRecordNumeric($value)

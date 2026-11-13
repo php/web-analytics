@@ -11,6 +11,7 @@ namespace Piwik;
 
 use Exception;
 use Piwik\AssetManager\UIAssetCacheBuster;
+use Piwik\Request\AuthenticationToken;
 use Piwik\Container\StaticContainer;
 use Piwik\Plugins\CoreAdminHome\Controller;
 use Piwik\Plugins\CorePluginsAdmin\CorePluginsAdmin;
@@ -135,8 +136,6 @@ class View implements ViewInterface
     public $sendHeadersWhenRendering = true;
 
     /**
-     * Constructor.
-     *
      * @param string $templateFile The template file to load. Must be in the following format:
      *                             `"@MyPlugin/templateFileName"`. Note the absence of .twig
      *                             from the end of the name.
@@ -420,7 +419,6 @@ class View implements ViewInterface
     /**
      * Add form to view
      *
-     * @param QuickForm2 $form
      * @ignore
      */
     public function addForm(QuickForm2 $form)
@@ -495,8 +493,8 @@ class View implements ViewInterface
      */
     private function validTokenAuthInUrl()
     {
-        $tokenAuth = Common::getRequestVar('token_auth', '', 'string', $_GET);
-        return ($tokenAuth && $tokenAuth === Piwik::getCurrentUserTokenAuth());
+        $token = StaticContainer::get(AuthenticationToken::class);
+        return (!$token->wasTokenAuthProvidedSecurely() && $token->getAuthToken() === Piwik::getCurrentUserTokenAuth());
     }
 
     /**
@@ -510,7 +508,16 @@ class View implements ViewInterface
     }
 
     /**
-     * Sets whether a strict Referrer-Policy header will be sent (if not, nothing is sent).
+     * Sets whether a strict Referrer-Policy header will be sent.
+     *
+     * Passing `false` relaxes the response policy to `no-referrer-when-downgrade`, which exposes
+     * the full request URL — including its query string — as the outgoing `Referer` header on the
+     * next navigation, even across origins. Callers that disable the strict policy MUST ensure
+     * the current request URL carries no credentials (e.g. `token_auth`) or other sensitive
+     * parameters at the moment any subsequent cross-origin navigation runs. The established
+     * pattern is to rewrite the URL down to its required handshake fields before redirecting;
+     * see `plugins/Overlay/templates/startOverlaySession.twig` (`canonicalizeOverlayUrl()`) and
+     * `plugins/Overlay/Controller.php::startOverlaySession()` for a worked example.
      *
      * @param bool $useStrictReferrerPolicy
      */

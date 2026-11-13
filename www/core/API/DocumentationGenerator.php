@@ -12,6 +12,7 @@ namespace Piwik\API;
 use Exception;
 use Piwik\Common;
 use Piwik\Container\StaticContainer;
+use Piwik\Period;
 use Piwik\Piwik;
 use Piwik\Url;
 use ReflectionClass;
@@ -27,6 +28,16 @@ use ReflectionClass;
 class DocumentationGenerator
 {
     protected $countPluginsLoaded = 0;
+
+    /**
+     * @var string|null
+     */
+    private $examplePeriod = null;
+
+    /**
+     * @var string|null
+     */
+    private $exampleDate = null;
 
     /**
      * trigger loading all plugins with an API.php file in the Proxy
@@ -61,7 +72,7 @@ class DocumentationGenerator
     /**
      * Used on developer.matomo.org
      *
-     * @param bool|true $outputExampleUrls
+     * @param bool $outputExampleUrls
      * @param string $prefixUrls
      * @return string
      */
@@ -134,10 +145,11 @@ class DocumentationGenerator
         if ($token !== 'anonymous') {
             $token_auth_url .= "&force_api_session=1";
         }
+        // getExampleUrl() expects the values to be URL encoded already
         $parametersToSet = array(
             'idSite' => Common::getRequestVar('idSite', 1, 'int'),
-            'period' => Common::getRequestVar('period', 'day', 'string'),
-            'date' => Common::getRequestVar('date', 'today', 'string')
+            'period' => urlencode($this->getPeriodForExamples()),
+            'date' => urlencode($this->getDateForExamples()),
         );
         $str = '';
         $str .= "<span class=\"example\">";
@@ -163,9 +175,50 @@ class DocumentationGenerator
     }
 
     /**
+     * Returns the period the example links should use, falling back to the default when the
+     * requested one isn't a valid period.
+     */
+    private function getPeriodForExamples(): string
+    {
+        if (null === $this->examplePeriod) {
+            $period = Common::getRequestVar('period', 'day', 'string');
+
+            try {
+                Period\Factory::checkPeriodIsEnabled($period);
+            } catch (Exception $e) {
+                $period = 'day';
+            }
+
+            $this->examplePeriod = $period;
+        }
+
+        return $this->examplePeriod;
+    }
+
+    /**
+     * Returns the date the example links should use, falling back to the default when the
+     * requested one isn't a valid date.
+     */
+    private function getDateForExamples(): string
+    {
+        if (null === $this->exampleDate) {
+            $date = Common::getRequestVar('date', 'today', 'string');
+
+            try {
+                Period::checkDateFormat($date);
+            } catch (Exception $e) {
+                $date = 'today';
+            }
+
+            $this->exampleDate = $date;
+        }
+
+        return $this->exampleDate;
+    }
+
+    /**
      * Check if Class contains @hide
      *
-     * @param ReflectionClass $rClass instance of ReflectionMethod
      * @return bool
      */
     public function checkIfClassCommentContainsHideAnnotation(ReflectionClass $rClass)
@@ -174,9 +227,9 @@ class DocumentationGenerator
     }
 
     /**
-     * Check if Class contains @internal
+     * Check if a class or method doc comment contains @internal
      *
-     * @param ReflectionClass|\ReflectionMethod $rClass instance of ReflectionMethod
+     * @param ReflectionClass|\ReflectionMethod $rClass
      * @return bool
      */
     private function checkIfCommentContainsInternalAnnotation($rClass)
@@ -187,8 +240,8 @@ class DocumentationGenerator
     /**
      * Check if documentation contains @hide annotation and deletes it
      *
-     * @param $moduleToCheck
-     * @return mixed
+     * @param string $moduleToCheck
+     * @return string
      */
     public function checkDocumentation($moduleToCheck)
     {
@@ -199,13 +252,14 @@ class DocumentationGenerator
     }
 
     /**
-     * Returns a string containing links to examples on how to call a given method on a given API
-     * It will export links to XML, CSV, HTML, JSON, PHP, etc.
-     * It will not export links for methods such as deleteSite or deleteUser
+     * Builds the example API request query string (starting with '?') for a given method,
+     * used by self::addExamples() to render example links.
+     * Returns false for methods such as deleteSite or deleteUser, or when a required
+     * parameter has no known default value.
      *
      * @param string $class the class
      * @param string $methodName the method
-     * @param array $parametersToSet parameters to set
+     * @param array $parametersToSet parameters to set, values need to be URL encoded already
      * @return string|bool when not possible
      */
     public function getExampleUrl($class, $methodName, $parametersToSet = array())
@@ -252,7 +306,7 @@ class DocumentationGenerator
             'updateGoal',
             'deleteGoal',
             //Marketplace
-            'deleteLicenseKey'
+            'deleteLicenseKey',
         );
 
         if (in_array($methodName, $doNotPrintExampleForTheseMethods)) {
@@ -269,6 +323,8 @@ class DocumentationGenerator
         $aParameters['label'] = false;
         $aParameters['labelSeries'] = false;
         $aParameters['flat'] = false;
+        $aParameters['show_dimensions'] = false;
+        $aParameters['keep_flattened_dimension_columns'] = false;
         $aParameters['include_aggregate_rows'] = false;
         $aParameters['filter_offset'] = false;
         $aParameters['filter_limit'] = false;
@@ -299,6 +355,7 @@ class DocumentationGenerator
         $aParameters['invert_compare_change_compute'] = false;
         $aParameters['filter_update_columns_when_show_all_goals'] = false;
         $aParameters['filter_show_goal_columns_process_goals'] = false;
+        $aParameters['showMetadata'] = false;
 
         $extraParameters = StaticContainer::get('entities.idNames');
         $extraParameters = array_merge($extraParameters, StaticContainer::get('DocumentationGenerator.customParameters'));
@@ -372,9 +429,9 @@ class DocumentationGenerator
     }
 
     /**
-     * @param $outputExampleUrls
-     * @param $prefixUrls
-     * @param $displayTitlesAsEnrichedHeadline
+     * @param bool $outputExampleUrls
+     * @param string $prefixUrls
+     * @param bool $displayTitlesAsEnrichedHeadline
      * @return array
      */
     protected function generateDocumentation($outputExampleUrls, $prefixUrls, $displayTitlesAsEnrichedHeadline)

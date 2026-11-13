@@ -161,7 +161,7 @@ export default defineComponent({
     placeholder="Some text here"
     v-model="username"
   />
-</div>', [], false);
+</div>', [], [], false);
         $snippets[] = $this->formSnippet('withInlineHelp', 'email', "''", '', '<div v-form>
   <Field
     uicontrol="email"
@@ -208,11 +208,40 @@ export default defineComponent({
   />
 </div>');
 
+        $snippets[] = $this->formSnippet('passwordAutoClear', 'pwdAutoClear', "''", '', '<div v-form>
+  <Field
+    uicontrol="password"
+    name="password_autoclear"
+    title="Password with auto-clear after 5 seconds"
+    placeholder="When you stop typing, field will clear after 5 seconds"
+    v-model="pwdAutoClear"
+    v-auto-clear-password="{ delay: 5 }"
+  >
+    <template v-slot:inline-help>
+      Without the configuration object passed to the directive, the delay defaults to 600 seconds (10 minutes). You can provide a custom delay if you need. A delay too short may impact usability of the field. 
+    </template>
+  </Field>
+</div>', [], [['plugin' => 'CoreHome', 'directive' => 'AutoClearPassword']]);
+
+        // rules are hardcoded as json-encoding the regular expressions produces an output that breaks the combination of single and double quotes used here
+        $snippets[] = $this->formSnippet('passwordStrength', 'pwdStrength', "''", '', '<div v-form>
+  <Field
+    uicontrol="password"
+    name="password_strength"
+    title="Password with strength indicator"
+    v-model="pwdStrength"
+    :ui-control-attributes="{
+      passwordStrengthValidationRules: [{\'validationRegex\':\'\/^.{12,}$\/\',\'ruleText\':\'At least 12 characters\'},{\'validationRegex\':\'\/^.*[a-z].*$\/\',\'ruleText\':\'Contains a lowercase letter\'},{\'validationRegex\':\'\/^.*[A-Z].*$\/\',\'ruleText\':\'Contains an uppercase letter\'},{\'validationRegex\':\'\/^.*[0-9].*$\/\',\'ruleText\':\'Contains a number\'},{\'validationRegex\':\'\/^.*[!@#$%^&*(){}~].*$\/\',\'ruleText\':\'Contains a special character\'}]
+    }"
+  >
+  </Field>
+</div>');
+
         $snippets[] = $this->formSnippet('complexHelp', 'text', "''", '', '<div v-form>
   <Field
     uicontrol="text"
     name="alias"
-    title="Disabeld text field"
+    title="Disabled text field"
     :disabled="true"
     placeholder="This value cannot be changed"
     v-model="text"
@@ -254,7 +283,7 @@ export default defineComponent({
   />
 </div>');
 
-        // TODOO: handle arrays
+        // TODO: handle arrays
         $snippets[] = $this->formSnippet(
             'language',
             ['language', 'phoneNumber', 'selectedExpand'],
@@ -723,7 +752,7 @@ export default defineComponent({
                 'minus',
                 'archive',
                 'add1',
-                'remove'
+                'remove',
             ],
             'Alerts' => [
                 'error',
@@ -731,7 +760,7 @@ export default defineComponent({
                 'info',
                 'success',
                 'help',
-                'ok'
+                'ok',
             ],
             'Navigation' => [
                 'arrow-left',
@@ -761,7 +790,7 @@ export default defineComponent({
                 'close',
                 'maximise',
                 'refresh',
-                'reload'
+                'reload',
             ],
             'Reports' => [
                 'table',
@@ -774,41 +803,42 @@ export default defineComponent({
                 'transition',
                 'overlay',
                 'lab',
-                'clock'
+                'clock',
+                'dashboard-customize',
             ],
             'Users' => [
                 'user',
                 'user-add',
                 'users',
-                'user-personal'
+                'user-personal',
             ],
             'Date-picker' => [
                 'calendar',
                 'datepicker-arr-l',
-                'datepicker-arr-r'
+                'datepicker-arr-r',
             ],
             'Annotations' => [
-                'annotation'
+                'annotation',
             ],
             'E-commerce' => [
                 'ecommerce-order',
-                'ecommerce-abandoned-cart'
+                'ecommerce-abandoned-cart',
             ],
             'Goals' => [
-                'goal'
+                'goal',
             ],
             'Insights' => [
-                'insights'
+                'insights',
             ],
             'Segments' => [
-                'segment'
+                'segment',
             ],
             'Visitors' => [
                 'visitor-profile',
-                'segmented-visits-log'
+                'segmented-visits-log',
             ],
             'Lock' => [
-                'locked'
+                'locked',
             ],
             'Media' => [
                 'audio',
@@ -819,7 +849,7 @@ export default defineComponent({
                 'fast-forward',
                 'fast-rewind',
                 'skip-next',
-                'skip-previous'
+                'skip-previous',
             ],
             'Other' => [
                 'configure',
@@ -866,6 +896,7 @@ export default defineComponent({
                 'circle',
                 'dollar-sign',
                 'hits',
+                'ai-assistants',
             ],
         ];
         // @phpcs:enable Generic.Files.LineLength
@@ -876,7 +907,7 @@ export default defineComponent({
         ]);
     }
 
-    private function formSnippet($id, $dataName, $dataValueCode, $dataValue, $demoCode, $extraComponents = [], $noMargin = true)
+    private function formSnippet($id, $dataName, $dataValueCode, $dataValue, $demoCode, $extraComponents = [], $extraDirectives = [], $noMargin = true)
     {
         if (is_array($dataName)) {
             $dataCode = "";
@@ -923,9 +954,9 @@ $dataCode    };
             'components' => array_merge([
                 ['plugin' => 'CorePluginsAdmin', 'component' => 'Field'],
             ], $extraComponents),
-            'directives' => [
+            'directives' => array_merge([
                 ['plugin' => 'CorePluginsAdmin', 'directive' => 'Form'],
-            ],
+            ], $extraDirectives),
             'data' => $data,
             'noMargin' => $noMargin,
         ];

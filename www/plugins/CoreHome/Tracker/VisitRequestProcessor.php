@@ -31,7 +31,7 @@ use Piwik\Plugins\PrivacyManager\Config as PrivacyManagerConfig;
  * This RequestProcessor exposes the following metadata for the **CoreHome** plugin:
  *
  * * **visitorId**: A hash that identifies the current visitor being tracked. This value is
- *                  calculated using the Piwik\Tracker\Settings;:getConfigId() method.
+ *                  calculated using the Piwik\Tracker\Settings::getConfigId() method.
  *
  *                  Set in `processRequestParams()`.
  *
@@ -108,7 +108,7 @@ class VisitRequestProcessor extends RequestProcessor
             return true;
         }
 
-        $privacyConfig = new PrivacyManagerConfig();
+        $privacyConfig = new PrivacyManagerConfig($request->getIdSiteIfExists());
 
         if ($privacyConfig->randomizeConfigId) {
             // always new visit when randomising config id
@@ -155,8 +155,9 @@ class VisitRequestProcessor extends RequestProcessor
          * This event is primarily used by the **PrivacyManager** plugin to anonymize IP addresses.
          *
          * @param string &$ip The visitor's IP address.
+         * @param int $idSite The site ID we're tracking the visit for.
          */
-        $this->eventDispatcher->postEvent('Tracker.setVisitorIp', array(&$ip));
+        $this->eventDispatcher->postEvent('Tracker.setVisitorIp', [&$ip, (int) $request->getIdSiteIfExists()]);
 
         $visitProperties->setProperty('location_ip', $ip);
 
@@ -164,13 +165,12 @@ class VisitRequestProcessor extends RequestProcessor
     }
 
     /**
-     * Determines if the tracker if the current action should be treated as the start of a new visit or
+     * Determines if the current action should be treated as the start of a new visit or
      * an action in an existing visit.
      *
      * Note: public only for tests.
      *
      * @param VisitProperties $visitProperties The current visit/visitor information.
-     * @param Request $request
      * @return bool
      */
     public function isVisitNew(VisitProperties $visitProperties, Request $request, $lastKnownVisit)
@@ -200,7 +200,7 @@ class VisitRequestProcessor extends RequestProcessor
         }
 
         $wasLastActionYesterday = $this->wasLastActionNotToday($visitProperties, $request, $lastKnownVisit);
-        $forceNewVisitAtMidnight = (bool) TrackerConfig::getConfigValue('create_new_visit_after_midnight', $request->getIdSiteIfExists());
+        $forceNewVisitAtMidnight = TrackerConfig::getBoolConfigValue('create_new_visit_after_midnight', false, $request->getIdSiteIfExists());
 
         if ($wasLastActionYesterday && $forceNewVisitAtMidnight) {
             Common::printDebug("Visitor detected, but last action was yesterday...");
@@ -208,10 +208,7 @@ class VisitRequestProcessor extends RequestProcessor
             return true;
         }
 
-        if (
-            !TrackerConfig::getConfigValue('enable_userid_overwrites_visitorid', $request->getIdSiteIfExists())
-            && !$this->lastUserIdWasSetAndDoesMatch($visitProperties, $request)
-        ) {
+        if (!$this->lastUserIdWasSetAndDoesMatch($visitProperties, $request)) {
             Common::printDebug("Visitor detected, but last user_id does not match...");
             return true;
         }
@@ -220,7 +217,7 @@ class VisitRequestProcessor extends RequestProcessor
     }
 
     /**
-     * Returns true if the last action was done during the last 30 minutes
+     * Returns true if the last action was done within the standard visit length.
      * @return bool
      */
     protected function isLastActionInTheSameVisit(VisitProperties $visitProperties, Request $request, $lastKnownVisit)
@@ -234,7 +231,6 @@ class VisitRequestProcessor extends RequestProcessor
 
     /**
      * Returns true if the last action was not today.
-     * @param VisitProperties $visitor
      * @return bool
      */
     private function wasLastActionNotToday(VisitProperties $visitProperties, Request $request, $lastKnownVisit)
@@ -278,7 +274,6 @@ class VisitRequestProcessor extends RequestProcessor
      * Returns the last action time for the last recorded visit of this visitor, or if the visitor is new,
      * the current request's timestamp.
      *
-     * @param VisitProperties $visitProperties
      * @param $lastKnownVisit
      * @return false|int|mixed
      */

@@ -2,8 +2,14 @@
     "SegmentEditor": {
         "PluginDescription": "A segment is a set of criteria used to select only a part of the entire set of visits. Using segments you can inject arbitrary context back into your reports.",
         "AddANDorORCondition": "Add %s condition",
-        "AddNewSegment": "Add new segment",
-        "AreYouSureDeleteSegment": "Are you sure you want to delete this segment?",
+        "AddNewSegment": "Create new segment",
+        "ManageSegments": "Manage Segments",
+        "ManageSegmentsRealtimeNotice": "Some segments in the table are processed in real time, so their data will not be displayed.",
+        "ManageSegmentsRealtimeNoDataTooltip": "This segment is processed in real time, so no data will be displayed.",
+        "SegmentPageTitle": "Segments overview",
+        "SegmentPageDescription": "View and manage your segments while monitoring their impact on traffic and behaviour. This table shows visits, actions, and trends over time, with quick links to view, edit, or delete each segment.",
+        "SeeDashboardForThisSegment": "View dashboard for this segment.",
+        "AreYouSureDeleteSegment": "Are you sure you want to delete the segment \"%s\"?",
         "AutoArchivePreProcessed": "segmented reports are pre-processed (faster, requires cron)",
         "AutoArchiveRealTime": "segmented reports are processed in real time",
         "ChangingSegmentDefinitionConfirmationNotProcessedOnRequest": "You're about to change the segment definition. Your analytics reports for this new segment won't be available until the reports are re-processed. It may take a few hours for reports data to show for this segment. Proceed anyway?",
@@ -25,6 +31,10 @@
         "SegmentNotApplied": "Segment '%s' not applied",
         "SegmentNotAppliedMessage": "You are requesting data for the Custom Segment '%s', this Matomo's configuration currently prevents real time processing of reports for performance reasons.",
         "SelectSegmentOfVisits": "Select a segment of visits:",
+        "SparklineTooltipDays": "Evolution of Visits for segment \"%s\" over the last 30 days",
+        "SparklineTooltipWeeks": "Evolution of Visits for segment \"%s\" over the last 30 weeks",
+        "SparklineTooltipMonths": "Evolution of Visits for segment \"%s\" over the last 30 months",
+        "SparklineTooltipYears": "Evolution of Visits for segment \"%s\" over the last 30 years",
         "ThisSegmentIsVisibleTo": "This segment is visible to:",
         "VisibleToAllUsers": "all users",
         "VisibleToMe": "me",
@@ -60,6 +70,10 @@
         "CompareThisSegment": "Compare this segment with the selected segment and period.",
         "Test": "Test",
         "UpdatingAllSitesSegmentPermittedToSuperUser": "This segment was made accessible to all sites by the super user. Now, only super users are allowed to update or remove it.",
-        "UpdatingForeignSegmentPermittedToSuperUser": "You can only edit and delete custom segments that you have created yourself. This segment was created and 'shared with you' by the Super User. To modify this segment, you can first create a new one by clicking on 'Add new segment'. Then you can customize the segment's definition."
+        "UpdatingForeignSegmentPermittedToSuperUser": "You can only edit and delete custom segments that you have created yourself. This segment was created and 'shared with you' by the Super User. To modify this segment, you can first create a new one by clicking on 'Add new segment'. Then you can customize the segment's definition.",
+        "LimitSegmentsSettingTitle": "Segment Availability Restricted",
+        "LimitSegmentsSettingWhatItDoes": "Segments based on Visitor IP Address, Site Time - Hour representing the time of the last action, and Ad Click ID are disabled.<br><br>This prevents these detailed attributes from being filtered or combined to identify a specific visitor.",
+        "LimitSegmentsSettingImpact": "Visitor IP Address, Site Time - Hour, and Ad Click ID cannot be used when creating or applying segments.",
+        "LimitSegmentsSettingRequirementNote": "Limit the available segments to be compliant."
     }
 }

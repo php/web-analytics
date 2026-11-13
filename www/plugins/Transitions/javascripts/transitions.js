@@ -215,7 +215,7 @@ function Piwik_Transitions(actionType, actionName, rowAction, overrideParams) {
     this.ajax = new Piwik_Transitions_Ajax();
     this.model = new Piwik_Transitions_Model(this.ajax);
 
-    this.leftGroups = ['previousPages', 'previousSiteSearches', 'searchEngines', 'socialNetworks', 'websites', 'campaigns'];
+    this.leftGroups = ['previousPages', 'previousSiteSearches', 'searchEngines', 'socialNetworks', 'aiAssistants', 'websites', 'campaigns'];
     this.rightGroups = ['followingPages', 'followingSiteSearches', 'downloads', 'outlinks'];
 }
 
@@ -240,6 +240,7 @@ Piwik_Transitions.prototype.reset = function (actionType, actionName, overridePa
 Piwik_Transitions.prototype.showPopover = function (showEmbeddedInReport) {
     var self = this;
     this.showEmbeddedInReport = showEmbeddedInReport;
+    Piwik_Transitions.currentInstance = this;
 
     $('#transitions_report .popoverContainer').hide();
 
@@ -253,26 +254,13 @@ Piwik_Transitions.prototype.showPopover = function (showEmbeddedInReport) {
     }
 
     var bothLoaded = function () {
-        if (!showEmbeddedInReport) {
-            Piwik_Popover.setContent(Piwik_Transitions.popoverHtml);
-        } else {
-          $('#transitions_inline_loading').hide();
-            $('#transitions_report .popoverContainer').html(Piwik_Transitions.popoverHtml);
-            $('#transitions_report .popoverContainer').show();
+        if (showEmbeddedInReport) {
+            $('#transitions_inline_loading').hide();
         }
-        self.preparePopover();
+
+        self.restorePopoverContent();
         self.model.htmlLoaded();
-
-        if (self.model.searchEnginesNbTransitions > 0 && self.model.websitesNbTransitions > 0 && self.model.socialNetworksNbTransitions > 0
-            && self.model.campaignsNbTransitions > 0) {
-            self.canvas.narrowMode();
-        }
-
-        // truncate already placed elements, so height can be calculated correctly.
-        self.canvas.truncateVisibleBoxTexts();
-        self.render();
-        // truncate elements added during render()
-        self.canvas.truncateVisibleBoxTexts();
+        self.renderPopover();
     };
 
     // load the popover HTML (only done once)
@@ -400,6 +388,38 @@ Piwik_Transitions.prototype.render = function () {
     window.CoreHome.Matomo.postEvent('Transitions.dataChanged', {'actionType': this.actionType, 'actionName': this.actionName});
 };
 
+Piwik_Transitions.prototype.restorePopoverContent = function () {
+    if (this.showEmbeddedInReport) {
+        this.popover.find('.popoverContainer').html(Piwik_Transitions.popoverHtml).show();
+    } else {
+        Piwik_Popover.setContent(Piwik_Transitions.popoverHtml);
+    }
+};
+
+Piwik_Transitions.prototype.renderPopover = function () {
+    this.preparePopover();
+
+    if (this.model.searchEnginesNbTransitions > 0 && this.model.websitesNbTransitions > 0 && this.model.socialNetworksNbTransitions > 0
+        && this.model.aiAssistantsNbTransitions > 0 && this.model.campaignsNbTransitions > 0) {
+        this.canvas.narrowMode();
+    }
+
+    this.canvas.truncateVisibleBoxTexts();
+    this.render();
+    this.canvas.truncateVisibleBoxTexts();
+};
+
+Piwik_Transitions.prototype.refreshTheme = function () {
+    if (!this.popover || !this.popover.length
+        || !$.contains(document.documentElement, this.popover[0])
+        || typeof Piwik_Transitions.popoverHtml == 'undefined') {
+        return;
+    }
+
+    this.restorePopoverContent();
+    this.renderPopover();
+};
+
 /** Render left side: referrer groups & direct entries */
 Piwik_Transitions.prototype.renderLeftSide = function (onlyBg) {
     this.renderGroups(this.leftGroups, this.leftOpenGroup, 'left', onlyBg);
@@ -485,6 +505,7 @@ Piwik_Transitions.prototype.renderCenterBox = function () {
     showMetric('PreviousPages', 'previousPagesNbTransitions', 'left', true);
     showMetric('SearchEngines', 'searchEnginesNbTransitions', 'left', true);
     showMetric('SocialNetworks', 'socialNetworksNbTransitions', 'left', true);
+    showMetric('AIAssistants', 'aiAssistantsNbTransitions', 'left', true);
     showMetric('Websites', 'websitesNbTransitions', 'left', true);
     showMetric('Campaigns', 'campaignsNbTransitions', 'left', true);
 
@@ -919,6 +940,12 @@ Piwik_Transitions_Canvas.prototype.narrowMode = function () {
     this.boxSpacing = 4;
     this.narrowMode = true;
 };
+
+window.addEventListener('themeModeChange', function () {
+    if (Piwik_Transitions.currentInstance) {
+        Piwik_Transitions.currentInstance.refreshTheme();
+    }
+});
 
 Piwik_Transitions_Canvas.prototype.isNarrowMode = function () {
     return typeof this.narrowMode != 'undefined';
@@ -1367,6 +1394,7 @@ Piwik_Transitions_Model.prototype.htmlLoaded = function () {
         followingSiteSearches: Piwik_Transitions_Translations.toFollowingSiteSearchesInline,
         searchEngines: Piwik_Transitions_Translations.fromSearchEnginesInline,
         socialNetworks: Piwik_Transitions_Translations.fromSocialNetworksInline,
+        aiAssistants: Piwik_Transitions_Translations.fromAIAssistantsInline,
         websites: Piwik_Transitions_Translations.fromWebsitesInline,
         campaigns: Piwik_Transitions_Translations.fromCampaignsInline,
         outlinks: Piwik_Transitions_Translations.outlinksInline,
@@ -1388,6 +1416,9 @@ Piwik_Transitions_Model.prototype.loadData = function (actionType, actionName, o
 
     this.socialNetworksNbTransitions = 0;
     this.socialNetworks = [];
+
+    this.aiAssistantsNbTransitions = 0;
+    this.aiAssistants = [];
 
     this.websitesNbTransitions = 0;
     this.websites = [];
@@ -1446,6 +1477,10 @@ Piwik_Transitions_Model.prototype.loadData = function (actionType, actionName, o
                     self.socialNetworksNbTransitions = referrer.visits;
                     self.socialNetworks = referrer.details;
                     self.groupTitles.socialNetworks = referrer.label;
+                } else if (referrer.shortName == 'ai') {
+                    self.aiAssistantsNbTransitions = referrer.visits;
+                    self.aiAssistants = referrer.details;
+                    self.groupTitles.aiAssistants = referrer.label;
                 } else if (referrer.shortName == 'website') {
                     self.websitesNbTransitions = referrer.visits;
                     self.websites = referrer.details;
@@ -1588,7 +1623,7 @@ Piwik_Transitions_Ajax.prototype.callApi = function (method, params, callback) {
                     var errorTitle, errorMessage, errorBack;
                     if (typeof Piwik_Transitions_Translations[errorName] == 'undefined') {
                         errorTitle = 'Exception';
-                        errorMessage = errorName;
+                        errorMessage = piwikHelper.htmlEntities(piwikHelper.htmlDecode(errorName));
                         errorBack = '<<<';
                     } else {
                         errorTitle = Piwik_Transitions_Translations[errorName];
@@ -1602,7 +1637,6 @@ Piwik_Transitions_Ajax.prototype.callApi = function (method, params, callback) {
                         errorTitle = sprintf(errorTitle, '<span>' + url + '</span>');
                     }
 
-                    errorMessage = sprintf(errorMessage, '<br />');
                     var inlineErrorNode = $('#Transitions_Error_Container');
                     if (inlineErrorNode.length) {
                         // viewing it as report, not popover

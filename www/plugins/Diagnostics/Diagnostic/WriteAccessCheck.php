@@ -31,7 +31,6 @@ class WriteAccessCheck implements Diagnostic
     private $tmpPath;
 
     /**
-     * @param Translator $translator
      * @param string $tmpPath Path to the temp directory.
      */
     public function __construct(Translator $translator, $tmpPath)
@@ -87,6 +86,7 @@ class WriteAccessCheck implements Diagnostic
             $this->tmpPath . '/climulti/',
             $this->tmpPath . '/latest/',
             $this->tmpPath . '/logs/',
+            $this->tmpPath . '/logos/',
             $this->tmpPath . '/sessions/',
             $this->tmpPath . '/tcpdf/',
             StaticContainer::get('path.tmp.templates')

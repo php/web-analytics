@@ -23,13 +23,15 @@ export { default as useExternalPluginComponent } from './useExternalPluginCompon
 export { default as DirectiveUtilities } from './directiveUtilities';
 export { default as debounce } from './debounce';
 export { default as clone } from './clone';
+export { default as ucfirst } from './ucfirst';
 export { default as VueEntryContainer } from './VueEntryContainer/VueEntryContainer.vue';
 export { default as ActivityIndicator } from './ActivityIndicator/ActivityIndicator.vue';
 export { default as MatomoLoader } from './MatomoLoader/MatomoLoader.vue';
 export * from './translate';
 export * from './externalLink';
 export { default as Alert } from './Alert/Alert.vue';
-export { default as AjaxHelper, AjaxOptions } from './AjaxHelper/AjaxHelper';
+export { default as AjaxHelper } from './AjaxHelper/AjaxHelper';
+export type { AjaxOptions } from './AjaxHelper/AjaxHelper';
 export { setCookie, getCookie, deleteCookie } from './CookieHelper/CookieHelper';
 export { default as MatomoUrl } from './MatomoUrl/MatomoUrl';
 export { Matomo };
@@ -39,11 +41,14 @@ export { default as DropdownMenu } from './DropdownMenu/DropdownMenu';
 export { default as FocusAnywhereButHere } from './FocusAnywhereButHere/FocusAnywhereButHere';
 export { default as FocusIf } from './FocusIf/FocusIf';
 export { default as Tooltips } from './Tooltips/Tooltips';
+export { default as tooltipContent } from './Tooltips/tooltipContent';
 export { default as MatomoDialog } from './MatomoDialog/MatomoDialog.vue';
+export { default as MatomoModal } from './MatomoModal/MatomoModal.vue';
 export { default as ExpandOnClick } from './ExpandOnClick/ExpandOnClick';
 export { default as ExpandOnHover } from './ExpandOnHover/ExpandOnHover';
 export { default as ShowSensitiveData } from './ShowSensitiveData/ShowSensitiveData';
 export { default as DropdownButton } from './DropdownButton/DropdownButton';
+export { default as DraggableList } from './DraggableList/DraggableList.vue';
 export { default as SelectOnFocus } from './SelectOnFocus/SelectOnFocus';
 export { default as CopyToClipboard } from './CopyToClipboard/CopyToClipboard';
 export { default as SideNav } from './SideNav/SideNav';
@@ -59,10 +64,11 @@ export { default as PeriodDatePicker } from './PeriodDatePicker/PeriodDatePicker
 export * from './Notification';
 export { default as ShowHelpLink } from './ShowHelpLink/ShowHelpLink.vue';
 export { default as SitesStore } from './SiteSelector/SitesStore';
-export { default as Site } from './SiteSelector/Site';
+export type { default as Site } from './SiteSelector/Site';
 export { default as SiteSelector } from './SiteSelector/SiteSelector.vue';
 export { default as SiteRef } from './SiteSelector/SiteRef';
 export { default as QuickAccess } from './QuickAccess/QuickAccess.vue';
+export { default as SearchInput } from './SearchInput/SearchInput.vue';
 export { default as FieldArray } from './FieldArray/FieldArray.vue';
 export { default as MultiPairField } from './MultiPairField/MultiPairField.vue';
 export { default as PeriodSelector } from './PeriodSelector/PeriodSelector.vue';
@@ -71,7 +77,10 @@ export { default as ReportingMenuStore } from './ReportingMenu/ReportingMenu.sto
 export { default as ReportingPagesStore } from './ReportingPages/ReportingPages.store';
 export { default as ReportMetadataStore } from './ReportMetadata/ReportMetadata.store';
 export { default as WidgetsStore } from './Widget/Widgets.store';
+export { default as ReportHeader } from './ReportHeader/ReportHeader.vue';
+export { default as WidgetControls } from './WidgetControls/WidgetControls.vue';
 export { default as WidgetLoader } from './WidgetLoader/WidgetLoader.vue';
+export { default as ClientWidgetRenderer } from './Widget/ClientWidgetRenderer.vue';
 export { default as WidgetContainer } from './WidgetContainer/WidgetContainer.vue';
 export {
   default as WidgetByDimensionContainer,
@@ -96,3 +105,11 @@ export {
 } from './VersionInfoHeaderMessage/VersionInfoHeaderMessage.vue';
 export { default as MobileLeftMenu } from './MobileLeftMenu/MobileLeftMenu.vue';
 export { default as scrollToAnchorInUrl } from './scrollToAnchorInUrl';
+export { default as SearchFiltersPersistenceStore } from './SearchFiltersPersistence/SearchFiltersPersistence.store';
+export { default as AutoClearPassword } from './AutoClearPassword/AutoClearPassword';
+export { default as PasswordStrength } from './PasswordStrength/PasswordStrength.vue';
+export * from './PasswordStrength/PasswordStrength';
+export { default as EntityDuplicatorModal } from './EntityDuplicator/EntityDuplicatorModal.vue';
+export { default as EntityDuplicatorAction } from './EntityDuplicator/EntityDuplicatorAction.vue';
+export * from './EntityDuplicator/EntityDuplicatorStore';
+export * from './EntityDuplicator/EntityDuplicatorAdapter';

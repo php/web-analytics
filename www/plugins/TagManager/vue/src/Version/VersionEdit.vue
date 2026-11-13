@@ -36,7 +36,7 @@
                 @update:model-value="version.name = $event; setValueHasChanged()"
                 :maxlength="50"
                 :title="translate('TagManager_VersionName')"
-                :placeholder="translate('TagManager_VersionNamePlaceholder')"
+                :placeholder="translate('TagManager_VersionNamePlaceholderV2')"
               />
             </div>
             <div>
@@ -46,8 +46,9 @@
                 :model-value="version.description"
                 @update:model-value="version.description = $event; setValueHasChanged()"
                 :title="translate('TagManager_VersionDescriptionOptional')"
-                :inline-help="translate('TagManager_VersionDescriptionHelp')"
-                :placeholder="translate('TagManager_VersionDescriptionPlaceholder')"
+                :inline-help="translate('TagManager_VersionDescriptionHelpText')"
+                :ui-control-attributes="{ class: 'compact-textarea' }"
+                :placeholder="translate('TagManager_VersionDescriptionPlaceholderV2')"
               />
             </div>
             <SaveButton
@@ -362,14 +363,19 @@ export default defineComponent({
           this.$emit('changeVersion', {
             version: this.version,
           });
-          return;
         }
 
         VersionsStore.reload(this.idContainer).then(() => {
-          MatomoUrl.updateHash({
-            ...MatomoUrl.hashParsed.value,
-            idContainerVersion,
-          });
+          if (this.isEmbedded) {
+            MatomoUrl.updateHash({
+              ...MatomoUrl.hashParsed.value,
+            });
+          } else {
+            MatomoUrl.updateHash({
+              ...MatomoUrl.hashParsed.value,
+              idContainerVersion,
+            });
+          }
 
           setTimeout(() => {
             const createdX = translate('TagManager_CreatedX', translate('TagManager_Version'));
@@ -421,14 +427,18 @@ export default defineComponent({
             this.$emit('changeVersion', {
               version: this.version,
             });
-            return;
           }
-
           VersionsStore.reload(this.idContainer).then(() => {
-            MatomoUrl.updateHash({
-              ...MatomoUrl.hashParsed.value,
-              idContainerVersion,
-            });
+            if (this.isEmbedded) {
+              MatomoUrl.updateHash({
+                ...MatomoUrl.hashParsed.value,
+              });
+            } else {
+              MatomoUrl.updateHash({
+                ...MatomoUrl.hashParsed.value,
+                idContainerVersion,
+              });
+            }
 
             setTimeout(() => {
               this.showNotification(translate('TagManager_VersionPublishSuccess'), 'success');

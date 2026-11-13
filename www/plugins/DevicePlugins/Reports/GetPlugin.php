@@ -31,13 +31,24 @@ class GetPlugin extends Base
         $this->subcategoryId = 'DevicesDetection_Software';
     }
 
+    public function getMetricsDocumentation()
+    {
+        $documentation = parent::getMetricsDocumentation();
+
+        $documentation['nb_visits_percentage'] = Piwik::translate('DevicePlugins_ColumnPercentageVisitsDocumentation');
+
+        return $documentation;
+    }
+
     public function configureView(ViewDataTable $view)
     {
+        $view->config->show_flatten_table = false;
+        $view->config->show_flatten_table_export = false;
         $this->getBasicDevicePluginsDisplayProperties($view);
 
         $view->config->addTranslations(array(
             'nb_visits_percentage' =>
-            str_replace(' ', '&nbsp;', Piwik::translate('General_ColumnPercentageVisits'))
+            str_replace(' ', '&nbsp;', Piwik::translate('General_ColumnPercentageVisits')),
         ));
 
         $view->config->show_offset_information = false;

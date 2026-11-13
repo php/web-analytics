@@ -12,8 +12,6 @@ namespace Piwik\Db;
 use Zend_Db_Table;
 use Piwik\Piwik;
 
-/**
- */
 class Adapter
 {
     /**
@@ -24,8 +22,12 @@ class Adapter
      * @param bool $connect
      * @return AdapterInterface
      */
-    public static function factory($adapterName, &$dbInfos, $connect = true)
-    {
+    public static function factory(
+        $adapterName,
+        #[\SensitiveParameter]
+        &$dbInfos,
+        $connect = true
+    ) {
         if ($connect) {
             if (isset($dbInfos['port']) && is_string($dbInfos['port']) && $dbInfos['port'][0] === '/') {
                 $dbInfos['unix_socket'] = $dbInfos['port'];
@@ -148,7 +150,7 @@ class Adapter
             '[2006]'                        => Piwik::translate('General_ExceptionDatabaseUnavailable'),
             'MySQL server has gone away'    => Piwik::translate('General_ExceptionDatabaseUnavailable'),
             '[1698]'                        => Piwik::translate('General_ExceptionDatabaseAccess'),
-            'Access denied'                 => Piwik::translate('General_ExceptionDatabaseAccess')
+            'Access denied'                 => Piwik::translate('General_ExceptionDatabaseAccess'),
         );
 
         foreach ($safeMessageMap as $search_term => $safeMessage) {

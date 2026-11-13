@@ -165,7 +165,7 @@ class Config
 
         $locations = array(
             array('file' => $perHostFilename, 'path' => $pathDomainConfig),
-            array('file' => $standardConfigName, 'path' => $pathDomainMiscUser)
+            array('file' => $standardConfigName, 'path' => $pathDomainMiscUser),
         );
 
         return $locations;
@@ -188,6 +188,7 @@ class Config
             'action_title_category_delimiter' => $general['action_title_category_delimiter'],
             'are_ads_enabled' => Advertising::isAdsEnabledInConfig($general),
             'autocomplete_min_sites' => $general['autocomplete_min_sites'],
+            'data_comparison_segment_limit' => $general['data_comparison_segment_limit'],
             'datatable_export_range_as_day' => $general['datatable_export_range_as_day'],
             'datatable_row_limits' => $this->getDatatableRowLimits(),
             'enable_general_settings_admin' => Controller::isGeneralSettingsAdminEnabled(),
@@ -196,8 +197,7 @@ class Config
     }
 
     /**
-     * @param $general
-     * @return mixed
+     * @return string[]
      */
     private function getDatatableRowLimits()
     {
@@ -443,7 +443,7 @@ class Config
     }
 
     /**
-     * @throws \Exception
+     * @return MissingFilePermissionException
      */
     public function getConfigNotWritableException()
     {
@@ -478,11 +478,6 @@ class Config
 
     /**
      * Sanity check a config file by checking contents
-     *
-     * @param string $localPath
-     * @param string $expectedContent
-     * @param bool $notify
-     * @return bool
      */
     public function sanityCheck(string $localPath, string $expectedContent, bool $notify = false): bool
     {

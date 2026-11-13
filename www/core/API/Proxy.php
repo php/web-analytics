@@ -35,8 +35,6 @@ if (!class_exists('Piwik\API\NoDefaultValue', false)) {
  * and default values.
  * Proxy receives all the API calls requests via call() and forwards them to the right
  * object, with the parameters in the right order.
- *
- * It will also log the performance of API calls (time spent, parameter values, etc.) if logger available
  */
 class Proxy
 {
@@ -81,7 +79,7 @@ class Proxy
      *
      * The method will introspect the methods, their parameters, etc.
      *
-     * @param string $className ModuleName eg. "API"
+     * @param string $className Fully qualified API class name, eg. "\Piwik\Plugins\Referrers\API"
      */
     public function registerClass($className)
     {
@@ -113,6 +111,7 @@ class Proxy
     {
         // Doc comment
         $doc = $rClass->getDocComment();
+        $doc = $this->removeDocblockAnnotationBlocks($doc, 'phpstan');
         $doc = str_replace(" * " . PHP_EOL, "<br>", $doc);
 
         // boldify the first line only if there is more than one line, otherwise too much bold
@@ -130,6 +129,48 @@ class Proxy
     }
 
     /**
+     * Removes docblock annotations and their continuation lines.
+     *
+     * For example, this removes `@phpstan-type` and the following multiline shape definition.
+     *
+     * @param string|false $doc
+     * @param string $annotationPrefix
+     * @return string|false
+     */
+    private function removeDocblockAnnotationBlocks($doc, $annotationPrefix)
+    {
+        if (!is_string($doc) || $doc === '') {
+            return $doc;
+        }
+
+        $lines = preg_split('/\R/', $doc);
+        $result = [];
+        $isSkipping = false;
+
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*\*\s*@' . preg_quote($annotationPrefix, '/') . '\S*/', $line)) {
+                $isSkipping = true;
+                continue;
+            }
+
+            if ($isSkipping) {
+                // stop skipping once a new annotation starts
+                if (preg_match('/^\s*\*\s*@\S+/', $line)) {
+                    $isSkipping = false;
+                } elseif (preg_match('/^\s*\*\/\s*$/', $line)) {
+                    $isSkipping = false;
+                } else {
+                    continue;
+                }
+            }
+
+            $result[] = $line;
+        }
+
+        return implode(PHP_EOL, $result);
+    }
+
+    /**
      * Returns number of classes already loaded
      * @return int
      */
@@ -142,9 +183,6 @@ class Proxy
      * Will execute $className->$methodName($parametersValues)
      * If any error is detected (wrong number of parameters, method not found, class not found, etc.)
      * it will throw an exception
-     *
-     * It also logs the API calls, with the parameters values, the returned value, the performance, etc.
-     * You can enable logging in config/global.ini.php (log_api_call)
      *
      * @param string $className The class name (eg. API)
      * @param string $methodName The method name
@@ -440,7 +478,7 @@ class Proxy
     /**
      * Returns an array containing the *sanitized* values of the parameters to pass to the method to call
      *
-     * @param array $requiredParameters array of (parameter name, default value)
+     * @param array $requiredParameters array mapping parameter name to ['default' => value, 'type' => type]
      * @param array $parametersRequest
      * @throws Exception
      * @return array values to pass to the function call
@@ -473,9 +511,10 @@ class Proxy
                             $requestValue = Common::getRequestVar($name, $defaultValue, $type, $parametersRequest);
                         }
                     } catch (Exception $e) {
-                        // Special case: empty parameter in the URL, should return the empty string
+                        // Special case: empty parameter in the URL, should return the empty string, if no incompatible type is defined
                         if (isset($parametersRequest[$name])
                             && $parametersRequest[$name] === ''
+                            && (empty($type) || $type === 'string')
                         ) {
                             $requestValue = '';
                         } else {
@@ -484,7 +523,7 @@ class Proxy
                     }
                 }
             } catch (Exception $e) {
-                throw new Exception(Piwik::translate('General_PleaseSpecifyValue', array($name)));
+                throw new BadRequestException(Piwik::translate('General_PleaseSpecifyValue', [$name]));
             }
             $finalParameters[$name] = $requestValue;
         }
@@ -494,7 +533,7 @@ class Proxy
     /**
      * Returns an array containing the values of the parameters to pass to the method to call
      *
-     * @param array $requiredParameters array of (parameter name, default value)
+     * @param array $requiredParameters array mapping parameter name to ['default' => value, 'type' => type]
      * @param \Piwik\Request $request
      * @throws Exception
      * @return array values to pass to the function call
@@ -540,7 +579,7 @@ class Proxy
                     $requestValue = $request->$method($name, $defaultValue);
                 }
             } catch (Exception $e) {
-                throw new Exception(Piwik::translate('General_PleaseSpecifyValue', [$name]));
+                throw new BadRequestException(Piwik::translate('General_PleaseSpecifyValue', [$name]));
             }
             $finalParameters[$name] = $requestValue;
         }
@@ -621,7 +660,7 @@ class Proxy
     }
 
     /**
-     * @param $docComment
+     * @param string|false $docComment
      * @return bool
      */
     public function shouldHideAPIMethod($docComment)

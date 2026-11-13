@@ -15,9 +15,6 @@ use Piwik\Columns\Dimension;
 use Piwik\Piwik;
 use Piwik\Plugin;
 
-/**
- *
- */
 class DevicePlugins extends \Piwik\Plugin
 {
     /**
@@ -33,7 +30,7 @@ class DevicePlugins extends \Piwik\Plugin
     public function addMetricTranslations(&$translations)
     {
         $metrics = array(
-            'nb_visits_percentage' => Piwik::translate('General_ColumnPercentageVisits')
+            'nb_visits_percentage' => Piwik::translate('General_ColumnPercentageVisits'),
         );
 
         $translations = array_merge($translations, $metrics);

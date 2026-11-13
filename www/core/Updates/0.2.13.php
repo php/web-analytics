@@ -13,8 +13,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_0_2_13 extends Updates
 {
     /**
@@ -36,7 +34,7 @@ class Updates_0_2_13 extends Updates
                 'option_value' => 'LONGTEXT NOT NULL' ,
                 'autoload' => "TINYINT NOT NULL DEFAULT '1'",
             )),
-            $this->migration->db->addPrimaryKey('option', 'option_name')
+            $this->migration->db->addPrimaryKey('option', 'option_name'),
         );
     }
 

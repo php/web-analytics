@@ -43,9 +43,6 @@ class LogDataPurger
      */
     private $rawLogDao;
 
-    /**
-     * Constructor.
-     */
     public function __construct(LogDeleter $logDeleter, RawLogDao $rawLogDao)
     {
         $this->logDeleter = $logDeleter;
@@ -145,14 +142,14 @@ class LogDataPurger
 
     /**
      * get highest idVisit to delete rows from
-     * @return string
+     * @return string|false
      */
     private function getDeleteIdVisitOffset($deleteLogsOlderThan)
     {
         $logVisit = Common::prefixTable("log_visit");
 
         // get max idvisit
-        $maxIdVisit = Db::fetchOne("SELECT MAX(idvisit) FROM $logVisit");
+        $maxIdVisit = Db::fetchOne("SELECT MAX(idvisit) FROM `$logVisit`");
         if (empty($maxIdVisit)) {
             return false;
         }
@@ -160,7 +157,7 @@ class LogDataPurger
         // select highest idvisit to delete from
         $dateStart = Date::factory("today")->subDay($deleteLogsOlderThan);
         $sql = "SELECT idvisit
-		          FROM $logVisit
+		          FROM `$logVisit`
 		         WHERE '" . $dateStart->toString('Y-m-d H:i:s') . "' > visit_last_action_time
 		           AND idvisit <= ?
 		           AND idvisit > ?
@@ -172,7 +169,7 @@ class LogDataPurger
 
     private function getLogTableDeleteCount($table, $maxIdVisit)
     {
-        $sql = "SELECT COUNT(*) FROM $table WHERE idvisit <= ?";
+        $sql = "SELECT COUNT(*) FROM `$table` WHERE idvisit <= ?";
         return (int) Db::fetchOne($sql, array($maxIdVisit));
     }
 

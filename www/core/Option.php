@@ -68,7 +68,7 @@ class Option
      *
      * @param string $name The option name.
      * @param string $value The value to set the option to.
-     * @param int $autoLoad If set to 1, this option value will be automatically loaded when Piwik is initialized;
+     * @param int|bool $autoload If set to 1, this option value will be automatically loaded when Piwik is initialized;
      *                      should be set to 1 for options that will be used in every Piwik request.
      */
     public static function set($name, $value, $autoload = 0)
@@ -151,7 +151,7 @@ class Option
     /**
      * Sets the singleton instance. For testing purposes.
      *
-     * @param mixed
+     * @param mixed $instance
      * @ignore
      */
     public static function setSingletonInstance($instance)

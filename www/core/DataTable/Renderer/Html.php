@@ -28,20 +28,16 @@ class Html extends Renderer
 
     /**
      * Sets the table id
-     *
-     * @param string $id
      */
-    public function setTableId($id)
+    public function setTableId(string $id): void
     {
         $this->tableId = str_replace('.', '_', $id);
     }
 
     /**
      * Computes the dataTable output and returns the string/binary
-     *
-     * @return string
      */
-    public function render()
+    public function render(): string
     {
         $this->tableStructure = array();
         $this->allColumns = array();
@@ -53,14 +49,12 @@ class Html extends Renderer
     /**
      * Computes the output for the given data table
      *
-     * @param DataTableInterface $table
-     * @return string
+     * @param DataTableInterface|array $table
      */
-    protected function renderTable($table)
+    protected function renderTable($table): string
     {
         if (is_array($table)) {
             // convert array to DataTable
-
             $table = DataTable::makeFromSimpleArray($table);
         }
 
@@ -78,19 +72,17 @@ class Html extends Renderer
             }
         }
 
-        $out = $this->renderDataTable();
-        return $out;
+        return $this->renderDataTable();
     }
 
     /**
      * Adds the given data table to the table structure array
      *
-     * @param DataTable $table
-     * @param null|string $columnToAdd
-     * @param null|string $valueToAdd
+     * @param DataTable|DataTable\Map $table
+     * @param null|mixed $valueToAdd
      * @throws Exception
      */
-    protected function buildTableStructure($table, $columnToAdd = null, $valueToAdd = null)
+    protected function buildTableStructure($table, ?string $columnToAdd = null, $valueToAdd = null): void
     {
         $i = $this->i;
         $someMetadata = false;
@@ -115,44 +107,50 @@ class Html extends Renderer
                 $this->tableStructure[$i][$column] = $value;
             }
 
-            $metadata = array();
-            foreach ($row->getMetadata() as $name => $value) {
-                if (is_string($value)) {
-                    $value = "'$value'";
-                } elseif (is_array($value)) {
-                    $value = var_export($value, true);
-                } elseif ($value instanceof DataTable\DataTableInterface) {
-                    $value = $this->renderTable($value);
+            if (!$this->hideMetadata) {
+                $metadata = [];
+                foreach ($row->getMetadata() as $name => $value) {
+                    if (is_string($value)) {
+                        $value = "'$value'";
+                    } elseif (is_array($value)) {
+                        $value = var_export($value, true);
+                    } elseif ($value instanceof DataTable\DataTableInterface) {
+                        $value = $this->renderTable($value);
+                    }
+                    $metadata[] = "'$name' => $value";
                 }
-                $metadata[] = "'$name' => $value";
-            }
 
-            if (count($metadata) != 0) {
-                $someMetadata = true;
-                $metadata = implode("<br />", $metadata);
-                $this->tableStructure[$i]['_metadata'] = $metadata;
-            }
+                if (count($metadata) != 0) {
+                    $someMetadata = true;
+                    $metadata = implode("<br />", $metadata);
+                    $this->tableStructure[$i]['_metadata'] = $metadata;
+                }
 
-            $idSubtable = $row->getIdSubDataTable();
-            if (!is_null($idSubtable)) {
-                $someIdSubTable = true;
-                $this->tableStructure[$i]['_idSubtable'] = $idSubtable;
+                if (!$this->hideIdSubDatatable) {
+                    $idSubtable = $row->getIdSubDataTable();
+                    if (!is_null($idSubtable)) {
+                        $someIdSubTable = true;
+                        $this->tableStructure[$i]['_idSubtable'] = $idSubtable;
+                    }
+                }
             }
 
             $i++;
         }
         $this->i = $i;
 
-        $this->allColumns['_metadata'] = $someMetadata;
-        $this->allColumns['_idSubtable'] = $someIdSubTable;
+        if (!$this->hideMetadata) {
+            $this->allColumns['_metadata'] = $someMetadata;
+            if (!$this->hideIdSubDatatable) {
+                $this->allColumns['_idSubtable'] = $someIdSubTable;
+            }
+        }
     }
 
     /**
      * Computes the output for the table structure array
-     *
-     * @return string
      */
-    protected function renderDataTable()
+    protected function renderDataTable(): string
     {
         $html = "<table " . ($this->tableId ? "id=\"{$this->tableId}\" " : "") . "border=\"1\">\n<thead>\n\t<tr>\n";
 
@@ -164,7 +162,7 @@ class Html extends Renderer
                 if ($this->translateColumnNames) {
                     $name = $this->translateColumnName($name);
                 }
-                $html .= "\t\t<th>$name</th>\n";
+                $html .= "\t\t<th>" . self::formatValueXml($name) . "</th>\n";
             }
         }
 

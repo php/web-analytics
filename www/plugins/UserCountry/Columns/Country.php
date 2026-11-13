@@ -35,7 +35,7 @@ class Country extends Base
     protected $nameSingular = 'UserCountry_Country';
     protected $namePlural = 'UserCountryMap_Countries';
     protected $segmentName = 'countryCode';
-    protected $acceptValues = 'ISO 3166-1 alpha-2 country codes (de, us, fr, in, es, etc.)';
+    protected $acceptValues = 'UserCountry_CountrySegmentHelp';
 
     public function configureSegments(SegmentsList $segmentsList, DimensionSegmentFactory $dimensionSegmentFactory)
     {
@@ -55,7 +55,11 @@ class Country extends Base
         });
 
         $segment->setSqlFilterValue(function ($val) use ($countryList) {
-            $result   = array_search($val, $countryList);
+            $countryList = array_map(function ($countryName) {
+                return mb_strtolower($countryName);
+            }, $countryList);
+            $result = array_search(mb_strtolower($val), $countryList);
+
             if ($result === false) {
                 $result = 'UNK';
             }
@@ -74,8 +78,6 @@ class Country extends Base
     }
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
      * @return mixed
      */
@@ -98,10 +100,8 @@ class Country extends Base
     }
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
-     * @return int
+     * @return string|false
      */
     public function onExistingVisit(Request $request, Visitor $visitor, $action)
     {
@@ -109,8 +109,6 @@ class Country extends Base
     }
 
     /**
-     * @param Request $request
-     * @param Visitor $visitor
      * @param Action|null $action
      * @return mixed
      */

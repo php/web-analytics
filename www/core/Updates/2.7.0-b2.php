@@ -13,8 +13,6 @@ use Piwik\Updates;
 use Piwik\Updater;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_2_7_0_b2 extends Updates
 {
     /**
@@ -30,7 +28,7 @@ class Updates_2_7_0_b2 extends Updates
     public function getMigrationss(Updater $updater)
     {
         return array(
-            $this->migration->plugin->activate('Contents')
+            $this->migration->plugin->activate('Contents'),
         );
     }
 

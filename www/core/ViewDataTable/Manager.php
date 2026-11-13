@@ -32,7 +32,7 @@ class Manager
     /**
      * Returns the viewDataTable IDs of a visualization's class lineage.
      *
-     * @see self::getVisualizationClassLineage
+     * @see \Piwik\Common::getClassLineage
      *
      * @param string $klass The visualization class.
      *
@@ -76,7 +76,6 @@ class Manager
 
         $klassToExtend = '\\Piwik\\Plugin\\ViewDataTable';
 
-        /** @var string[] $visualizations */
         $visualizations = PluginManager::getInstance()->findMultipleComponents('Visualizations', $klassToExtend);
 
         $result = array();
@@ -283,7 +282,7 @@ class Manager
      */
     public static function saveViewDataTableParameters($login, $controllerAction, $parametersToOverride, $containerId = null)
     {
-        $params = self::getViewDataTableParameters($login, $controllerAction);
+        $params = self::getViewDataTableParameters($login, $controllerAction, $containerId);
 
         self::unsetComparisonParams($params);
 
@@ -325,7 +324,6 @@ class Manager
      * Display a meaningful error message when any invalid parameter is being set.
      *
      * @param $params
-     * @throws
      */
     private static function errorWhenSettingNonOverridableParameter($controllerAction, $params)
     {
@@ -393,14 +391,14 @@ class Manager
                 'id' => 'ecommerceOrder',
                 'title' => Piwik::translate('General_EcommerceOrders'),
                 'icon' => 'icon-ecommerce-order',
-                'text' => Piwik::translate('General_EcommerceOrders')
+                'text' => Piwik::translate('General_EcommerceOrders'),
             );
 
             $normalViewIcons['buttons'][] = array(
                 'id' => 'ecommerceAbandonedCart',
                 'title' => Piwik::translate('General_AbandonedCarts'),
                 'icon' => 'icon-ecommerce-abandoned-cart',
-                'text' => Piwik::translate('General_AbandonedCarts')
+                'text' => Piwik::translate('General_AbandonedCarts'),
             );
         }
 

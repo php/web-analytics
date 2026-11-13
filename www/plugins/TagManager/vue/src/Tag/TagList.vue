@@ -139,13 +139,15 @@
               v-show="hasWriteAccess"
             >
               <a
-                v-show="tag.status === 'active'"
+                v-show="tag.status === 'active'
+                && (!tag.typeMetadata?.isCustomTemplate || canUseCustomTemplates)"
                 class="table-action icon-pause"
                 @click="pauseTag(tag)"
                 :title="translate('TagManager_PauseX', translate('TagManager_Tag'))"
               />
               <a
-                v-show="tag.status === 'paused'"
+                v-show="tag.status === 'paused'
+                && (!tag.typeMetadata?.isCustomTemplate || canUseCustomTemplates)"
                 class="table-action icon-play"
                 @click="resumeTag(tag)"
                 :title="translate('TagManager_ResumeX', translate('TagManager_Tag'))"
@@ -156,11 +158,6 @@
                 :title="translate('TagManager_EditTag')"
               />
               <a
-                class="table-action icon-delete"
-                @click="deleteTag(tag)"
-                :title="translate('TagManager_DeleteX', translate('TagManager_Tag'))"
-              />
-              <a
                 class="table-action icon-content-copy"
                 v-show="hasPublishCapability()"
                 @click="openCopyDialog(tag)"
@@ -168,6 +165,12 @@
                   'TagManager_CopyX',
                   translate('TagManager_Tag'),
                 )"
+              />
+              <a
+                v-show="!tag.typeMetadata?.isCustomTemplate || canUseCustomTemplates"
+                class="table-action icon-delete"
+                @click="deleteTag(tag)"
+                :title="translate('TagManager_DeleteX', translate('TagManager_Tag'))"
               />
             </td>
           </tr>
@@ -483,6 +486,9 @@ export default defineComponent({
     getActionClasses(): string {
       const copyClass = this.hasPublishCapability() ? ' hasCopyAction' : '';
       return `action${copyClass}`;
+    },
+    canUseCustomTemplates() {
+      return Matomo.hasUserCapability('tagmanager_use_custom_templates');
     },
   },
 });

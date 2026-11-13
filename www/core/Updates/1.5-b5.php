@@ -13,8 +13,6 @@ use Piwik\Updater;
 use Piwik\Updates;
 use Piwik\Updater\Migration\Factory as MigrationFactory;
 
-/**
- */
 class Updates_1_5_b5 extends Updates
 {
     /**
@@ -35,7 +33,7 @@ class Updates_1_5_b5 extends Updates
                 'modified' => 'INTEGER',
                 'lifetime' => 'INTEGER',
                 'data' => 'TEXT',
-            ), $primary = 'id')
+            ), $primary = 'id'),
         );
     }
 

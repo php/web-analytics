@@ -87,7 +87,7 @@
           <span v-if="pluginNamesHavingSettings.indexOf(name) !== -1">
             <br /><br />
             <a
-              :href="`${generalSettingsLink}#${name}`"
+              :href="`${generalSettingsLink}#/${name}`"
               class="settingsLink"
             >{{ translate('General_Settings') }}</a>
           </span>
@@ -143,22 +143,6 @@
                     :href="getPluginDonateLink(name, plugin.info.donate.paypal)"
                   >
                     <img src="plugins/CorePluginsAdmin/images/paypal_donate.png" height="30"/>
-                  </a>
-
-                  <a
-                    v-if="plugin.info?.donate?.flattr"
-                    class="donation-link flattr"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    :href="plugin.info.donate?.flattr"
-                  >
-                    <img
-                      class="alignnone"
-                      title="Flattr"
-                      alt=""
-                      src="plugins/CorePluginsAdmin/images/flattr.png"
-                      height="29"
-                    />
                   </a>
 
                   <div

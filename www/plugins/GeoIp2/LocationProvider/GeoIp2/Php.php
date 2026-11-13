@@ -57,8 +57,6 @@ class Php extends GeoIp2
     private $customDbNames;
 
     /**
-     * Constructor.
-     *
      * @param array|bool $customDbNames The possible filenames for each type of GeoIP database.
      *                                   eg array(
      *                                       'loc' => array('GeoLite2-City.mmdb'),
@@ -424,7 +422,7 @@ class Php extends GeoIp2
      * Returns information about this location provider. Contains an id, title & description:
      *
      * array(
-     *     'id' => 'geoip2_php',
+     *     'id' => 'geoip2php',
      *     'title' => '...',
      *     'description' => '...'
      * );
@@ -442,7 +440,7 @@ class Php extends GeoIp2
             );
         }
 
-        $installDocs = '<a rel="noreferrer"  target="_blank" href="' . Url::addCampaignParametersToMatomoLink('https://matomo.org/faq/how-to/faq_163') . '">'
+        $installDocs = Url::getExternalLinkTag('https://matomo.org/faq/how-to/faq_163')
             . Piwik::translate('UserCountry_HowToInstallGeoIPDatabases')
             . '</a>';
 
@@ -497,7 +495,7 @@ class Php extends GeoIp2
         $view->geoIPDatabasesInstalled = $geoIPDatabasesInstalled;
         $view->updatePeriodOptions = [
             'month' => Piwik::translate('Intl_PeriodMonth'),
-            'week' => Piwik::translate('Intl_PeriodWeek')
+            'week' => Piwik::translate('Intl_PeriodWeek'),
         ];
 
 

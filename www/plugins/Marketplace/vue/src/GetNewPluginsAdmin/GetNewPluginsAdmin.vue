@@ -32,6 +32,8 @@
             :src="`${plugin.screenshots[0]}?w=600`"
             style="width: 100%"
             alt=""
+            loading="lazy"
+            decoding="async"
           />
         </span>
       </div>
@@ -63,6 +65,8 @@ export default defineComponent({
   computed: {
     marketplaceOverviewLink() {
       return `?${MatomoUrl.stringify({
+        ...MatomoUrl.urlParsed.value,
+        idSite: MatomoUrl.parsed.value.idSite,
         module: 'Marketplace',
         action: 'overview',
       })}`;
