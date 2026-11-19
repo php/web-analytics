@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
+class ComposerStaticInit92fe453c45dcfeaaf23311d4f1a0b999
 {
     public static $files = array (
         'a4a119a56e50fbb293281d9a48007e0e' => __DIR__ . '/..' . '/symfony/polyfill-php80/bootstrap.php',
@@ -880,6 +880,7 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
         'Piwik\\Access\\Role\\View' => __DIR__ . '/../..' . '/core/Access/Role/View.php',
         'Piwik\\Access\\Role\\Write' => __DIR__ . '/../..' . '/core/Access/Role/Write.php',
         'Piwik\\Access\\RolesProvider' => __DIR__ . '/../..' . '/core/Access/RolesProvider.php',
+        'Piwik\\Access\\TransientCacheOverlay' => __DIR__ . '/../..' . '/core/Access/TransientCacheOverlay.php',
         'Piwik\\Application\\Environment' => __DIR__ . '/../..' . '/core/Application/Environment.php',
         'Piwik\\Application\\EnvironmentManipulator' => __DIR__ . '/../..' . '/core/Application/EnvironmentManipulator.php',
         'Piwik\\Application\\Kernel\\EnvironmentValidator' => __DIR__ . '/../..' . '/core/Application/Kernel/EnvironmentValidator.php',
@@ -1218,13 +1219,18 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
         'Piwik\\Plugins\\AIProviders\\AIProviders' => __DIR__ . '/../..' . '/plugins/AIProviders/AIProviders.php',
         'Piwik\\Plugins\\AIProviders\\AIProvidersList' => __DIR__ . '/../..' . '/plugins/AIProviders/AIProvidersList.php',
         'Piwik\\Plugins\\AIProviders\\AIRequest' => __DIR__ . '/../..' . '/plugins/AIProviders/AIRequest.php',
+        'Piwik\\Plugins\\AIProviders\\AIRequestContext' => __DIR__ . '/../..' . '/plugins/AIProviders/AIRequestContext.php',
+        'Piwik\\Plugins\\AIProviders\\AIRequestDecision' => __DIR__ . '/../..' . '/plugins/AIProviders/AIRequestDecision.php',
+        'Piwik\\Plugins\\AIProviders\\AIUsage' => __DIR__ . '/../..' . '/plugins/AIProviders/AIUsage.php',
         'Piwik\\Plugins\\AIProviders\\API' => __DIR__ . '/../..' . '/plugins/AIProviders/API.php',
         'Piwik\\Plugins\\AIProviders\\CanonicalMessage' => __DIR__ . '/../..' . '/plugins/AIProviders/CanonicalMessage.php',
         'Piwik\\Plugins\\AIProviders\\Controller' => __DIR__ . '/../..' . '/plugins/AIProviders/Controller.php',
         'Piwik\\Plugins\\AIProviders\\Exception\\AIProviderClientException' => __DIR__ . '/../..' . '/plugins/AIProviders/Exception/AIProviderClientException.php',
         'Piwik\\Plugins\\AIProviders\\Exception\\AIProviderException' => __DIR__ . '/../..' . '/plugins/AIProviders/Exception/AIProviderException.php',
         'Piwik\\Plugins\\AIProviders\\Exception\\AIProviderServerException' => __DIR__ . '/../..' . '/plugins/AIProviders/Exception/AIProviderServerException.php',
+        'Piwik\\Plugins\\AIProviders\\Exception\\AIQuotaExceededException' => __DIR__ . '/../..' . '/plugins/AIProviders/Exception/AIQuotaExceededException.php',
         'Piwik\\Plugins\\AIProviders\\Menu' => __DIR__ . '/../..' . '/plugins/AIProviders/Menu.php',
+        'Piwik\\Plugins\\AIProviders\\Model\\AIProcessingSettings' => __DIR__ . '/../..' . '/plugins/AIProviders/Model/AIProcessingSettings.php',
         'Piwik\\Plugins\\AIProviders\\Model\\Configuration' => __DIR__ . '/../..' . '/plugins/AIProviders/Model/Configuration.php',
         'Piwik\\Plugins\\AIProviders\\Provider\\AIProvider' => __DIR__ . '/../..' . '/plugins/AIProviders/Provider/AIProvider.php',
         'Piwik\\Plugins\\AIProviders\\Provider\\Anthropic' => __DIR__ . '/../..' . '/plugins/AIProviders/Provider/Anthropic.php',
@@ -1233,8 +1239,11 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
         'Piwik\\Plugins\\AIProviders\\Provider\\Google' => __DIR__ . '/../..' . '/plugins/AIProviders/Provider/Google.php',
         'Piwik\\Plugins\\AIProviders\\Provider\\OpenAI' => __DIR__ . '/../..' . '/plugins/AIProviders/Provider/OpenAI.php',
         'Piwik\\Plugins\\AIProviders\\WebSearchUsage' => __DIR__ . '/../..' . '/plugins/AIProviders/WebSearchUsage.php',
+        'Piwik\\Plugins\\AIProviders\\tests\\Fixtures\\ConfiguredProviders' => __DIR__ . '/../..' . '/plugins/AIProviders/tests/Fixtures/ConfiguredProviders.php',
+        'Piwik\\Plugins\\AIProviders\\tests\\Integration\\AIProcessingSettingsTest' => __DIR__ . '/../..' . '/plugins/AIProviders/tests/Integration/AIProcessingSettingsTest.php',
         'Piwik\\Plugins\\AIProviders\\tests\\Integration\\ConfigurationTest' => __DIR__ . '/../..' . '/plugins/AIProviders/tests/Integration/ConfigurationTest.php',
         'Piwik\\Plugins\\AIProviders\\tests\\Integration\\ConverseServiceTest' => __DIR__ . '/../..' . '/plugins/AIProviders/tests/Integration/ConverseServiceTest.php',
+        'Piwik\\Plugins\\AIProviders\\tests\\Integration\\UsageEventsTest' => __DIR__ . '/../..' . '/plugins/AIProviders/tests/Integration/UsageEventsTest.php',
         'Piwik\\Plugins\\AIProviders\\tests\\Unit\\AIConversationRequestTest' => __DIR__ . '/../..' . '/plugins/AIProviders/tests/Unit/AIConversationRequestTest.php',
         'Piwik\\Plugins\\AIProviders\\tests\\Unit\\AIConversationResponseTest' => __DIR__ . '/../..' . '/plugins/AIProviders/tests/Unit/AIConversationResponseTest.php',
         'Piwik\\Plugins\\AIProviders\\tests\\Unit\\AIProviderResponseTest' => __DIR__ . '/../..' . '/plugins/AIProviders/tests/Unit/AIProviderResponseTest.php',
@@ -1728,6 +1737,7 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
         'Piwik\\Plugins\\CoreUpdater\\tests\\Integration\\UpdateCommunicationTest' => __DIR__ . '/../..' . '/plugins/CoreUpdater/tests/Integration/UpdateCommunicationTest.php',
         'Piwik\\Plugins\\CoreUpdater\\tests\\Mock\\UpdaterMock' => __DIR__ . '/../..' . '/plugins/CoreUpdater/tests/Mock/UpdaterMock.php',
         'Piwik\\Plugins\\CoreUpdater\\tests\\Unit\\ModelTest' => __DIR__ . '/../..' . '/plugins/CoreUpdater/tests/Unit/ModelTest.php',
+        'Piwik\\Plugins\\CoreUpdater\\tests\\Unit\\UpdaterExceptionTest' => __DIR__ . '/../..' . '/plugins/CoreUpdater/tests/Unit/UpdaterExceptionTest.php',
         'Piwik\\Plugins\\CoreVisualizations\\CoreVisualizations' => __DIR__ . '/../..' . '/plugins/CoreVisualizations/CoreVisualizations.php',
         'Piwik\\Plugins\\CoreVisualizations\\JqplotDataGenerator' => __DIR__ . '/../..' . '/plugins/CoreVisualizations/JqplotDataGenerator.php',
         'Piwik\\Plugins\\CoreVisualizations\\JqplotDataGenerator\\Chart' => __DIR__ . '/../..' . '/plugins/CoreVisualizations/JqplotDataGenerator/Chart.php',
@@ -2243,6 +2253,7 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
         'Piwik\\Plugins\\Goals\\Visualizations\\Goals' => __DIR__ . '/../..' . '/plugins/Goals/Visualizations/Goals.php',
         'Piwik\\Plugins\\Goals\\Widgets\\AddNewGoal' => __DIR__ . '/../..' . '/plugins/Goals/Widgets/AddNewGoal.php',
         'Piwik\\Plugins\\Goals\\Widgets\\EditGoals' => __DIR__ . '/../..' . '/plugins/Goals/Widgets/EditGoals.php',
+        'Piwik\\Plugins\\Goals\\tests\\Fixtures\\GoalRecommendationsSaved' => __DIR__ . '/../..' . '/plugins/Goals/tests/Fixtures/GoalRecommendationsSaved.php',
         'Piwik\\Plugins\\Goals\\tests\\Integration\\APITest' => __DIR__ . '/../..' . '/plugins/Goals/tests/Integration/APITest.php',
         'Piwik\\Plugins\\Goals\\tests\\Integration\\GetGoalsAccessTest' => __DIR__ . '/../..' . '/plugins/Goals/tests/Integration/GetGoalsAccessTest.php',
         'Piwik\\Plugins\\Goals\\tests\\Integration\\GoalRecommendationsTest' => __DIR__ . '/../..' . '/plugins/Goals/tests/Integration/GoalRecommendationsTest.php',
@@ -2658,6 +2669,7 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
         'Piwik\\Plugins\\PrivacyManager\\tests\\System\\RandomizedConfigIdTest' => __DIR__ . '/../..' . '/plugins/PrivacyManager/tests/System/RandomizedConfigIdTest.php',
         'Piwik\\Plugins\\PrivacyManager\\tests\\Unit\\AnonymizeIPTest' => __DIR__ . '/../..' . '/plugins/PrivacyManager/tests/Unit/AnonymizeIPTest.php',
         'Piwik\\Plugins\\PrivacyManager\\tests\\Unit\\AnonymizeReferrerTest' => __DIR__ . '/../..' . '/plugins/PrivacyManager/tests/Unit/AnonymizeReferrerTest.php',
+        'Piwik\\Plugins\\PrivacyManager\\tests\\Unit\\Compliance\\ComplianceSettingsProviderTest' => __DIR__ . '/../..' . '/plugins/PrivacyManager/tests/Unit/Compliance/ComplianceSettingsProviderTest.php',
         'Piwik\\Plugins\\PrivacyManager\\tests\\Unit\\DataRoundingTest' => __DIR__ . '/../..' . '/plugins/PrivacyManager/tests/Unit/DataRoundingTest.php',
         'Piwik\\Plugins\\PrivacyManager\\tests\\Unit\\DoNotTrackHeaderCheckerTest' => __DIR__ . '/../..' . '/plugins/PrivacyManager/tests/Unit/DoNotTrackHeaderCheckerTest.php',
         'Piwik\\Plugins\\PrivacyManager\\tests\\Unit\\Settings\\PolicyConstraintTest' => __DIR__ . '/../..' . '/plugins/PrivacyManager/tests/Unit/Settings/PolicyConstraintTest.php',
@@ -2868,6 +2880,7 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
         'Piwik\\Plugins\\ScheduledReports\\ReportEmailGenerator' => __DIR__ . '/../..' . '/plugins/ScheduledReports/ReportEmailGenerator.php',
         'Piwik\\Plugins\\ScheduledReports\\ReportEmailGenerator\\AttachedFileReportEmailGenerator' => __DIR__ . '/../..' . '/plugins/ScheduledReports/ReportEmailGenerator/AttachedFileReportEmailGenerator.php',
         'Piwik\\Plugins\\ScheduledReports\\ReportEmailGenerator\\HtmlReportEmailGenerator' => __DIR__ . '/../..' . '/plugins/ScheduledReports/ReportEmailGenerator/HtmlReportEmailGenerator.php',
+        'Piwik\\Plugins\\ScheduledReports\\ReportSchedule' => __DIR__ . '/../..' . '/plugins/ScheduledReports/ReportSchedule.php',
         'Piwik\\Plugins\\ScheduledReports\\ScheduledReportEmail' => __DIR__ . '/../..' . '/plugins/ScheduledReports/ScheduledReportEmail.php',
         'Piwik\\Plugins\\ScheduledReports\\ScheduledReports' => __DIR__ . '/../..' . '/plugins/ScheduledReports/ScheduledReports.php',
         'Piwik\\Plugins\\ScheduledReports\\SubscriptionModel' => __DIR__ . '/../..' . '/plugins/ScheduledReports/SubscriptionModel.php',
@@ -2878,6 +2891,7 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
         'Piwik\\Plugins\\ScheduledReports\\tests\\Integration\\ReportEmailGeneratorTest' => __DIR__ . '/../..' . '/plugins/ScheduledReports/tests/Integration/ReportEmailGeneratorTest.php',
         'Piwik\\Plugins\\ScheduledReports\\tests\\Integration\\ReportEmailGenerator\\AttachedFileReportEmailGeneratorTest' => __DIR__ . '/../..' . '/plugins/ScheduledReports/tests/Integration/ReportEmailGenerator/AttachedFileReportEmailGeneratorTest.php',
         'Piwik\\Plugins\\ScheduledReports\\tests\\Integration\\ReportEmailGenerator\\HtmlReportEmailGeneratorTest' => __DIR__ . '/../..' . '/plugins/ScheduledReports/tests/Integration/ReportEmailGenerator/HtmlReportEmailGeneratorTest.php',
+        'Piwik\\Plugins\\ScheduledReports\\tests\\Integration\\ReportScheduleTest' => __DIR__ . '/../..' . '/plugins/ScheduledReports/tests/Integration/ReportScheduleTest.php',
         'Piwik\\Plugins\\ScheduledReports\\tests\\Integration\\SchedulingDispatchTest' => __DIR__ . '/../..' . '/plugins/ScheduledReports/tests/Integration/SchedulingDispatchTest.php',
         'Piwik\\Plugins\\ScheduledReports\\tests\\Integration\\WidgetReportMapperTest' => __DIR__ . '/../..' . '/plugins/ScheduledReports/tests/Integration/WidgetReportMapperTest.php',
         'Piwik\\Plugins\\SegmentEditor\\API' => __DIR__ . '/../..' . '/plugins/SegmentEditor/API.php',
@@ -4514,10 +4528,10 @@ class ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90::$prefixDirsPsr4;
-            $loader->prefixesPsr0 = ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90::$prefixesPsr0;
-            $loader->classMap = ComposerStaticInitaf8e842d49ff6d4bd3a16a4c5114ab90::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit92fe453c45dcfeaaf23311d4f1a0b999::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit92fe453c45dcfeaaf23311d4f1a0b999::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInit92fe453c45dcfeaaf23311d4f1a0b999::$prefixesPsr0;
+            $loader->classMap = ComposerStaticInit92fe453c45dcfeaaf23311d4f1a0b999::$classMap;
 
         }, null, ClassLoader::class);
     }
